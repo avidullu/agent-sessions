@@ -7,6 +7,7 @@ PROJECT DOC TEMPLATE — copy this file to docs/<YOUR_PLAN>.md and fill it in.
 > **Status:** `IN PROGRESS` · **Owner:** `Agent` · **Created:** `2026-07-06` · **Last updated:** `2026-07-06`
 > **Lifecycle:** `DRAFT → IN PROGRESS → DONE → archived`
 > **Tracking anchors:** §7 progress tracker is the source of truth.
+> **PR:** [#12](https://github.com/avidullu/agent-sessions/pull/12) — awaiting review comments
 
 ---
 
@@ -71,23 +72,23 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated.
 
 | ID | Deliverable | Depends on | Gated? | Status | Notes |
 |----|-------------|-----------|--------|--------|-------|
-| T0 | Set up pytest infrastructure (conftest, pyproject.toml) | — | No | ☐ | |
-| T1 | `test_models.py` | T0 | No | ☐ | 3 dataclasses, ~21 lines |
-| T2 | `test_utils.py` | T0 | No | ☐ | 5 pure functions, ~52 lines |
-| T3 | `test_config.py` | T0 | No | ☐ | config loading + repo_path, ~46 lines |
-| T4 | `test_path_templates.py` | T0 | No | ☐ | PathTemplateContext + WSL helpers, ~77 lines |
-| T5 | `test_render.py` | T0 | No | ☐ | markdown_for_session, write_pdf, ~91 lines |
-| T6 | `test_registry.py` | T0 | No | ☐ | register/get_extractor/known_kinds, ~18 lines |
-| T7 | `test_claude_extractor.py` | T0 | No | ☐ | claude JSONL extract, ~26 lines |
-| T8 | `test_codex_extractor.py` | T0 | No | ☐ | codex JSONL extract, ~29 lines |
-| T9 | `test_deepseek_extractor.py` | T0 | No | ☐ | deepseek text extract, ~11 lines |
-| T10 | `test_gemini_extractor.py` | T0 | No | ☐ | gemini JSONL extract, ~19 lines |
-| T11 | `test_grok_extractor.py` | T0 | No | ☐ | grok JSONL extract, ~18 lines |
-| T12 | `test_archive.py` | T0 | No | ☐ | archive core logic, ~255 lines |
-| T13 | `test_baseline.py` | T0 | No | ☐ | baseline scaffold/suggest/calibrate, ~692 lines |
-| T14 | `test_baseline_agent.py` | T0 | No | ☐ | evidence bundles, ~142 lines |
-| T15 | `test_cli.py` | T0 | No | ☐ | CLI parsing + dispatch, ~126 lines |
-| T16 | Run `pytest --cov` and verify >80% overall | T1–T15 | No | ☐ | |
+| T0 | Set up pytest infrastructure (conftest, pyproject.toml) | — | No | ☑ | |
+| T1 | `test_models.py` | T0 | No | ☑ | 7 tests, 100% coverage |
+| T2 | `test_utils.py` | T0 | No | ☑ | 29 tests, 100% coverage |
+| T3 | `test_config.py` | T0 | No | ☑ | 8 tests, 100% coverage |
+| T4 | `test_path_templates.py` | T0 | No | ☑ | 18 tests, 100% coverage |
+| T5 | `test_render.py` | T0 | No | ☑ | 12 tests, 46% coverage (write_pdf partial) |
+| T6 | `test_registry.py` | T0 | No | ☑ | 6 tests, 100% coverage |
+| T7 | `test_claude_extractor.py` | T0 | No | ☑ | 7 tests, 100% coverage |
+| T8 | `test_codex_extractor.py` | T0 | No | ☑ | 9 tests, 100% coverage |
+| T9 | `test_deepseek_extractor.py` | T0 | No | ☑ | 4 tests, 100% coverage |
+| T10 | `test_gemini_extractor.py` | T0 | No | ☑ | 7 tests, 100% coverage |
+| T11 | `test_grok_extractor.py` | T0 | No | ☑ | 5 tests, 100% coverage |
+| T12 | `test_archive.py` | T0 | No | ☐ | ~255 lines — next priority |
+| T13 | `test_baseline.py` | T0 | No | ☐ | ~692 lines — largest module |
+| T14 | `test_baseline_agent.py` | T0 | No | ☐ | ~142 lines |
+| T15 | `test_cli.py` | T0 | No | ☐ | ~126 lines |
+| T16 | Run `pytest --cov` and verify >80% overall | T1–T15 | No | ☐ | Currently 30% |
 
 ## 8. Open questions
 

@@ -50,9 +50,7 @@ class TestMarkdownForSession:
         session_file = tmp_path / "session.jsonl"
         session_file.write_text("dummy", encoding="utf-8")
         session = ExtractedSession(metadata={}, messages=[])
-        md = markdown_for_session(
-            source, session_file, session, digest="abc"
-        )
+        md = markdown_for_session(source, session_file, session, digest="abc")
 
         # Should use path stem as fallback
         assert "test / session" in md
@@ -158,12 +156,14 @@ class TestWritePdf:
 
     def test_writes_pdf_when_reportlab_available(self, tmp_path: Path) -> None:
         """Integration-style test that actually writes a PDF if reportlab is installed."""
-        try:
-            from reportlab.lib.pagesizes import letter
-            from reportlab.pdfgen import canvas  # noqa: F401
-        except ImportError:
-            import pytest
+        import pytest
 
+        try:
+            from importlib.util import find_spec
+
+            if not find_spec("reportlab"):
+                pytest.skip("reportlab not installed")
+        except ImportError:
             pytest.skip("reportlab not installed")
 
         out_path = tmp_path / "test.pdf"
@@ -173,11 +173,14 @@ class TestWritePdf:
         assert out_path.stat().st_size > 0
 
     def test_pdf_handles_multiple_headings(self, tmp_path: Path) -> None:
-        try:
-            from reportlab.pdfgen import canvas  # noqa: F401
-        except ImportError:
-            import pytest
+        import pytest
 
+        try:
+            from importlib.util import find_spec
+
+            if not find_spec("reportlab"):
+                pytest.skip("reportlab not installed")
+        except ImportError:
             pytest.skip("reportlab not installed")
 
         out_path = tmp_path / "test.pdf"

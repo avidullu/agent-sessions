@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_sessions.models import ExtractedSession, SessionMessage
+from agent_sessions.models import ExtractedSession
 from agent_sessions.sources.registry import get_extractor, known_kinds, register
 
 
