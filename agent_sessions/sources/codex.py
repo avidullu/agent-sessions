@@ -15,7 +15,8 @@ def extract(path: Path) -> ExtractedSession:
     metadata: dict[str, Any] = {"session_id": session_id_from_name(path)}
     messages: list[SessionMessage] = []
     for obj in jsonl_objects(path):
-        payload = obj.get("payload") if isinstance(obj.get("payload"), dict) else {}
+        payload_raw = obj.get("payload")
+        payload: dict[str, Any] = payload_raw if isinstance(payload_raw, dict) else {}
         if obj.get("type") == "session_meta":
             metadata.update(
                 {
