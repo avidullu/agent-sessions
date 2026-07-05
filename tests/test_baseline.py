@@ -39,6 +39,8 @@ from agent_sessions.baseline import (
     scan_text_signals,
     signal_confidence,
     signal_evidence,
+    tracked_project_doc_confidence,
+    tracked_project_doc_evidence,
     upsert_ledger,
     write_prediction_artifacts,
 )
@@ -449,9 +451,21 @@ class TestBaselineSuggest:
         assert result == 0
 
 
+def _baseline_settings(repo_root: Path) -> BaselineSettings:
+    return BaselineSettings(
+        root=repo_root / "baseline",
+        candidates_dir=repo_root / "baseline" / "candidates",
+        metacognition_dir=repo_root / "baseline" / "metacognition",
+        ledger_path=repo_root / "baseline" / "metacognition" / "ledger.jsonl",
+        feedback_example=repo_root / "baseline" / "calibration" / "feedback.example.toml",
+        pilots=(),
+    )
+
+
 class TestBuildPredictions:
-    def test_returns_predictions(self) -> None:
+    def test_returns_predictions(self, repo_root: Path) -> None:
         predictions = build_predictions(
+            settings=_baseline_settings(repo_root),
             source_counts=Counter({"claude": 5, "codex": 3}),
             kind_counts=Counter({"claude": 5, "codex": 3}),
             project_hits=Counter({"test": 2}),
@@ -464,6 +478,23 @@ class TestBuildPredictions:
             assert isinstance(pred, Prediction)
             assert pred.id
             assert pred.title
+
+    def test_includes_tracked_project_docs_prediction(self, repo_root: Path) -> None:
+        predictions = build_predictions(
+            settings=_baseline_settings(repo_root),
+            source_counts=Counter({"claude": 1}),
+            kind_counts=Counter({"claude": 1}),
+            project_hits=Counter(),
+            text_signals={
+                "tracked-project-docs": [
+                    TextSignal(source="s", markdown="archive/s.md", count=12)
+                ]
+            },
+        )
+        tracked = next(p for p in predictions if p.id == "guardrail.tracked-project-docs")
+        assert tracked.title == "Tracked Project Docs For Substantial Work"
+        assert tracked.confidence > 0.55
+        assert any("tracked-project-docs" in item for item in tracked.evidence)
 
 
 class TestRenderPrediction:
@@ -743,6 +774,52 @@ class TestBaselineCalibrate:
             baseline_calibrate(config, feedback=fake_feedback, dry_run=True)
 
 
+class TestTrackedProjectDocHelpers:
+    def test_confidence_boosted_by_calibration_anchor(self, repo_root: Path) -> None:
+        settings = _baseline_settings(repo_root)
+        signals = {
+            "tracked-project-docs": [TextSignal(source="s", markdown="m.md", count=5)]
+        }
+        base_conf = tracked_project_doc_confidence(signals, settings)
+
+        (repo_root / "config" / "baseline.toml").write_text(
+            '[baseline]\nroot = "baseline"\n'
+            'candidates_dir = "baseline/candidates"\n'
+            'metacognition_dir = "baseline/metacognition"\n'
+            'ledger_path = "baseline/metacognition/prediction-ledger.jsonl"\n'
+            'feedback_example = "baseline/calibration/feedback.example.toml"\n\n'
+            '[[calibration_anchors]]\n'
+            'kind = "tracked-project-doc"\n'
+            'archive_hits = 200\n',
+            encoding="utf-8",
+        )
+        boosted_conf = tracked_project_doc_confidence(signals, settings)
+        assert boosted_conf > base_conf
+
+    def test_evidence_includes_calibration_anchor(self, repo_root: Path) -> None:
+        settings = _baseline_settings(repo_root)
+        (repo_root / "config" / "baseline.toml").write_text(
+            '[baseline]\nroot = "baseline"\n'
+            'candidates_dir = "baseline/candidates"\n'
+            'metacognition_dir = "baseline/metacognition"\n'
+            'ledger_path = "baseline/metacognition/prediction-ledger.jsonl"\n'
+            'feedback_example = "baseline/calibration/feedback.example.toml"\n\n'
+            '[[calibration_anchors]]\n'
+            'kind = "tracked-project-doc"\n'
+            'source_repo = "badminton-highlight-indexer"\n'
+            'source_path = "docs/PROJECT_DOC_TEMPLATE.md"\n'
+            'archive_signal = "PROJECT_DOC_TEMPLATE"\n'
+            'archive_hits = 237\n',
+            encoding="utf-8",
+        )
+        signals = {
+            "tracked-project-docs": [TextSignal(source="s", markdown="m.md", count=5)]
+        }
+        evidence = tracked_project_doc_evidence(signals, settings)
+        assert any("Calibration anchor" in item for item in evidence)
+        assert any("badminton-highlight-indexer" in item for item in evidence)
+
+
 class TestScanTextSignals:
     def test_scans_with_mock(self, repo_root: Path) -> None:
         config = ArchiveConfig(
@@ -773,6 +850,32 @@ class TestScanTextSignals:
         assert any(len(signals) > 0 for signals in result.values()), (
             "Should find at least some keyword signals"
         )
+
+    def test_windows_backslash_markdown_path(self, repo_root: Path) -> None:
+        config = ArchiveConfig(
+            repo_root=repo_root,
+            archive_dir=repo_root / "archive",
+            raw_dir=repo_root / "raw",
+            sources=(),
+        )
+        md_dir = repo_root / "archive" / "test-src"
+        md_dir.mkdir(parents=True, exist_ok=True)
+        md_path = md_dir / "session.md"
+        md_path.write_text(
+            "Use pytest and ruff before opening a pull request.\n",
+            encoding="utf-8",
+        )
+
+        records = [
+            {
+                "source": "test-src",
+                "kind": "claude",
+                "markdown": "archive\\test-src\\session.md",
+            }
+        ]
+        result = scan_text_signals(config, records, max_sessions=1)
+        assert len(result["repo-governance"]) == 1
+        assert len(result["regression-frameworks"]) == 1
 
 
 class TestLoadFeedback:

@@ -11,6 +11,10 @@ locations where transcript-like files are discoverable.
 
 ## Next Steps / Open Threads
 
+- **Active tracked project:** `docs/BASELINE_LOOP_CLOSURE.md` (§7 closure tracker).
+- **Efficacy gates:** `docs/CALIBRATION_EFFICACY.md` and `baseline/calibration/efficacy.toml`.
+- Implement `baseline promote` (P1) and `baseline publish` (P2) per §7 table.
+- Promote top guardrails after reviewing `baseline/calibration/feedback.example.toml`.
 - Add a daily Codex automation for pull/export/PDF/commit/push once the desired
   schedule is chosen.
 - Keep hosted/cloud session imports as optional future work only; the current
@@ -40,8 +44,13 @@ locations where transcript-like files are discoverable.
 - `docs/ROADMAP.md`
 - `docs/ENGINEERING_BASELINE.md`
 - `docs/BASELINE_PLANNING.md`
+- `docs/README.md`
+- `docs/BASELINE_LOOP_CLOSURE.md`
+- `docs/CALIBRATION_EFFICACY.md`
+- `docs/PROJECT_DOC_TEMPLATE.md`
 - `docs/COMPOSE_STACK.md`
 - `docs/AUTOMATION.md`
+- `baseline/calibration/efficacy.toml`
 - `tools/agent_archive.py`
 - `agent_sessions/`
 - `baseline/`

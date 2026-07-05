@@ -1,0 +1,63 @@
+# Tool efficacy metrics for baseline loop closure.
+# Update status after each review: pending | pass | fail
+# See docs/CALIBRATION_EFFICACY.md
+
+[meta]
+project_doc = "docs/BASELINE_LOOP_CLOSURE.md"
+last_reviewed = "2026-07-05"
+reviewer = "unassigned"
+
+[[metrics]]
+id = "E1.detect.tracked-project-template"
+phase = "detect"
+status = "pass"
+target = "baseline suggest emits guardrail.tracked-project-docs"
+measure = "grep baseline/candidates/*.md or *.predictions.json for guardrail.tracked-project-docs"
+baseline = "237 archive sessions mention PROJECT_DOC_TEMPLATE; confidence 0.85 with calibration anchor"
+
+[[metrics]]
+id = "E2.anchor.template-source"
+phase = "anchor"
+status = "pass"
+target = "config/baseline.toml calibration_anchors lists badminton-highlight-indexer template"
+measure = "read config/baseline.toml [[calibration_anchors]]"
+baseline = "badminton-highlight-indexer/docs/PROJECT_DOC_TEMPLATE.md"
+
+[[metrics]]
+id = "E3.dogfood.tracked-project-doc"
+phase = "dogfood"
+status = "pass"
+target = "docs/BASELINE_LOOP_CLOSURE.md is a filled PROJECT_DOC_TEMPLATE instance"
+measure = "§7 table has P0-P9 rows; definition of done present"
+baseline = "docs/PROJECT_DOC_TEMPLATE.md mirrored from mothership repo"
+
+[[metrics]]
+id = "E4.promote.global-baseline"
+phase = "promote"
+status = "pending"
+target = "baseline/global/engineering-guardrails.md has promoted non-placeholder text"
+measure = "file content differs from scaffold placeholder"
+baseline = "0 promoted rules as of 2026-07-05"
+
+[[metrics]]
+id = "E5.publish.agent-slices"
+phase = "publish"
+status = "pending"
+target = "baseline/agents/claude/CLAUDE.generated.md exists with >=3 rules"
+measure = "file exists and line count > 20"
+baseline = "generated agent files not yet produced"
+
+[[metrics]]
+id = "E6.calibrate.feedback-loop"
+phase = "calibrate"
+status = "pending"
+target = "second baseline suggest reflects feedback.toml verdicts"
+measure = "compare confidence or presence of accepted/rejected IDs across runs"
+baseline = "calibrate summarizes only; suggest does not yet read ledger for adjustment"
+
+[closure]
+total_metrics = 6
+passed = 3
+pending = 3
+failed = 0
+gate = "E1-E6 pass AND BASELINE_LOOP_CLOSURE P9 checked"

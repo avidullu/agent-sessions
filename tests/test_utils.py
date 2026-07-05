@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from agent_sessions.utils import (
+    archive_markdown_path,
     jsonl_objects,
     now_utc,
     session_id_from_name,
@@ -184,6 +185,20 @@ class TestSessionIdFromName:
         path = Path("AA329F09-28B7-4ACC-B062-98EC7E905ABC-agent.jsonl")
         result = session_id_from_name(path)
         assert result == "AA329F09-28B7-4ACC-B062-98EC7E905ABC"
+
+
+class TestArchiveMarkdownPath:
+    def test_forward_slashes(self, repo_root: Path) -> None:
+        result = archive_markdown_path(repo_root, "archive/claude/session.md")
+        assert result == repo_root / "archive" / "claude" / "session.md"
+
+    def test_windows_backslashes(self, repo_root: Path) -> None:
+        result = archive_markdown_path(repo_root, "archive\\claude\\session.md")
+        assert result == repo_root / "archive" / "claude" / "session.md"
+
+    def test_mixed_separators(self, repo_root: Path) -> None:
+        result = archive_markdown_path(repo_root, "archive/claude\\session.md")
+        assert result == repo_root / "archive" / "claude" / "session.md"
 
 
 class TestSlugify:

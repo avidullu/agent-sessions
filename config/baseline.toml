@@ -18,6 +18,12 @@ aliases = ["muneem"]
 notes = "Newer project with useful agent/workflow upserts."
 
 [[pilots]]
+slug = "agent-sessions"
+kind = "repo"
+aliases = ["agent-sessions", "agent sessions"]
+notes = "Dogfood repo for baseline loop closure and efficacy calibration."
+
+[[pilots]]
 slug = "telegram"
 kind = "repo-family"
 aliases = ["telegram"]
@@ -50,3 +56,34 @@ applies_to = ["low-risk-facts", "formatting"]
 [approval_modes.observe-only]
 description = "Capture evidence and suggestions without publishing into agent-facing instructions."
 applies_to = ["uncertain-patterns", "conflicting-evidence"]
+
+# Ground-truth anchors for efficacy calibration (see docs/CALIBRATION_EFFICACY.md).
+[[calibration_anchors]]
+id = "standard-project-template"
+kind = "tracked-project-doc"
+source_repo = "badminton-highlight-indexer"
+source_path = "docs/PROJECT_DOC_TEMPLATE.md"
+local_mirror = "docs/PROJECT_DOC_TEMPLATE.md"
+archive_signal = "PROJECT_DOC_TEMPLATE"
+archive_hits = 237
+notes = "Mothership tracked-project-doc pattern; mirrored here for dogfooding and E2 gate."
+
+[[calibration_anchors]]
+id = "session-handoff-ramp-up"
+kind = "checkpointing"
+source_repo = "badminton-highlight-indexer"
+source_path = "SESSION_HANDOFF.md"
+local_mirror = "SESSION_HANDOFF.md"
+archive_signal = "session-handoff"
+archive_hits = 943
+notes = "Handoff + ramp-up kit pattern repeated across Claude/Codex/DeepSeek sessions."
+
+[[calibration_anchors]]
+id = "baseline-loop-closure-project"
+kind = "tracked-project"
+source_repo = "agent-sessions"
+source_path = "docs/BASELINE_LOOP_CLOSURE.md"
+local_mirror = "docs/BASELINE_LOOP_CLOSURE.md"
+archive_signal = "baseline loop"
+archive_hits = 0
+notes = "Dogfood project for closing promote/publish/calibrate loop; §7 is closure tracker."

@@ -9,6 +9,7 @@ from typing import Any
 
 from .baseline import load_baseline_settings, load_index_records
 from .config import ArchiveConfig
+from .utils import archive_markdown_path
 
 
 DEFAULT_OUTPUT_DIR = Path("baseline/evidence")
@@ -85,7 +86,7 @@ def select_records(records: list[dict[str, Any]], focus: list[str], max_sessions
 
 def evidence_record(config: ArchiveConfig, record: dict[str, Any], max_chars: int) -> dict[str, Any]:
     markdown = str(record.get("markdown", ""))
-    markdown_path = config.repo_root / markdown
+    markdown_path = archive_markdown_path(config.repo_root, markdown)
     excerpt = ""
     if markdown_path.exists():
         excerpt = markdown_path.read_text(encoding="utf-8", errors="replace")[:max_chars].rstrip()

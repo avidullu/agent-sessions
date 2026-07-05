@@ -1,6 +1,6 @@
 {
   "run_id": "2026-07-05-extraction",
-  "generated_at": "2026-07-05T18:23:40+00:00",
+  "generated_at": "2026-07-05T19:27:10+00:00",
   "candidate": "baseline/candidates/2026-07-05-extraction.md",
   "scanned_sessions": 500,
   "source_counts": {
@@ -128,6 +128,25 @@
         "archive/codex-windows/20260702-019f2174-3bdf-73b3-9285-a8db45326c90-rollout-2026-07-02t11-41-33-019f2174-3bdf-73.md (140 keyword hits)"
       ],
       "text": "Projects should maintain a short session handoff or start-here file so future agents can resume from real state instead of replaying old conversation."
+    },
+    {
+      "id": "guardrail.tracked-project-docs",
+      "title": "Tracked Project Docs For Substantial Work",
+      "scope": "global",
+      "risk": "medium",
+      "category": "docs",
+      "confidence": 0.99,
+      "status": "proposed",
+      "feedback": "none",
+      "evidence": [
+        "98 scanned sessions contain `tracked-project-docs` signals.",
+        "archive/claude-windows/20260703-accd47af-95a3-46a7-9b51-b3eb5066a777-accd47af-95a3-46a7-9b51-b3eb5066a777-19f6756.md (142 keyword hits)",
+        "archive/claude-windows/20260621-9f6357d8-0e35-491a-a830-052e094c7f37-9f6357d8-0e35-491a-a830-052e094c7f37-03bb544.md (123 keyword hits)",
+        "archive/claude-windows/20260621-f81fb2b5-e34b-427e-a8a1-a37eb4539a49-f81fb2b5-e34b-427e-a8a1-a37eb4539a49-d7088cf.md (122 keyword hits)",
+        "archive/claude-windows/20260703-7fce5410-4c57-4ec9-a054-be898bda22da-7fce5410-4c57-4ec9-a054-be898bda22da-bd42d4f.md (102 keyword hits)",
+        "Calibration anchor: `badminton-highlight-indexer/docs/PROJECT_DOC_TEMPLATE.md` (237 archive sessions mention `PROJECT_DOC_TEMPLATE`)"
+      ],
+      "text": "Substantial design or multi-PR project work should use a tracked project doc following `docs/PROJECT_DOC_TEMPLATE.md`: status header, decisions locked, §7 progress tracker with one small PR per row, definition of done, then archive on completion. Precedent: `badminton-highlight-indexer`."
     },
     {
       "id": "harness.predict-then-calibrate",
