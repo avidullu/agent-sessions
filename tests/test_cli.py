@@ -108,6 +108,18 @@ class TestBuildParser:
         assert args.baseline_cmd == "calibrate"
         assert args.feedback == Path("fb.toml")
 
+    def test_baseline_eval(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["baseline", "eval", "--dry-run"])
+        assert args.baseline_cmd == "eval"
+        assert args.dry_run is True
+
+    def test_baseline_suggest_no_calibration(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["baseline", "suggest", "--no-calibration", "--dry-run"])
+        assert args.baseline_cmd == "suggest"
+        assert args.no_calibration is True
+
     def test_baseline_publish(self) -> None:
         parser = build_parser()
         args = parser.parse_args(

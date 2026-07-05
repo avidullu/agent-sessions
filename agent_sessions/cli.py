@@ -51,6 +51,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum Markdown sessions to scan for text signals. Use 0 for all indexed sessions.",
     )
     p_baseline_suggest.add_argument("--feedback", type=Path, help="Optional calibration feedback TOML file.")
+    p_baseline_suggest.add_argument(
+        "--no-calibration",
+        action="store_true",
+        help="Skip ledger-aware calibration filtering and confidence adjustments.",
+    )
     p_baseline_suggest.add_argument("--dry-run", action="store_true")
 
     p_baseline_calibrate = baseline_sub.add_parser("calibrate", help="Summarize calibration feedback for predictions.")
@@ -80,6 +85,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Publish only selected agent targets. Default: all.",
     )
     p_baseline_publish.add_argument("--dry-run", action="store_true")
+
+    p_baseline_eval = baseline_sub.add_parser("eval", help="Evaluate baseline loop efficacy gates E1-E6.")
+    p_baseline_eval.add_argument("--output", type=Path, help="Evaluation report Markdown output path.")
+    p_baseline_eval.add_argument("--dry-run", action="store_true")
 
     p_baseline_bundle = baseline_sub.add_parser("bundle", help="Create a bounded evidence bundle for an AI agent.")
     p_baseline_bundle.add_argument("--output-dir", type=Path, help="Bundle output directory.")
@@ -142,6 +151,7 @@ def main(argv: list[str] | None = None) -> int:
                 max_sessions=args.max_sessions,
                 feedback=args.feedback,
                 dry_run=args.dry_run,
+                use_calibration=not args.no_calibration,
             )
         if args.baseline_cmd == "calibrate":
             from .baseline import baseline_calibrate
@@ -169,6 +179,10 @@ def main(argv: list[str] | None = None) -> int:
 
             publish_agents = tuple(args.publish_agents) if args.publish_agents else None
             return baseline_publish(config, dry_run=args.dry_run, agents=publish_agents)
+        if args.baseline_cmd == "eval":
+            from .baseline_eval import baseline_eval
+
+            return baseline_eval(config, output=args.output, dry_run=args.dry_run)
         if args.baseline_cmd == "bundle":
             from .baseline_agent import baseline_bundle
 

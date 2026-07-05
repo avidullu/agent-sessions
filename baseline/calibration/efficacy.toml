@@ -50,14 +50,14 @@ baseline = "codex/claude/vscode generated slices from 4 promoted guardrails"
 [[metrics]]
 id = "E6.calibrate.feedback-loop"
 phase = "calibrate"
-status = "pending"
+status = "pass"
 target = "second baseline suggest reflects feedback.toml verdicts"
-measure = "compare confidence or presence of accepted/rejected IDs across runs"
-baseline = "calibrate summarizes only; suggest does not yet read ledger for adjustment"
+measure = "baseline eval E6 + suggest suppresses rejected ids with calibration enabled"
+baseline = "apply_calibration_loop suppresses rejects and adjusts confidence from ledger"
 
 [closure]
 total_metrics = 6
-passed = 5
-pending = 1
+passed = 6
+pending = 0
 failed = 0
 gate = "E1-E6 pass AND BASELINE_LOOP_CLOSURE P9 checked"

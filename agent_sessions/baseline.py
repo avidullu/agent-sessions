@@ -116,6 +116,7 @@ def baseline_suggest(
     max_sessions: int = 500,
     feedback: Path | None = None,
     dry_run: bool = False,
+    use_calibration: bool = True,
 ) -> int:
     settings = load_baseline_settings(config)
     index_records = load_index_records(config)
@@ -132,6 +133,14 @@ def baseline_suggest(
         text_signals=text_signals,
     )
     predictions = [apply_feedback(prediction, feedback_map) for prediction in predictions]
+    if use_calibration:
+        from .baseline_calibration import apply_calibration_loop, load_ledger_entries
+
+        predictions = apply_calibration_loop(
+            predictions,
+            feedback_map,
+            load_ledger_entries(settings.ledger_path),
+        )
     markdown = render_candidate_report(
         settings=settings,
         index_records=index_records,
