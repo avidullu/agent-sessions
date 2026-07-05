@@ -1,6 +1,8 @@
 [baseline]
 root = "baseline"
 candidates_dir = "baseline/candidates"
+metacognition_dir = "baseline/metacognition"
+ledger_path = "baseline/metacognition/prediction-ledger.jsonl"
 feedback_example = "baseline/calibration/feedback.example.toml"
 
 [[pilots]]

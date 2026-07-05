@@ -30,6 +30,8 @@ class Pilot:
 class BaselineSettings:
     root: Path
     candidates_dir: Path
+    metacognition_dir: Path
+    ledger_path: Path
     feedback_example: Path
     pilots: tuple[Pilot, ...]
 
@@ -139,6 +141,41 @@ def baseline_suggest(
         return 0
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(markdown, encoding="utf-8", newline="\n")
+    if is_relative_to(target, settings.candidates_dir):
+        write_prediction_artifacts(
+            settings=settings,
+            candidate_path=target,
+            predictions=predictions,
+            source_counts=source_counts,
+            kind_counts=kind_counts,
+            project_hits=project_hits,
+            scanned_sessions=len(index_records) if max_sessions == 0 else min(max_sessions, len(index_records)),
+        )
+    print(f"Wrote {target}")
+    return 0
+
+
+def baseline_calibrate(
+    config: ArchiveConfig,
+    feedback: Path,
+    predictions: Path | None = None,
+    output: Path | None = None,
+    dry_run: bool = False,
+) -> int:
+    settings = load_baseline_settings(config)
+    feedback_map = load_feedback(config, feedback)
+    prediction_path = resolve_prediction_sidecar(settings, predictions)
+    prediction_data = json.loads(prediction_path.read_text(encoding="utf-8"))
+    summary = render_calibration_summary(prediction_data, feedback_map, feedback, prediction_path)
+    target = output or settings.metacognition_dir / "calibration-summary.md"
+    if not target.is_absolute():
+        target = config.repo_root / target
+    if dry_run:
+        print(summary)
+        print(f"Would write {target}")
+        return 0
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(summary, encoding="utf-8", newline="\n")
     print(f"Wrote {target}")
     return 0
 
@@ -149,6 +186,11 @@ def load_baseline_settings(config: ArchiveConfig) -> BaselineSettings:
     baseline = data.get("baseline", {})
     root = repo_path(config.repo_root, baseline.get("root", str(BASELINE_ROOT)))
     candidates_dir = repo_path(config.repo_root, baseline.get("candidates_dir", str(BASELINE_ROOT / "candidates")))
+    metacognition_dir = repo_path(config.repo_root, baseline.get("metacognition_dir", str(BASELINE_ROOT / "metacognition")))
+    ledger_path = repo_path(
+        config.repo_root,
+        baseline.get("ledger_path", str(BASELINE_ROOT / "metacognition" / "prediction-ledger.jsonl")),
+    )
     feedback_example = repo_path(
         config.repo_root,
         baseline.get("feedback_example", str(BASELINE_ROOT / "calibration" / "feedback.example.toml")),
@@ -162,7 +204,14 @@ def load_baseline_settings(config: ArchiveConfig) -> BaselineSettings:
         )
         for item in data.get("pilots", [])
     )
-    return BaselineSettings(root=root, candidates_dir=candidates_dir, feedback_example=feedback_example, pilots=pilots)
+    return BaselineSettings(
+        root=root,
+        candidates_dir=candidates_dir,
+        metacognition_dir=metacognition_dir,
+        ledger_path=ledger_path,
+        feedback_example=feedback_example,
+        pilots=pilots,
+    )
 
 
 def baseline_files(settings: BaselineSettings) -> dict[Path, str]:
@@ -176,6 +225,7 @@ def baseline_files(settings: BaselineSettings) -> dict[Path, str]:
         settings.root / "agents" / "codex" / "README.md": agent_readme("Codex", "AGENTS.generated.md"),
         settings.root / "agents" / "claude" / "README.md": agent_readme("Claude", "CLAUDE.generated.md"),
         settings.root / "agents" / "vscode" / "README.md": agent_readme("VS Code", "copilot-instructions.generated.md"),
+        settings.metacognition_dir / "README.md": metacognition_readme(),
         settings.feedback_example: feedback_example(),
     }
     for pilot in settings.pilots:
@@ -237,6 +287,15 @@ note = "Example of a rejected hypothesis."
 """
 
 
+def metacognition_readme() -> str:
+    return """# Metacognition
+
+This folder holds machine-readable prediction history and calibration summaries.
+The loop is: generate predictions from local evidence, collect feedback, compare
+error, and make the next candidate report sharper.
+"""
+
+
 def load_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
     index_path = config.archive_dir / "index.jsonl"
     if not index_path.exists():
@@ -282,6 +341,154 @@ def apply_feedback(prediction: Prediction, feedback_map: dict[str, dict[str, str
         prediction.confidence = max(0.01, prediction.confidence - 0.08)
     prediction.feedback = f"{verdict}: {note}" if note else verdict or "present"
     return prediction
+
+
+def write_prediction_artifacts(
+    settings: BaselineSettings,
+    candidate_path: Path,
+    predictions: list[Prediction],
+    source_counts: Counter[str],
+    kind_counts: Counter[str],
+    project_hits: Counter[str],
+    scanned_sessions: int,
+) -> None:
+    run_id = candidate_path.stem
+    payload = {
+        "run_id": run_id,
+        "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+        "candidate": str(candidate_path.relative_to(settings.root.parent)).replace("\\", "/"),
+        "scanned_sessions": scanned_sessions,
+        "source_counts": dict(source_counts),
+        "kind_counts": dict(kind_counts),
+        "project_hits": dict(project_hits),
+        "predictions": [prediction_to_dict(prediction) for prediction in predictions],
+    }
+    sidecar = candidate_path.with_suffix(".predictions.json")
+    sidecar.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+    upsert_ledger(settings.ledger_path, run_id, payload["predictions"])
+
+
+def prediction_to_dict(prediction: Prediction) -> dict[str, Any]:
+    return {
+        "id": prediction.id,
+        "title": prediction.title,
+        "scope": prediction.scope,
+        "risk": prediction.risk,
+        "category": prediction.category,
+        "confidence": round(prediction.confidence, 4),
+        "status": prediction.status,
+        "feedback": prediction.feedback,
+        "evidence": prediction.evidence,
+        "text": prediction.text,
+    }
+
+
+def upsert_ledger(ledger_path: Path, run_id: str, predictions: list[dict[str, Any]]) -> None:
+    existing: list[dict[str, Any]] = []
+    if ledger_path.exists():
+        with ledger_path.open("r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                record = json.loads(line)
+                if record.get("run_id") != run_id:
+                    existing.append(record)
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    with ledger_path.open("w", encoding="utf-8", newline="\n") as f:
+        for record in existing:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        recorded_at = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+        for prediction in predictions:
+            record = {"run_id": run_id, "recorded_at": recorded_at, **prediction}
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def resolve_prediction_sidecar(settings: BaselineSettings, predictions: Path | None) -> Path:
+    if predictions is not None:
+        if not predictions.is_absolute():
+            predictions = settings.root.parent / predictions
+        if not predictions.exists():
+            raise SystemExit(f"Prediction sidecar does not exist: {predictions}")
+        return predictions
+    sidecars = sorted(settings.candidates_dir.glob("*.predictions.json"), key=lambda path: path.stat().st_mtime)
+    if not sidecars:
+        raise SystemExit("No prediction sidecar found. Run `baseline suggest` first.")
+    return sidecars[-1]
+
+
+def render_calibration_summary(
+    prediction_data: dict[str, Any],
+    feedback_map: dict[str, dict[str, str]],
+    feedback_path: Path,
+    prediction_path: Path,
+) -> str:
+    predictions = prediction_data.get("predictions", [])
+    accepted: list[str] = []
+    edited: list[str] = []
+    rejected: list[str] = []
+    missing: list[str] = []
+    for prediction in predictions:
+        prediction_id = prediction.get("id", "")
+        feedback = feedback_map.get(prediction_id)
+        if not feedback:
+            missing.append(prediction_id)
+            continue
+        verdict = str(feedback.get("verdict", "")).strip().lower()
+        if verdict == "accept":
+            accepted.append(prediction_id)
+        elif verdict == "edit":
+            edited.append(prediction_id)
+        elif verdict == "reject":
+            rejected.append(prediction_id)
+    lines = [
+        f"# Calibration Summary ({dt.date.today().isoformat()})",
+        "",
+        f"- Prediction run: `{prediction_data.get('run_id', prediction_path.stem)}`",
+        f"- Prediction sidecar: `{prediction_path}`",
+        f"- Feedback file: `{feedback_path}`",
+        f"- Predictions reviewed: `{len(predictions)}`",
+        f"- Accepted: `{len(accepted)}`",
+        f"- Edited: `{len(edited)}`",
+        f"- Rejected: `{len(rejected)}`",
+        f"- Awaiting feedback: `{len(missing)}`",
+        "",
+        "## Accepted",
+        "",
+        *render_id_list(accepted),
+        "",
+        "## Edit Requested",
+        "",
+        *render_id_list(edited),
+        "",
+        "## Rejected",
+        "",
+        *render_id_list(rejected),
+        "",
+        "## Awaiting Feedback",
+        "",
+        *render_id_list(missing),
+        "",
+        "## Next Correction",
+        "",
+        "Use accepted predictions as stronger priors, rewrite edited predictions before promotion, and suppress",
+        "or reframe rejected predictions in the next candidate report.",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def render_id_list(values: list[str]) -> list[str]:
+    if not values:
+        return ["- None"]
+    return [f"- `{value}`" for value in values]
+
+
+def is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+    except ValueError:
+        return False
+    return True
 
 
 def project_signal_counts(settings: BaselineSettings, records: list[dict[str, Any]]) -> Counter[str]:
