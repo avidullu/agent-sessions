@@ -1,15 +1,16 @@
 # Agent Session Discovery
 
-Generated: `2026-07-05T16:46:24+00:00`
+Generated: `2026-07-05T17:20:21+00:00`
 
 ## codex-windows
 
 - Kind: `codex`
 - Glob: `**/*.jsonl`
+- Description: Codex local and archived JSONL sessions on Windows.
 - Root: `C:\Users\avidu\.codex\sessions` (exists)
 - Root: `C:\Users\avidu\.codex\archived_sessions` (exists)
 - Matching files: `52`
-- Matching bytes: `101855946`
+- Matching bytes: `102648232`
 
   - `C:\Users\avidu\.codex\sessions\2026\07\02\rollout-2026-07-02T11-41-32-019f2174-38b2-7d92-bff9-9b57ab7306e6.jsonl` (239346 bytes)
   - `C:\Users\avidu\.codex\sessions\2026\07\02\rollout-2026-07-02T11-41-32-019f2174-38b3-7260-a032-587c94d92d34.jsonl` (234035 bytes)
@@ -22,6 +23,7 @@ Generated: `2026-07-05T16:46:24+00:00`
 
 - Kind: `claude`
 - Glob: `**/*.jsonl`
+- Description: Claude Code project JSONL sessions on Windows.
 - Root: `C:\Users\avidu\.claude\projects` (exists)
 - Matching files: `2222`
 - Matching bytes: `653294856`
@@ -37,6 +39,7 @@ Generated: `2026-07-05T16:46:24+00:00`
 
 - Kind: `claude`
 - Glob: `**/*.jsonl`
+- Description: Claude Code project JSONL sessions in the default WSL distribution.
 - Root: `\\wsl.localhost\Ubuntu\home\avidullu\.claude\projects` (exists)
 - Matching files: `19`
 - Matching bytes: `8222786`
@@ -52,6 +55,7 @@ Generated: `2026-07-05T16:46:24+00:00`
 
 - Kind: `gemini_antigravity`
 - Glob: `**/transcript*.jsonl`
+- Description: Gemini Antigravity transcript JSONL files on Windows.
 - Root: `C:\Users\avidu\.gemini\antigravity\brain` (exists)
 - Matching files: `3`
 - Matching bytes: `581048`
@@ -64,6 +68,7 @@ Generated: `2026-07-05T16:46:24+00:00`
 
 - Kind: `grok`
 - Glob: `**/chat_history.jsonl`
+- Description: Grok chat history files in the default WSL distribution.
 - Root: `\\wsl.localhost\Ubuntu\home\avidullu\.grok\sessions` (exists)
 - Matching files: `13`
 - Matching bytes: `7558228`
@@ -79,6 +84,7 @@ Generated: `2026-07-05T16:46:24+00:00`
 
 - Kind: `deepseek_request_dump`
 - Glob: `**/*.msg*.txt`
+- Description: DeepSeek V4 VS Code request dump prompts on Windows.
 - Root: `C:\Users\avidu\AppData\Roaming\Code\User\globalStorage\vizards.deepseek-v4-for-copilot\request-dumps` (exists)
 - Matching files: `752`
 - Matching bytes: `29243762`
@@ -94,6 +100,7 @@ Generated: `2026-07-05T16:46:24+00:00`
 
 - Kind: `deepseek_request_dump`
 - Glob: `**/*.msg*.txt`
+- Description: DeepSeek V4 VS Code request dump prompts in WSL VS Code Server.
 - Root: `\\wsl.localhost\Ubuntu\home\avidullu\.vscode-server\data\User\globalStorage\vizards.deepseek-v4-for-copilot\request-dumps` (exists)
 - Matching files: `53`
 - Matching bytes: `1824054`
@@ -109,6 +116,7 @@ Generated: `2026-07-05T16:46:24+00:00`
 
 - Kind: `inventory`
 - Glob: `**/*`
+- Description: VS Code Copilot Chat storage inventory. Exporter intentionally skips inventory-only sources.
 - Root: `C:\Users\avidu\AppData\Roaming\Code\User\globalStorage\github.copilot-chat` (exists)
 - Matching files: `14`
 - Matching bytes: `44315065`
@@ -124,6 +132,7 @@ Generated: `2026-07-05T16:46:24+00:00`
 
 - Kind: `inventory`
 - Glob: `**/*`
+- Description: WSL VS Code Server Copilot Chat storage inventory. Exporter intentionally skips inventory-only sources.
 - Root: `\\wsl.localhost\Ubuntu\home\avidullu\.vscode-server\data\User\globalStorage\github.copilot-chat` (exists)
 - Matching files: `12`
 - Matching bytes: `37619929`
@@ -139,6 +148,7 @@ Generated: `2026-07-05T16:46:24+00:00`
 
 - Kind: `inventory`
 - Glob: `**/*`
+- Description: ZAI VS Code extension inventory. Exporter intentionally skips inventory-only sources.
 - Root: `\\wsl.localhost\Ubuntu\home\avidullu\.vscode-server\extensions\ltmoerdani.zai-copilot-chat-0.3.1` (exists)
 - Matching files: `73`
 - Matching bytes: `556820`

@@ -9,15 +9,18 @@ contents, or tool outputs.
 
 ## Current Importers
 
-- Codex Windows: `~/.codex/sessions` and `~/.codex/archived_sessions`
-- Claude Code Windows: `~/.claude/projects`
-- Gemini Antigravity Windows: `~/.gemini/antigravity/**/transcript*.jsonl`
-- Grok WSL Ubuntu: `~/.grok/sessions/**/chat_history.jsonl`
+- Codex Windows: local and archived JSONL sessions
+- Claude Code Windows/WSL: project JSONL sessions
+- Gemini Antigravity Windows: transcript JSONL files
+- Grok WSL: `chat_history.jsonl` files
 - DeepSeek V4 VS Code extension: request dump prompts from VS Code globalStorage
 
 VS Code Copilot Chat and Z.AI/ZAI locations are discovered and documented, but
 the first exporter treats them as source inventory unless transcript files are
 present in known locations.
+
+Default sources live in `config/default_sources.toml`. Copy
+`sources.example.toml` to `sources.toml` for local machine overrides.
 
 ## Quick Start
 
@@ -42,6 +45,13 @@ python .\tools\agent_archive.py export --all --copy-raw
 Raw files land under `raw/`, which is ignored by Git unless you intentionally
 force-add it.
 
+## Adding Agents
+
+1. Add a source entry in `config/default_sources.toml` or local `sources.toml`.
+2. Add an extractor module under `agent_sessions/sources/`.
+3. Register it with `@register("<kind>")`.
+4. Run a dry export with `--source <kind> --limit 1 --dry-run`.
+
 ## Other Machines
 
 Clone this private repo on another machine, run the same discovery/export
@@ -55,3 +65,6 @@ local `sources.toml` is ignored by Git.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for optional future importers and archive
 automation ideas.
+
+The engineering-baseline idea is sketched in
+[docs/ENGINEERING_BASELINE.md](docs/ENGINEERING_BASELINE.md).

@@ -12,3 +12,5 @@ owned CPU/RAM and local disks, including Windows and WSL paths.
   extension hooks over UI scraping.
 - VS Code chat export inbox for any manually exported JSON or Markdown session
   files from machines that expose an official export command.
+- Engineering baseline extraction that turns repeated session lessons into
+  reviewable guardrails and agent-specific instruction files.
