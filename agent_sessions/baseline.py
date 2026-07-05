@@ -83,6 +83,15 @@ KEYWORD_GROUPS = {
     "docs-freshness": ("handoff", "readme", "roadmap", "docs", "documentation", "runbook"),
     "checkpointing": ("resume", "checkpoint", "session handoff", "start here", "ramp-up"),
     "metacognition": ("pattern", "memory", "baseline", "salient", "guardrail", "calibrate", "prediction"),
+    "tracked-project-docs": (
+        "project_doc_template",
+        "tracked project doc",
+        "progress tracker",
+        "definition of done",
+        "decisions locked",
+        "one small pr per row",
+        "§7",
+    ),
 }
 
 
@@ -115,6 +124,7 @@ def baseline_suggest(
     project_hits = project_signal_counts(settings, index_records)
     text_signals = scan_text_signals(config, index_records, max_sessions=max_sessions)
     predictions = build_predictions(
+        settings=settings,
         source_counts=source_counts,
         kind_counts=kind_counts,
         project_hits=project_hits,
@@ -542,6 +552,7 @@ def keyword_hits(text: str, keywords: tuple[str, ...]) -> int:
 
 
 def build_predictions(
+    settings: BaselineSettings,
     source_counts: Counter[str],
     kind_counts: Counter[str],
     project_hits: Counter[str],
@@ -641,6 +652,21 @@ def build_predictions(
             ),
         ),
         Prediction(
+            id="guardrail.tracked-project-docs",
+            title="Tracked Project Docs For Substantial Work",
+            scope="global",
+            risk="medium",
+            category="docs",
+            confidence=tracked_project_doc_confidence(text_signals, settings),
+            status="proposed",
+            evidence=tracked_project_doc_evidence(text_signals, settings),
+            text=(
+                "Substantial design or multi-PR project work should use a tracked project doc following "
+                "`docs/PROJECT_DOC_TEMPLATE.md`: status header, decisions locked, §7 progress tracker with one small "
+                "PR per row, definition of done, then archive on completion. Precedent: `badminton-highlight-indexer`."
+            ),
+        ),
+        Prediction(
             id="harness.predict-then-calibrate",
             title="Predict Then Calibrate",
             scope="global",
@@ -681,6 +707,40 @@ def signal_evidence(text_signals: dict[str, list[TextSignal]], group: str) -> li
     for signal in signals[:4]:
         markdown = signal.markdown.replace("\\", "/")
         evidence.append(f"{markdown} ({signal.count} keyword hits)")
+    return evidence
+
+
+def tracked_project_doc_confidence(
+    text_signals: dict[str, list[TextSignal]],
+    settings: BaselineSettings,
+) -> float:
+    conf = signal_confidence(text_signals, "tracked-project-docs", base=0.55)
+    path = settings.root.parent / BASELINE_CONFIG
+    data = read_toml(path) if path.exists() else {}
+    for anchor in data.get("calibration_anchors", []):
+        if anchor.get("kind") != "tracked-project-doc":
+            continue
+        hits = int(anchor.get("archive_hits") or 0)
+        if hits:
+            conf = confidence(conf + min(hits, 500) / 800)
+    return conf
+
+
+def tracked_project_doc_evidence(
+    text_signals: dict[str, list[TextSignal]],
+    settings: BaselineSettings,
+) -> list[str]:
+    evidence = signal_evidence(text_signals, "tracked-project-docs")
+    path = settings.root.parent / BASELINE_CONFIG
+    data = read_toml(path) if path.exists() else {}
+    for anchor in data.get("calibration_anchors", []):
+        if anchor.get("kind") != "tracked-project-doc":
+            continue
+        repo = anchor.get("source_repo", "unknown")
+        path = anchor.get("source_path", "")
+        hits = anchor.get("archive_hits")
+        hit_note = f"{hits} archive sessions mention `{anchor.get('archive_signal', '')}`" if hits else ""
+        evidence.append(f"Calibration anchor: `{repo}/{path}` ({hit_note})".strip())
     return evidence
 
 

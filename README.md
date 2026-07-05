@@ -52,6 +52,13 @@ force-add it.
 3. Register it with `@register("<kind>")`.
 4. Run a dry export with `--source <kind> --limit 1 --dry-run`.
 
+## Baseline Loop Closure (Active Project)
+
+Iteration is tracked in [docs/BASELINE_LOOP_CLOSURE.md](docs/BASELINE_LOOP_CLOSURE.md)
+using the standard [PROJECT_DOC_TEMPLATE](docs/PROJECT_DOC_TEMPLATE.md) pattern
+(identified from `badminton-highlight-indexer` archive evidence). Efficacy gates:
+[docs/CALIBRATION_EFFICACY.md](docs/CALIBRATION_EFFICACY.md).
+
 ## Engineering Baseline
 
 Create or refresh the baseline scaffold:
