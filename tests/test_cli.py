@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import patch
 
@@ -141,7 +142,7 @@ class TestBuildParser:
 
 class TestMain:
     @pytest.fixture(autouse=True)
-    def _patch_repo_root(self, repo_root: Path) -> None:
+    def _patch_repo_root(self, repo_root: Path) -> Generator[None, None, None]:
         """Patch REPO_ROOT to use test directory."""
         self._repo_root = repo_root
         with patch("agent_sessions.cli.REPO_ROOT", repo_root):

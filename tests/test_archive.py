@@ -477,6 +477,7 @@ class TestUtilityFunctions:
         )
         path = repo_root / "archive" / "file.md"
         result = as_repo_relative(config, path)
+        assert result is not None
         assert result.replace("\\", "/") == "archive/file.md"
 
     def test_as_repo_relative_none(self, repo_root: Path) -> None:
