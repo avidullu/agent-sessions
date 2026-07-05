@@ -68,3 +68,5 @@ automation ideas.
 
 The engineering-baseline idea is sketched in
 [docs/ENGINEERING_BASELINE.md](docs/ENGINEERING_BASELINE.md).
+The current implementation plan is tracked in
+[docs/BASELINE_PLANNING.md](docs/BASELINE_PLANNING.md).

@@ -14,3 +14,6 @@ owned CPU/RAM and local disks, including Windows and WSL paths.
   files from machines that expose an official export command.
 - Engineering baseline extraction that turns repeated session lessons into
   reviewable guardrails and agent-specific instruction files.
+- Agent-assisted proposal generation that uses bounded, reasonable access to
+  sessions, repos, PRs, issues, CI logs, and local instruction files to draft
+  reviewable baseline candidates.
