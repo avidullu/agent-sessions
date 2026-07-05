@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import json
 import os
+import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +17,10 @@ from .models import Source
 from .render import markdown_for_session, write_pdf
 from .sources.registry import get_extractor
 from .utils import now_utc, slugify
+
+
+IMPORTED_AT_RE = re.compile(r"^- Imported at: `([^`]+)`$", re.MULTILINE)
+GENERATED_RE = re.compile(r"^Generated: `([^`]+)`$", re.MULTILINE)
 
 
 @dataclass(frozen=True)
@@ -94,13 +99,15 @@ def export_sources(
             out_dir = config.archive_dir / source.name
             out_dir.mkdir(parents=True, exist_ok=True)
             md_path = out_dir / f"{stem}.md"
-            markdown = markdown_for_session(source, path, session, digest)
+            markdown = markdown_for_session(source, path, session, digest, imported_at=existing_imported_at(md_path))
+            md_changed = True
             if not dry_run:
-                md_path.write_text(markdown, encoding="utf-8", newline="\n")
+                md_changed = write_text_if_changed(md_path, markdown)
             pdf_path = None
             if write_pdfs:
                 pdf_path = md_path.with_suffix(".pdf")
-                if not dry_run and not write_pdf(markdown, pdf_path):
+                should_write_pdf = md_changed or not pdf_path.exists()
+                if not dry_run and should_write_pdf and not write_pdf(markdown, pdf_path):
                     pdf_missing = True
                     pdf_path = None
             raw_path = None
@@ -130,9 +137,8 @@ def export_sources(
 
 def write_indexes(config: ArchiveConfig, records: list[dict[str, Any]]) -> None:
     jsonl_path = config.archive_dir / "index.jsonl"
-    with jsonl_path.open("w", encoding="utf-8", newline="\n") as f:
-        for record in records:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    jsonl_text = "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in records)
+    write_text_if_changed(jsonl_path, jsonl_text)
 
     lines = [
         "# Agent Session Archive",
@@ -154,7 +160,36 @@ def write_indexes(config: ArchiveConfig, records: list[dict[str, Any]]) -> None:
             f"| {record['source']} | {record['kind']} | {record['messages']} | "
             f"[{Path(md).name}]({link}) | {pdf_link} |"
         )
-    (config.archive_dir / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    index_path = config.archive_dir / "INDEX.md"
+    index_text = preserve_generated_at(index_path, "\n".join(lines) + "\n")
+    write_text_if_changed(index_path, index_text)
+
+
+def existing_imported_at(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    match = IMPORTED_AT_RE.search(path.read_text(encoding="utf-8", errors="replace"))
+    return match.group(1) if match else None
+
+
+def preserve_generated_at(path: Path, text: str) -> str:
+    if not path.exists():
+        return text
+    existing = path.read_text(encoding="utf-8", errors="replace")
+    if GENERATED_RE.sub("Generated: `<generated>`", existing) != GENERATED_RE.sub("Generated: `<generated>`", text):
+        return text
+    match = GENERATED_RE.search(existing)
+    if not match:
+        return text
+    return GENERATED_RE.sub(f"Generated: `{match.group(1)}`", text, count=1)
+
+
+def write_text_if_changed(path: Path, text: str) -> bool:
+    if path.exists() and path.read_text(encoding="utf-8", errors="replace") == text:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8", newline="\n")
+    return True
 
 
 def load_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:

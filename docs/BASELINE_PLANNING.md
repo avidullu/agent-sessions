@@ -35,7 +35,8 @@ seed candidates for configuration and evaluation.
 The baseline has four layers:
 
 1. Evidence: archived sessions, repo docs, code, PRs, issues, CI logs, and local
-   agent instruction files.
+   agent instruction files. Search/discovery can use the compose stack, but the
+   archive remains the durable local evidence layer.
 2. Candidates: proposed rules, patterns, project facts, and onboarding notes with
    provenance.
 3. Promoted baseline: reviewed guidance accepted into global or project-specific

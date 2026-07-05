@@ -11,7 +11,13 @@ from .models import ExtractedSession, Source
 from .utils import now_utc
 
 
-def markdown_for_session(source: Source, path: Path, session: ExtractedSession, digest: str) -> str:
+def markdown_for_session(
+    source: Source,
+    path: Path,
+    session: ExtractedSession,
+    digest: str,
+    imported_at: str | None = None,
+) -> str:
     title_bits = [source.name, str(session.metadata.get("session_id") or path.stem)]
     title = " / ".join(x for x in title_bits if x)
     lines = [
@@ -24,7 +30,7 @@ def markdown_for_session(source: Source, path: Path, session: ExtractedSession, 
         f"- Source file: `{path}`",
         f"- SHA-256: `{digest}`",
         f"- Source modified: `{modified_timestamp(path)}`",
-        f"- Imported at: `{now_utc()}`",
+        f"- Imported at: `{imported_at or now_utc()}`",
     ]
     for key in sorted(session.metadata):
         value = session.metadata[key]

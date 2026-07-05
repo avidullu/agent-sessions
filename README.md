@@ -83,6 +83,14 @@ Create a local evidence bundle for an authorized AI agent to draft proposals:
 python .\tools\agent_archive.py baseline bundle --focus badminton-highlight-indexer
 ```
 
+## Compose Stack
+
+This repo owns durable export and baseline generation. Search, Claude-specific
+browsing, live capture, and runtime memory are delegated to external tools where
+they are already stronger. See [docs/COMPOSE_STACK.md](docs/COMPOSE_STACK.md).
+
+Daily export automation is documented in [docs/AUTOMATION.md](docs/AUTOMATION.md).
+
 ## Other Machines
 
 Clone this private repo on another machine, run the same discovery/export
