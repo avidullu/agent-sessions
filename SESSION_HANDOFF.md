@@ -28,6 +28,10 @@ locations where transcript-like files are discoverable.
   `baseline calibrate` summaries.
 - AI proposal adapter slice adds `baseline bundle` for local evidence packets
   that authorized agents can use to draft structured baseline proposals.
+- Compose-stack scope is now explicit: this repo owns archive and baseline;
+  search/live memory/Claude-specific UX are delegated externally.
+- Daily export automation lives in `scripts/daily-export.*` and
+  `docs/AUTOMATION.md`.
 
 ## Ramp-Up Kit
 
@@ -36,9 +40,13 @@ locations where transcript-like files are discoverable.
 - `docs/ROADMAP.md`
 - `docs/ENGINEERING_BASELINE.md`
 - `docs/BASELINE_PLANNING.md`
+- `docs/COMPOSE_STACK.md`
+- `docs/AUTOMATION.md`
 - `tools/agent_archive.py`
 - `agent_sessions/`
 - `baseline/`
+- `scripts/daily-export.ps1`
+- `scripts/daily-export.sh`
 - `config/baseline.toml`
 - `sources.example.toml`
 - `config/default_sources.toml`
