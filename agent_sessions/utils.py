@@ -57,6 +57,12 @@ def session_id_from_name(path: Path) -> str:
     return match.group(1) if match else path.stem
 
 
+def archive_markdown_path(repo_root: Path, markdown: str) -> Path:
+    """Resolve an archive markdown path from index.jsonl (may use Windows separators)."""
+    normalized = markdown.replace("\\", "/")
+    return repo_root / normalized
+
+
 def slugify(value: str, max_len: int = 90) -> str:
     value = re.sub(r"[^\w.\- ]+", "-", value, flags=re.ASCII)
     value = re.sub(r"\s+", "-", value.strip())

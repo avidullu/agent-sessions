@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import ArchiveConfig, read_toml, repo_path
+from .utils import archive_markdown_path
 
 
 BASELINE_CONFIG = Path("config/baseline.toml")
@@ -522,7 +523,7 @@ def scan_text_signals(config: ArchiveConfig, records: list[dict[str, Any]], max_
     selected = records if max_sessions == 0 else records[:max_sessions]
     grouped: dict[str, list[TextSignal]] = {key: [] for key in KEYWORD_GROUPS}
     for record in selected:
-        markdown_path = config.repo_root / str(record.get("markdown", ""))
+        markdown_path = archive_markdown_path(config.repo_root, str(record.get("markdown", "")))
         if not markdown_path.exists():
             continue
         text = markdown_path.read_text(encoding="utf-8", errors="replace").lower()
