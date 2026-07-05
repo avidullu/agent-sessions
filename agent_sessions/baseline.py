@@ -9,7 +9,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .config import ArchiveConfig, read_toml, repo_path
 
@@ -365,7 +365,7 @@ def write_prediction_artifacts(
     }
     sidecar = candidate_path.with_suffix(".predictions.json")
     sidecar.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
-    upsert_ledger(settings.ledger_path, run_id, payload["predictions"])
+    upsert_ledger(settings.ledger_path, run_id, cast(list[dict[str, Any]], payload["predictions"]))
 
 
 def prediction_to_dict(prediction: Prediction) -> dict[str, Any]:
