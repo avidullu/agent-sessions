@@ -42,10 +42,10 @@ baseline = "4 guardrails promoted via baseline promote + feedback.example.toml"
 [[metrics]]
 id = "E5.publish.agent-slices"
 phase = "publish"
-status = "pending"
+status = "pass"
 target = "baseline/agents/claude/CLAUDE.generated.md exists with >=3 rules"
 measure = "file exists and line count > 20"
-baseline = "generated agent files not yet produced"
+baseline = "codex/claude/vscode generated slices from 4 promoted guardrails"
 
 [[metrics]]
 id = "E6.calibrate.feedback-loop"
@@ -57,7 +57,7 @@ baseline = "calibrate summarizes only; suggest does not yet read ledger for adju
 
 [closure]
 total_metrics = 6
-passed = 4
-pending = 2
+passed = 5
+pending = 1
 failed = 0
 gate = "E1-E6 pass AND BASELINE_LOOP_CLOSURE P9 checked"

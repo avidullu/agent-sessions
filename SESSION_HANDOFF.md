@@ -13,8 +13,9 @@ locations where transcript-like files are discoverable.
 
 - **Active tracked project:** `docs/BASELINE_LOOP_CLOSURE.md` (§7 closure tracker).
 - **Efficacy gates:** `docs/CALIBRATION_EFFICACY.md` and `baseline/calibration/efficacy.toml`.
-- **P1 in review:** `baseline promote` writes accepted guardrails to `baseline/global/`.
-- **Next:** `baseline publish` (P2) per §7 table.
+- **P1 in review (PR #13):** `baseline promote` → `baseline/global/`.
+- **P2 in review (PR #14):** `baseline publish` → `baseline/agents/*/ *.generated.md`.
+- **Next:** P3 calibration loop (suggest reads feedback + ledger).
 - Add a daily Codex automation for pull/export/PDF/commit/push once the desired
   schedule is chosen.
 - Keep hosted/cloud session imports as optional future work only; the current
