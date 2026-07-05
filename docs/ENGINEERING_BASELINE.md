@@ -1,5 +1,8 @@
 # Engineering Baseline
 
+For current planning, pilot scope, and PR-sized work items, see
+[BASELINE_PLANNING.md](BASELINE_PLANNING.md).
+
 ## Context
 
 The archive captures useful evidence: which repositories show up repeatedly,

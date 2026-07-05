@@ -19,6 +19,8 @@ locations where transcript-like files are discoverable.
   export locations are identified.
 - Build the engineering-baseline extraction flow described in
   `docs/ENGINEERING_BASELINE.md`.
+- Iterate on the planning details in `docs/BASELINE_PLANNING.md`, especially
+  pilot repo config, AI-assisted proposal generation, and approval policy.
 
 ## Ramp-Up Kit
 
@@ -26,6 +28,7 @@ locations where transcript-like files are discoverable.
 - `docs/DISCOVERY.md`
 - `docs/ROADMAP.md`
 - `docs/ENGINEERING_BASELINE.md`
+- `docs/BASELINE_PLANNING.md`
 - `tools/agent_archive.py`
 - `agent_sessions/`
 - `sources.example.toml`
