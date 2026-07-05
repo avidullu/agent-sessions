@@ -53,6 +53,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_baseline_suggest.add_argument("--feedback", type=Path, help="Optional calibration feedback TOML file.")
     p_baseline_suggest.add_argument("--dry-run", action="store_true")
 
+    p_baseline_calibrate = baseline_sub.add_parser("calibrate", help="Summarize calibration feedback for predictions.")
+    p_baseline_calibrate.add_argument("--feedback", type=Path, required=True, help="Calibration feedback TOML file.")
+    p_baseline_calibrate.add_argument("--predictions", type=Path, help="Prediction JSON sidecar to calibrate.")
+    p_baseline_calibrate.add_argument("--output", type=Path, help="Calibration summary Markdown output path.")
+    p_baseline_calibrate.add_argument("--dry-run", action="store_true")
+
     return parser
 
 
@@ -95,6 +101,16 @@ def main(argv: list[str] | None = None) -> int:
                 output=args.output,
                 max_sessions=args.max_sessions,
                 feedback=args.feedback,
+                dry_run=args.dry_run,
+            )
+        if args.baseline_cmd == "calibrate":
+            from .baseline import baseline_calibrate
+
+            return baseline_calibrate(
+                config,
+                feedback=args.feedback,
+                predictions=args.predictions,
+                output=args.output,
                 dry_run=args.dry_run,
             )
     parser.error(f"Unknown command: {args.cmd}")

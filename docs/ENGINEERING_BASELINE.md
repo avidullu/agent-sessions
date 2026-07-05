@@ -85,4 +85,5 @@ The first version can be simple and deterministic:
 It should also make explicit metacognitive predictions about the user and the
 work style, then invite calibration feedback. The loop is: predict from local
 evidence, ask what was right or wrong, record feedback, and make the next report
-less vague.
+less vague. Prediction sidecars and a ledger make that loop machine-readable so
+future runs can compare what the tool guessed against what the user confirmed.

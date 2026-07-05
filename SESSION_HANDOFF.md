@@ -24,6 +24,8 @@ locations where transcript-like files are discoverable.
 - First implementation slice adds baseline scaffold files and
   `python .\tools\agent_archive.py baseline suggest` for deterministic
   candidate/metacognition reports.
+- Next slice adds structured prediction sidecars, a metacognition ledger, and
+  `baseline calibrate` summaries.
 
 ## Ramp-Up Kit
 

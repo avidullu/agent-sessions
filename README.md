@@ -71,6 +71,12 @@ Candidate reports are suggestions with provenance and calibration hooks. Copy
 `baseline/calibration/feedback.toml` to mark predictions as accepted, edited, or
 rejected before the next run.
 
+Summarize calibration feedback against the latest prediction sidecar:
+
+```powershell
+python .\tools\agent_archive.py baseline calibrate --feedback baseline\calibration\feedback.toml
+```
+
 ## Other Machines
 
 Clone this private repo on another machine, run the same discovery/export

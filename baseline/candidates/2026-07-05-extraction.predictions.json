@@ -1,0 +1,151 @@
+{
+  "run_id": "2026-07-05-extraction",
+  "generated_at": "2026-07-05T18:23:40+00:00",
+  "candidate": "baseline/candidates/2026-07-05-extraction.md",
+  "scanned_sessions": 500,
+  "source_counts": {
+    "codex-windows": 52,
+    "claude-windows": 2222,
+    "claude-wsl-ubuntu": 19,
+    "gemini-antigravity-windows": 3,
+    "grok-wsl-ubuntu": 13,
+    "deepseek-vscode-windows": 752,
+    "deepseek-vscode-wsl-ubuntu": 53
+  },
+  "kind_counts": {
+    "codex": 52,
+    "claude": 2241,
+    "gemini_antigravity": 3,
+    "grok": 13,
+    "deepseek_request_dump": 805
+  },
+  "project_hits": {
+    "badminton-highlight-indexer": 1770,
+    "khelsutra": 233,
+    "telegram": 1,
+    "muneem": 294,
+    "avidullu": 85
+  },
+  "predictions": [
+    {
+      "id": "profile.multi-agent-builder",
+      "title": "Multi-Agent Builder",
+      "scope": "user-profile",
+      "risk": "low",
+      "category": "metacognition",
+      "confidence": 0.99,
+      "status": "proposed",
+      "feedback": "none",
+      "evidence": [
+        "3114 archived session files across 7 configured sources.",
+        "Active source mix: claude-windows=2222, deepseek-vscode-windows=752, deepseek-vscode-wsl-ubuntu=53, codex-windows=52, claude-wsl-ubuntu=19, grok-wsl-ubuntu=13"
+      ],
+      "text": "The user appears to be a heavy multi-agent builder who uses several local coding agents as part of an active engineering workflow rather than as an occasional chat-only assistant."
+    },
+    {
+      "id": "profile.local-first-private-compute",
+      "title": "Local-First Private Compute Preference",
+      "scope": "user-profile",
+      "risk": "low",
+      "category": "metacognition",
+      "confidence": 0.75,
+      "status": "proposed",
+      "feedback": "none",
+      "evidence": [
+        "Windows and WSL local stores are first-class archive sources.",
+        "Grok, Claude, Codex, DeepSeek, and Gemini sources are read from local disk paths."
+      ],
+      "text": "The user strongly prefers owned/local CPU, RAM, and disk as the default source of truth, while still allowing explicit, bounded access to external services when useful."
+    },
+    {
+      "id": "profile.business-productivity-engineer",
+      "title": "Business/Productivity-Oriented Engineer",
+      "scope": "user-profile",
+      "risk": "medium",
+      "category": "metacognition",
+      "confidence": 0.63,
+      "status": "proposed",
+      "feedback": "none",
+      "evidence": [
+        "badminton-highlight-indexer: 1770 archive records",
+        "muneem: 294 archive records",
+        "khelsutra: 233 archive records",
+        "avidullu: 85 archive records",
+        "telegram: 1 archive records"
+      ],
+      "text": "The user looks like a builder who blends software engineering, product/business workflows, and agent automation to improve productivity across several durable projects."
+    },
+    {
+      "id": "guardrail.pr-only-repo-writes",
+      "title": "PR-Only Repo Writes",
+      "scope": "global",
+      "risk": "high",
+      "category": "repo-governance",
+      "confidence": 0.93,
+      "status": "proposed",
+      "feedback": "none",
+      "evidence": [
+        "333 scanned sessions contain `repo-governance` signals.",
+        "archive/codex-windows/20260702-019f2174-3a4a-7753-9b64-acafa102f804-rollout-2026-07-02t11-41-33-019f2174-3a4a-77.md (1118 keyword hits)",
+        "archive/codex-windows/20260702-019f2174-3bdf-73b3-9285-a8db45326c90-rollout-2026-07-02t11-41-33-019f2174-3bdf-73.md (1072 keyword hits)",
+        "archive/claude-windows/20260618-6a82308f-69d6-43a8-9ea4-d8eaf497253d-6a82308f-69d6-43a8-9ea4-d8eaf497253d-d3b76c6.md (820 keyword hits)",
+        "archive/claude-windows/20260703-7fce5410-4c57-4ec9-a054-be898bda22da-7fce5410-4c57-4ec9-a054-be898bda22da-bd42d4f.md (810 keyword hits)"
+      ],
+      "text": "Agents must not push directly to durable/shared repos. They should branch from the remote base, stage explicit paths, open a PR, and merge only after explicit approval or a scoped umbrella approval."
+    },
+    {
+      "id": "guardrail.verified-regression-gates",
+      "title": "Verified Regression Gates",
+      "scope": "global",
+      "risk": "high",
+      "category": "regression-frameworks",
+      "confidence": 0.83,
+      "status": "proposed",
+      "feedback": "none",
+      "evidence": [
+        "210 scanned sessions contain `regression-frameworks` signals.",
+        "archive/claude-windows/20260704-a9fd4426-f234-4e4a-bfb4-1f2c8255c661-a9fd4426-f234-4e4a-bfb4-1f2c8255c661-76c46d7.md (1120 keyword hits)",
+        "archive/codex-windows/20260702-019f2174-3a4a-7753-9b64-acafa102f804-rollout-2026-07-02t11-41-33-019f2174-3a4a-77.md (970 keyword hits)",
+        "archive/codex-windows/20260702-019f2174-3937-7a93-8a9d-3b54c2d0628a-rollout-2026-07-02t11-41-32-019f2174-3937-7a.md (943 keyword hits)",
+        "archive/claude-windows/20260703-7fce5410-4c57-4ec9-a054-be898bda22da-7fce5410-4c57-4ec9-a054-be898bda22da-bd42d4f.md (873 keyword hits)"
+      ],
+      "text": "Agents should discover and run the repo's real test, lint, type, coverage, and smoke gates before claiming a change is ready, and clearly state anything that could not be verified."
+    },
+    {
+      "id": "guardrail.handoff-and-resume",
+      "title": "Handoff And Resume Discipline",
+      "scope": "global",
+      "risk": "medium",
+      "category": "checkpointing",
+      "confidence": 0.77,
+      "status": "proposed",
+      "feedback": "none",
+      "evidence": [
+        "151 scanned sessions contain `checkpointing` signals.",
+        "archive/claude-windows/20260701-45ea3a91-654d-4972-9cd3-65f35db54caf-45ea3a91-654d-4972-9cd3-65f35db54caf-9f13f1f.md (192 keyword hits)",
+        "archive/claude-windows/20260622-985cc286-9e1e-4217-87c3-2d418bc4fa9c-985cc286-9e1e-4217-87c3-2d418bc4fa9c-090b1b8.md (173 keyword hits)",
+        "archive/claude-windows/20260618-6a82308f-69d6-43a8-9ea4-d8eaf497253d-6a82308f-69d6-43a8-9ea4-d8eaf497253d-d3b76c6.md (171 keyword hits)",
+        "archive/codex-windows/20260702-019f2174-3bdf-73b3-9285-a8db45326c90-rollout-2026-07-02t11-41-33-019f2174-3bdf-73.md (140 keyword hits)"
+      ],
+      "text": "Projects should maintain a short session handoff or start-here file so future agents can resume from real state instead of replaying old conversation."
+    },
+    {
+      "id": "harness.predict-then-calibrate",
+      "title": "Predict Then Calibrate",
+      "scope": "global",
+      "risk": "medium",
+      "category": "metacognition",
+      "confidence": 0.75,
+      "status": "proposed",
+      "feedback": "none",
+      "evidence": [
+        "249 scanned sessions contain `metacognition` signals.",
+        "archive/claude-windows/20260618-6a82308f-69d6-43a8-9ea4-d8eaf497253d-6a82308f-69d6-43a8-9ea4-d8eaf497253d-d3b76c6.md (432 keyword hits)",
+        "archive/codex-windows/20260702-019f2174-3bdf-73b3-9285-a8db45326c90-rollout-2026-07-02t11-41-33-019f2174-3bdf-73.md (388 keyword hits)",
+        "archive/codex-windows/20260702-019f2174-39c7-7941-84a6-7b6c81c91f4b-rollout-2026-07-02t11-41-32-019f2174-39c7-79.md (373 keyword hits)",
+        "archive/claude-windows/20260702-188dd06f-9c99-487c-aa7d-b0bee83c629c-188dd06f-9c99-487c-aa7d-b0bee83c629c-8f094ca.md (363 keyword hits)"
+      ],
+      "text": "The baseline system should regularly make explicit predictions about user/project patterns, ask for calibration feedback, and adjust confidence or wording based on accepted, edited, or rejected guesses."
+    }
+  ]
+}
