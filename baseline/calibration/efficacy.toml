@@ -34,10 +34,10 @@ baseline = "docs/PROJECT_DOC_TEMPLATE.md mirrored from mothership repo"
 [[metrics]]
 id = "E4.promote.global-baseline"
 phase = "promote"
-status = "pending"
+status = "pass"
 target = "baseline/global/engineering-guardrails.md has promoted non-placeholder text"
 measure = "file content differs from scaffold placeholder"
-baseline = "0 promoted rules as of 2026-07-05"
+baseline = "4 guardrails promoted via baseline promote + feedback.example.toml"
 
 [[metrics]]
 id = "E5.publish.agent-slices"
@@ -57,7 +57,7 @@ baseline = "calibrate summarizes only; suggest does not yet read ledger for adju
 
 [closure]
 total_metrics = 6
-passed = 3
-pending = 3
+passed = 4
+pending = 2
 failed = 0
 gate = "E1-E6 pass AND BASELINE_LOOP_CLOSURE P9 checked"
