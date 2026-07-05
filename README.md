@@ -51,3 +51,7 @@ If a machine has different usernames, WSL distribution names, or custom storage
 paths, copy `sources.example.toml` to `sources.toml` and edit the roots. The
 local `sources.toml` is ignored by Git.
 
+## Roadmap
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for optional future importers and archive
+automation ideas.
