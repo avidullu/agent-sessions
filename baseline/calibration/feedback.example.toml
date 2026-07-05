@@ -1,0 +1,13 @@
+# Copy to feedback.toml and mark predictions after reviewing a candidate file.
+
+[feedback."profile.multi-agent-builder"]
+verdict = "accept"
+note = "This matches the user's actual working style."
+
+[feedback."profile.local-first-private-compute"]
+verdict = "edit"
+note = "Keep the local-first point, but mention that cloud APIs are acceptable when explicitly authorized."
+
+[feedback."profile.business-productivity-engineer"]
+verdict = "reject"
+note = "Example of a rejected hypothesis."

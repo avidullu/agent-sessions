@@ -81,3 +81,8 @@ The first version can be simple and deterministic:
 - Produce `baseline/candidates/<date>-extraction.md`.
 - Add a manual `promote-baseline` command later, after the candidate format feels
   useful.
+
+It should also make explicit metacognitive predictions about the user and the
+work style, then invite calibration feedback. The loop is: predict from local
+evidence, ask what was right or wrong, record feedback, and make the next report
+less vague.

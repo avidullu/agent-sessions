@@ -52,6 +52,25 @@ force-add it.
 3. Register it with `@register("<kind>")`.
 4. Run a dry export with `--source <kind> --limit 1 --dry-run`.
 
+## Engineering Baseline
+
+Create or refresh the baseline scaffold:
+
+```powershell
+python .\tools\agent_archive.py baseline scaffold
+```
+
+Generate reviewable candidate predictions from the archive:
+
+```powershell
+python .\tools\agent_archive.py baseline suggest
+```
+
+Candidate reports are suggestions with provenance and calibration hooks. Copy
+`baseline/calibration/feedback.example.toml` to
+`baseline/calibration/feedback.toml` to mark predictions as accepted, edited, or
+rejected before the next run.
+
 ## Other Machines
 
 Clone this private repo on another machine, run the same discovery/export
