@@ -1,0 +1,50 @@
+[baseline]
+root = "baseline"
+candidates_dir = "baseline/candidates"
+feedback_example = "baseline/calibration/feedback.example.toml"
+
+[[pilots]]
+slug = "badminton-highlight-indexer"
+kind = "repo"
+aliases = ["badminton-highlight-indexer", "badminton highlight indexer"]
+notes = "Mothership project and primary source of tribal knowledge."
+
+[[pilots]]
+slug = "muneem"
+kind = "repo"
+aliases = ["muneem"]
+notes = "Newer project with useful agent/workflow upserts."
+
+[[pilots]]
+slug = "telegram"
+kind = "repo-family"
+aliases = ["telegram"]
+notes = "Integration-heavy pilot; exact repo should be named later."
+
+[[pilots]]
+slug = "avidullu"
+kind = "github-account"
+aliases = ["avidullu"]
+notes = "Broader personal repo inventory and cross-project patterns."
+
+[[pilots]]
+slug = "khelsutra"
+kind = "github-organization"
+aliases = ["KhelSutra", "khelsutra"]
+notes = "Organization-style pilot and future sharing candidate."
+
+[approval_modes.strict]
+description = "PR required and human approval required."
+applies_to = ["repo-writes", "baseline-promotion", "destructive-ops", "security-policy", "architecture-policy"]
+
+[approval_modes.umbrella]
+description = "Scoped user approval for a batch of related work."
+applies_to = ["debugging-batches", "multi-pr-workflows"]
+
+[approval_modes.auto-promote]
+description = "Low-risk facts or formatting only, never repo writes or policy changes."
+applies_to = ["low-risk-facts", "formatting"]
+
+[approval_modes.observe-only]
+description = "Capture evidence and suggestions without publishing into agent-facing instructions."
+applies_to = ["uncertain-patterns", "conflicting-evidence"]

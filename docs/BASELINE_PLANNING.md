@@ -193,6 +193,8 @@ Agent-assisted extraction should follow these rules:
 - Add baseline directory skeleton and candidate template.
 - Add pilot project configuration placeholders.
 - Keep generated agent files out of project instruction files for now.
+- Add the first metacognition harness: generate explicit predictions, attach
+  evidence, and provide feedback hooks for calibration.
 
 ### PR 3: Candidate Extractor
 

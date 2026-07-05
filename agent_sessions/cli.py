@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 from .archive import discover_sources, export_sources, pdf_existing
+from .baseline import baseline_scaffold, baseline_suggest
 from .config import load_config
 
 
@@ -34,6 +35,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_pdf.add_argument("--source", action="append", help="Source name or kind to PDF. Can be repeated.")
     p_pdf.add_argument("--limit", type=int, help="Maximum PDFs to write.")
     p_pdf.add_argument("--force", action="store_true", help="Overwrite existing PDFs.")
+
+    p_baseline = sub.add_parser("baseline", help="Work with engineering baseline candidates.")
+    baseline_sub = p_baseline.add_subparsers(dest="baseline_cmd", required=True)
+
+    p_baseline_scaffold = baseline_sub.add_parser("scaffold", help="Create missing baseline folders/templates.")
+    p_baseline_scaffold.add_argument("--dry-run", action="store_true")
+
+    p_baseline_suggest = baseline_sub.add_parser("suggest", help="Generate reviewable baseline candidate suggestions.")
+    p_baseline_suggest.add_argument("--output", type=Path, help="Candidate Markdown output path.")
+    p_baseline_suggest.add_argument(
+        "--max-sessions",
+        type=int,
+        default=500,
+        help="Maximum Markdown sessions to scan for text signals. Use 0 for all indexed sessions.",
+    )
+    p_baseline_suggest.add_argument("--feedback", type=Path, help="Optional calibration feedback TOML file.")
+    p_baseline_suggest.add_argument("--dry-run", action="store_true")
 
     return parser
 
@@ -68,5 +86,16 @@ def main(argv: list[str] | None = None) -> int:
         if not args.all and not args.source:
             parser.error("pdf requires --all or at least one --source")
         return pdf_existing(config, selected=args.source, limit=args.limit, force=args.force)
+    if args.cmd == "baseline":
+        if args.baseline_cmd == "scaffold":
+            return baseline_scaffold(config, dry_run=args.dry_run)
+        if args.baseline_cmd == "suggest":
+            return baseline_suggest(
+                config,
+                output=args.output,
+                max_sessions=args.max_sessions,
+                feedback=args.feedback,
+                dry_run=args.dry_run,
+            )
     parser.error(f"Unknown command: {args.cmd}")
     return 2

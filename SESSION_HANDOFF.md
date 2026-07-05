@@ -21,6 +21,9 @@ locations where transcript-like files are discoverable.
   `docs/ENGINEERING_BASELINE.md`.
 - Iterate on the planning details in `docs/BASELINE_PLANNING.md`, especially
   pilot repo config, AI-assisted proposal generation, and approval policy.
+- First implementation slice adds baseline scaffold files and
+  `python .\tools\agent_archive.py baseline suggest` for deterministic
+  candidate/metacognition reports.
 
 ## Ramp-Up Kit
 
@@ -31,6 +34,8 @@ locations where transcript-like files are discoverable.
 - `docs/BASELINE_PLANNING.md`
 - `tools/agent_archive.py`
 - `agent_sessions/`
+- `baseline/`
+- `config/baseline.toml`
 - `sources.example.toml`
 - `config/default_sources.toml`
 
