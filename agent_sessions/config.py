@@ -9,7 +9,7 @@ from typing import Any
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover
-    tomllib = None
+    tomllib: Any = None  # type: ignore[no-redef]
 
 from .models import Source
 from .path_templates import PathTemplateContext

@@ -1,0 +1,32 @@
+[project]
+name = "agent-sessions"
+version = "0.2.0"
+description = "Local coding-agent session archive tooling"
+requires-python = ">=3.11"
+license = {text = "Private"}
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = ["-v", "--tb=short", "--strict-markers"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+
+[tool.coverage.run]
+source = ["agent_sessions"]
+omit = ["tests/*", "tools/*"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = false
