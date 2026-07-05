@@ -77,6 +77,12 @@ Summarize calibration feedback against the latest prediction sidecar:
 python .\tools\agent_archive.py baseline calibrate --feedback baseline\calibration\feedback.toml
 ```
 
+Create a local evidence bundle for an authorized AI agent to draft proposals:
+
+```powershell
+python .\tools\agent_archive.py baseline bundle --focus badminton-highlight-indexer
+```
+
 ## Other Machines
 
 Clone this private repo on another machine, run the same discovery/export

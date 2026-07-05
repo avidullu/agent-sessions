@@ -1,0 +1,16 @@
+{
+  "id": "stable.dotted.identifier",
+  "title": "Short proposal title",
+  "scope": "global | project:<slug> | user-profile | agent:<name>",
+  "category": "repo-governance | regression-frameworks | architecture | docs | metacognition | prompt-patterns",
+  "risk": "low | medium | high",
+  "confidence": "0.00-1.00",
+  "approval_mode": "strict | umbrella | auto-promote | observe-only",
+  "evidence": [
+    "relative archive or repo references"
+  ],
+  "suggested_baseline_text": "Concise proposed guidance.",
+  "open_questions": [
+    "questions for the user before promotion"
+  ]
+}

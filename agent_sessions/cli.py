@@ -59,6 +59,24 @@ def build_parser() -> argparse.ArgumentParser:
     p_baseline_calibrate.add_argument("--output", type=Path, help="Calibration summary Markdown output path.")
     p_baseline_calibrate.add_argument("--dry-run", action="store_true")
 
+    p_baseline_bundle = baseline_sub.add_parser("bundle", help="Create a bounded evidence bundle for an AI agent.")
+    p_baseline_bundle.add_argument("--output-dir", type=Path, help="Bundle output directory.")
+    p_baseline_bundle.add_argument("--max-sessions", type=int, default=12)
+    p_baseline_bundle.add_argument("--max-chars-per-session", type=int, default=2500)
+    p_baseline_bundle.add_argument(
+        "--access-level",
+        choices=(
+            "session-only",
+            "repo-read-only",
+            "collaboration-metadata",
+            "local-agent-context",
+            "write-candidates",
+        ),
+        default="session-only",
+    )
+    p_baseline_bundle.add_argument("--focus", action="append", help="Focus keyword or project slug. Can be repeated.")
+    p_baseline_bundle.add_argument("--dry-run", action="store_true")
+
     return parser
 
 
@@ -111,6 +129,18 @@ def main(argv: list[str] | None = None) -> int:
                 feedback=args.feedback,
                 predictions=args.predictions,
                 output=args.output,
+                dry_run=args.dry_run,
+            )
+        if args.baseline_cmd == "bundle":
+            from .baseline_agent import baseline_bundle
+
+            return baseline_bundle(
+                config,
+                output_dir=args.output_dir,
+                max_sessions=args.max_sessions,
+                max_chars_per_session=args.max_chars_per_session,
+                access_level=args.access_level,
+                focus=args.focus,
                 dry_run=args.dry_run,
             )
     parser.error(f"Unknown command: {args.cmd}")

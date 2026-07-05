@@ -211,6 +211,8 @@ Agent-assisted extraction should follow these rules:
   evidence.
 - Keep model-specific wiring replaceable so Codex, Claude, Grok, Gemini, or
   other local/authorized agents can be used later.
+- Keep raw evidence bundles ignored by default because future client/org bundles
+  may contain private excerpts.
 
 ### PR 5: Review And Promote
 
