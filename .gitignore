@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+work/
+tmp/
+
+# Raw transcripts can be very large and may include secrets or full tool output.
+# Use `git add -f raw/` only when you intentionally want raw backups in GitHub.
+raw/
+
+# Local machine overrides.
+sources.toml
+

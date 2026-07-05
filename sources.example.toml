@@ -1,0 +1,73 @@
+# Copy this file to sources.toml for machine-specific overrides.
+# sources.toml is ignored by Git.
+
+[[sources]]
+name = "codex-windows"
+kind = "codex"
+roots = [
+  "%USERPROFILE%\\.codex\\sessions",
+  "%USERPROFILE%\\.codex\\archived_sessions",
+]
+glob = "**/*.jsonl"
+
+[[sources]]
+name = "claude-windows"
+kind = "claude"
+roots = ["%USERPROFILE%\\.claude\\projects"]
+glob = "**/*.jsonl"
+
+[[sources]]
+name = "claude-wsl-ubuntu"
+kind = "claude"
+roots = ["\\\\wsl.localhost\\Ubuntu\\home\\avidullu\\.claude\\projects"]
+glob = "**/*.jsonl"
+
+[[sources]]
+name = "gemini-antigravity-windows"
+kind = "gemini_antigravity"
+roots = ["%USERPROFILE%\\.gemini\\antigravity\\brain"]
+glob = "**/transcript*.jsonl"
+
+[[sources]]
+name = "grok-wsl-ubuntu"
+kind = "grok"
+roots = ["\\\\wsl.localhost\\Ubuntu\\home\\avidullu\\.grok\\sessions"]
+glob = "**/chat_history.jsonl"
+
+[[sources]]
+name = "deepseek-vscode-windows"
+kind = "deepseek_request_dump"
+roots = [
+  "%APPDATA%\\Code\\User\\globalStorage\\vizards.deepseek-v4-for-copilot\\request-dumps",
+]
+glob = "**/*.msg*.txt"
+
+[[sources]]
+name = "deepseek-vscode-wsl-ubuntu"
+kind = "deepseek_request_dump"
+roots = [
+  "\\\\wsl.localhost\\Ubuntu\\home\\avidullu\\.vscode-server\\data\\User\\globalStorage\\vizards.deepseek-v4-for-copilot\\request-dumps",
+]
+glob = "**/*.msg*.txt"
+
+[[sources]]
+name = "copilot-vscode-windows-inventory"
+kind = "inventory"
+roots = ["%APPDATA%\\Code\\User\\globalStorage\\github.copilot-chat"]
+glob = "**/*"
+
+[[sources]]
+name = "copilot-vscode-wsl-ubuntu-inventory"
+kind = "inventory"
+roots = [
+  "\\\\wsl.localhost\\Ubuntu\\home\\avidullu\\.vscode-server\\data\\User\\globalStorage\\github.copilot-chat",
+]
+glob = "**/*"
+
+[[sources]]
+name = "zai-vscode-wsl-ubuntu-inventory"
+kind = "inventory"
+roots = [
+  "\\\\wsl.localhost\\Ubuntu\\home\\avidullu\\.vscode-server\\extensions\\ltmoerdani.zai-copilot-chat-0.3.1",
+]
+glob = "**/*"
