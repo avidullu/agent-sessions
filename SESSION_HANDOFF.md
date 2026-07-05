@@ -26,6 +26,8 @@ locations where transcript-like files are discoverable.
   candidate/metacognition reports.
 - Next slice adds structured prediction sidecars, a metacognition ledger, and
   `baseline calibrate` summaries.
+- AI proposal adapter slice adds `baseline bundle` for local evidence packets
+  that authorized agents can use to draft structured baseline proposals.
 
 ## Ramp-Up Kit
 

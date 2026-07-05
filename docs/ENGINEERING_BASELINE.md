@@ -60,6 +60,9 @@ baseline/
   baseline section.
 - VS Code: a VS Code adapter can publish a generated instruction file once the
   chosen local instruction target is validated on each machine.
+- External/peer agents: `baseline bundle` can produce a bounded local evidence
+  packet plus a proposal prompt for any explicitly authorized agent. Generated
+  evidence packets are ignored by Git by default.
 
 ## Guardrails
 
