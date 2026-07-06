@@ -90,6 +90,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_baseline_eval.add_argument("--output", type=Path, help="Evaluation report Markdown output path.")
     p_baseline_eval.add_argument("--dry-run", action="store_true")
 
+    p_baseline_ingest = baseline_sub.add_parser(
+        "ingest",
+        help="Ingest structured JSON proposals from baseline/proposals/.",
+    )
+    p_baseline_ingest.add_argument("--proposal", type=Path, help="Single proposal JSON file to ingest.")
+    p_baseline_ingest.add_argument("--output", type=Path, help="Optional ingest report output path.")
+    p_baseline_ingest.add_argument("--dry-run", action="store_true")
+
     p_baseline_bundle = baseline_sub.add_parser("bundle", help="Create a bounded evidence bundle for an AI agent.")
     p_baseline_bundle.add_argument("--output-dir", type=Path, help="Bundle output directory.")
     p_baseline_bundle.add_argument("--max-sessions", type=int, default=12)
@@ -183,6 +191,15 @@ def main(argv: list[str] | None = None) -> int:
             from .baseline_eval import baseline_eval
 
             return baseline_eval(config, output=args.output, dry_run=args.dry_run)
+        if args.baseline_cmd == "ingest":
+            from .baseline_ingest import baseline_ingest
+
+            return baseline_ingest(
+                config,
+                proposal=args.proposal,
+                output=args.output,
+                dry_run=args.dry_run,
+            )
         if args.baseline_cmd == "bundle":
             from .baseline_agent import baseline_bundle
 

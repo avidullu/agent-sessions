@@ -1,0 +1,14 @@
+{
+  "id": "guardrail.explicit-test-gates",
+  "title": "Explicit Test Gates Before Done Claims",
+  "scope": "global",
+  "category": "regression-frameworks",
+  "risk": "high",
+  "confidence": 0.82,
+  "approval_mode": "strict",
+  "evidence": [
+    "archive/example/session.md mentions pytest and ruff before merge"
+  ],
+  "suggested_baseline_text": "Before claiming a change is ready, run the repo's real lint, type, test, and coverage gates; report anything that could not be verified.",
+  "open_questions": []
+}
