@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Generator
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -195,6 +193,11 @@ class TestBuildParser:
         args = parser.parse_args(["--config", "custom.toml", "discover"])
         assert args.config == Path("custom.toml")
 
+    def test_repo_root_option(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["--repo-root", "archive-root", "discover"])
+        assert args.repo_root == Path("archive-root")
+
     def test_no_subcommand_errors(self) -> None:
         parser = build_parser()
         with pytest.raises(SystemExit):
@@ -203,11 +206,8 @@ class TestBuildParser:
 
 class TestMain:
     @pytest.fixture(autouse=True)
-    def _patch_repo_root(self, repo_root: Path) -> Generator[None, None, None]:
-        """Patch REPO_ROOT to use test directory."""
-        self._repo_root = repo_root
-        with patch("agent_sessions.cli.REPO_ROOT", repo_root):
-            yield
+    def _chdir_repo_root(self, repo_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(repo_root)
 
     def test_discover(self, repo_root: Path) -> None:
         # Set up config

@@ -27,7 +27,7 @@ class ArchiveConfig:
 
 
 def load_config(repo_root: Path, config_path: Path | None = None) -> ArchiveConfig:
-    path = config_path or repo_root / "sources.toml"
+    path = repo_path(repo_root, str(config_path)) if config_path is not None else repo_root / "sources.toml"
     if not path.exists():
         path = repo_root / DEFAULT_CONFIG
     data = read_toml(path)

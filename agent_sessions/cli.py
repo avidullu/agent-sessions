@@ -11,11 +11,13 @@ from .baseline import baseline_scaffold, baseline_suggest
 from .config import load_config
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+def default_repo_root() -> Path:
+    return Path.cwd()
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Export local coding-agent sessions.")
+    parser.add_argument("--repo-root", type=Path, default=default_repo_root(), help="Archive repository root.")
     parser.add_argument("--config", type=Path, help="Optional sources TOML path.")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -127,7 +129,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    config = load_config(REPO_ROOT, args.config)
+    config = load_config(args.repo_root.resolve(), args.config)
 
     if args.cmd == "discover":
         return discover_sources(config, samples=args.samples, write=args.write)

@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "agent-sessions"
 version = "0.2.0"
@@ -5,11 +9,29 @@ description = "Local coding-agent session archive tooling"
 requires-python = ">=3.11"
 license = {text = "Private"}
 
+[project.scripts]
+agent-archive = "agent_sessions.cli:main"
+
+[tool.setuptools]
+packages = ["agent_sessions", "agent_sessions.sources"]
+
 [project.optional-dependencies]
 dev = [
+    "mypy>=1.10",
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    "reportlab>=4.0",
+    "ruff>=0.6",
+    "types-reportlab>=4.0",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

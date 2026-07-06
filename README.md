@@ -25,6 +25,7 @@ Default sources live in `config/default_sources.toml`. Copy
 ## Quick Start
 
 ```powershell
+python -m pip install -e ".[dev]"
 python .\tools\agent_archive.py discover --write docs\DISCOVERY.md
 python .\tools\agent_archive.py status
 python .\tools\agent_archive.py export --all
@@ -33,7 +34,6 @@ python .\tools\agent_archive.py export --all
 Optional PDF output:
 
 ```powershell
-python -m pip install reportlab
 python .\tools\agent_archive.py export --all --pdf
 ```
 
@@ -58,8 +58,8 @@ Set up my private agent-sessions archive on this computer.
 1. Clone or open the repo:
    https://github.com/avidullu/agent-sessions
    Pull with `git pull --ff-only` before reading files.
-2. Install local tooling in a Python 3.11+ environment. Prefer:
-   `python -m pip install -e ".[dev]" reportlab ruff mypy`
+2. Install local tooling in a Python 3.11+ environment:
+   `python -m pip install -e ".[dev]"`
 3. Validate the repo and report results. Use POSIX-style paths in the prompt;
    PowerShell users may substitute `.\tools\...` and `docs\DISCOVERY.md` if
    they prefer:
