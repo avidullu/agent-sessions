@@ -1,107 +1,148 @@
-"""Engineering baseline scaffold and suggestion generation."""
+"""Baseline orchestration: scaffold, suggest, and calibrate commands.
+
+The baseline subsystem is split into focused modules; this one keeps the
+top-level commands and the prediction-artifact IO, and re-exports the public
+API so existing ``from agent_sessions.baseline import ...`` call sites keep
+working:
+
+- ``baseline_types``       — shared dataclasses + pure helpers (cycle-free root)
+- ``baseline_settings``    — settings loading, scaffold templates, feedback IO
+- ``baseline_predictions`` — keyword scanning + deterministic predictions
+- ``baseline_report``      — candidate/calibration Markdown rendering
+- ``baseline_promote``     — marker blocks + promotion of accepted guardrails
+- ``baseline_calibration`` — feedback/ledger calibration loop
+"""
 
 from __future__ import annotations
 
 import datetime as dt
 import json
-import math
 import os
-import re
 from collections import Counter
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 
-from .config import ArchiveConfig, read_toml, repo_path
-from .utils import archive_markdown_path, read_jsonl_dicts
-
-
-BASELINE_CONFIG = Path("config/baseline.toml")
-BASELINE_ROOT = Path("baseline")
-
-
-@dataclass(frozen=True)
-class Pilot:
-    slug: str
-    kind: str
-    aliases: tuple[str, ...]
-    notes: str = ""
-
-
-@dataclass(frozen=True)
-class BaselineSettings:
-    root: Path
-    candidates_dir: Path
-    metacognition_dir: Path
-    ledger_path: Path
-    feedback_example: Path
-    pilots: tuple[Pilot, ...]
-
-
-@dataclass(frozen=True)
-class Prediction:
-    id: str
-    title: str
-    scope: str
-    risk: str
-    category: str
-    confidence: float
-    status: str
-    evidence: list[str]
-    text: str
-    feedback: str = "none"
-
-
-@dataclass(frozen=True)
-class TextSignal:
-    source: str
-    markdown: str
-    count: int
-
-
-KEYWORD_GROUPS = {
-    "repo-governance": (
-        "pull request",
-        "pr",
-        "merge",
-        "approval",
-        "direct push",
-        "branch",
-        "git add",
-        "git pull --ff-only",
-        "origin/main",
-    ),
-    "regression-frameworks": (
-        "pytest",
-        "ruff",
-        "mypy",
-        "coverage",
-        "test suite",
-        "ci",
-        "smoke",
-        "regression",
-    ),
-    "architecture-decisions": ("architecture", "adr", "trade-off", "pivot", "boundary", "decision"),
-    "docs-freshness": ("handoff", "readme", "roadmap", "docs", "documentation", "runbook"),
-    "checkpointing": ("resume", "checkpoint", "session handoff", "start here", "ramp-up"),
-    "metacognition": ("pattern", "memory", "baseline", "salient", "guardrail", "calibrate", "prediction"),
-    "tracked-project-docs": (
-        "project_doc_template",
-        "tracked project doc",
-        "progress tracker",
-        "definition of done",
-        "decisions locked",
-        "one small pr per row",
-        "§7",
-    ),
-}
-
-PR_ONLY_REPO_WRITES_TEXT = (
-    "Agents must not push directly to durable/shared repos. They should branch from the remote base, stage "
-    "explicit paths, open a PR, and merge only after explicit approval or a scoped umbrella approval. Scoped "
-    "approval is limited to the named project, PR set, task, and time/context in which it was granted; it must "
-    "not be reused for adjacent work, self-authored PRs, or later PRs without renewed confirmation."
+from .baseline_calibration import apply_calibration_loop, load_ledger_entries
+from .baseline_predictions import (
+    KEYWORD_GROUPS,
+    PR_ONLY_REPO_WRITES_TEXT,
+    build_predictions,
+    keyword_hits,
+    project_evidence,
+    project_signal_counts,
+    scan_text_signals,
+    signal_confidence,
+    signal_evidence,
+    tracked_project_doc_confidence,
+    tracked_project_doc_evidence,
 )
+from .baseline_promote import (
+    PROMOTED_PLACEHOLDER,
+    PROMOTION_BEGIN,
+    PROMOTION_END,
+    baseline_promote,
+    category_promotion_target,
+    global_baseline_header,
+    parse_promoted_blocks,
+    promote_predictions,
+    render_promoted_block,
+    select_promotable_predictions,
+    upsert_promoted_content,
+)
+from .baseline_report import (
+    render_calibration_summary,
+    render_candidate_report,
+    render_id_list,
+    render_prediction,
+)
+from .baseline_settings import (
+    BASELINE_CONFIG,
+    BASELINE_ROOT,
+    agent_readme,
+    baseline_files,
+    baseline_readme,
+    candidates_readme,
+    feedback_example,
+    load_baseline_settings,
+    load_feedback,
+    metacognition_readme,
+    project_readme,
+    resolve_prediction_sidecar,
+)
+from .baseline_types import (
+    BaselineSettings,
+    Pilot,
+    Prediction,
+    TextSignal,
+    confidence,
+    parse_verdict,
+    prediction_to_dict,
+)
+from .config import ArchiveConfig
+from .utils import read_jsonl_dicts
+
+__all__ = [
+    # orchestration commands (this module)
+    "baseline_scaffold",
+    "baseline_suggest",
+    "baseline_calibrate",
+    "load_index_records",
+    "apply_feedback",
+    "write_prediction_artifacts",
+    "upsert_ledger",
+    "is_relative_to",
+    # baseline_types
+    "Pilot",
+    "BaselineSettings",
+    "Prediction",
+    "TextSignal",
+    "confidence",
+    "parse_verdict",
+    "prediction_to_dict",
+    # baseline_settings
+    "BASELINE_CONFIG",
+    "BASELINE_ROOT",
+    "load_baseline_settings",
+    "load_feedback",
+    "resolve_prediction_sidecar",
+    "baseline_files",
+    "baseline_readme",
+    "candidates_readme",
+    "agent_readme",
+    "project_readme",
+    "feedback_example",
+    "metacognition_readme",
+    # baseline_predictions
+    "KEYWORD_GROUPS",
+    "PR_ONLY_REPO_WRITES_TEXT",
+    "project_signal_counts",
+    "scan_text_signals",
+    "keyword_hits",
+    "build_predictions",
+    "signal_confidence",
+    "project_evidence",
+    "signal_evidence",
+    "tracked_project_doc_confidence",
+    "tracked_project_doc_evidence",
+    # baseline_report
+    "render_candidate_report",
+    "render_prediction",
+    "render_calibration_summary",
+    "render_id_list",
+    # baseline_promote
+    "PROMOTION_BEGIN",
+    "PROMOTION_END",
+    "PROMOTED_PLACEHOLDER",
+    "category_promotion_target",
+    "parse_promoted_blocks",
+    "render_promoted_block",
+    "global_baseline_header",
+    "upsert_promoted_content",
+    "select_promotable_predictions",
+    "promote_predictions",
+    "baseline_promote",
+]
 
 
 def baseline_scaffold(config: ArchiveConfig, dry_run: bool = False) -> int:
@@ -142,8 +183,6 @@ def baseline_suggest(
     )
     predictions = [apply_feedback(prediction, feedback_map) for prediction in predictions]
     if use_calibration:
-        from .baseline_calibration import apply_calibration_loop, load_ledger_entries
-
         predictions = apply_calibration_loop(
             predictions,
             feedback_map,
@@ -208,153 +247,11 @@ def baseline_calibrate(
     return 0
 
 
-def load_baseline_settings(config: ArchiveConfig) -> BaselineSettings:
-    path = config.repo_root / BASELINE_CONFIG
-    data = read_toml(path) if path.exists() else {}
-    baseline = data.get("baseline", {})
-    root = repo_path(config.repo_root, baseline.get("root", str(BASELINE_ROOT)))
-    candidates_dir = repo_path(config.repo_root, baseline.get("candidates_dir", str(BASELINE_ROOT / "candidates")))
-    metacognition_dir = repo_path(config.repo_root, baseline.get("metacognition_dir", str(BASELINE_ROOT / "metacognition")))
-    ledger_path = repo_path(
-        config.repo_root,
-        baseline.get("ledger_path", str(BASELINE_ROOT / "metacognition" / "prediction-ledger.jsonl")),
-    )
-    feedback_example = repo_path(
-        config.repo_root,
-        baseline.get("feedback_example", str(BASELINE_ROOT / "calibration" / "feedback.example.toml")),
-    )
-    pilots = tuple(
-        Pilot(
-            slug=item["slug"],
-            kind=item.get("kind", "repo"),
-            aliases=tuple(item.get("aliases", [])),
-            notes=item.get("notes", ""),
-        )
-        for item in data.get("pilots", [])
-    )
-    return BaselineSettings(
-        root=root,
-        candidates_dir=candidates_dir,
-        metacognition_dir=metacognition_dir,
-        ledger_path=ledger_path,
-        feedback_example=feedback_example,
-        pilots=pilots,
-    )
-
-
-def baseline_files(settings: BaselineSettings) -> dict[Path, str]:
-    files = {
-        settings.root / "README.md": baseline_readme(),
-        settings.root / "candidates" / "README.md": candidates_readme(),
-        settings.root / "global" / "engineering-guardrails.md": "# Engineering Guardrails\n\nPromoted guidance will land here.\n",
-        settings.root / "global" / "repo-workflows.md": "# Repo Workflows\n\nPromoted repo workflow guidance will land here.\n",
-        settings.root / "global" / "regression-frameworks.md": "# Regression Frameworks\n\nPromoted testing guidance will land here.\n",
-        settings.root / "global" / "prompt-patterns.md": "# Prompt Patterns\n\nPromoted prompt guidance will land here.\n",
-        settings.root / "agents" / "codex" / "README.md": agent_readme("Codex", "AGENTS.generated.md"),
-        settings.root / "agents" / "claude" / "README.md": agent_readme("Claude", "CLAUDE.generated.md"),
-        settings.root / "agents" / "vscode" / "README.md": agent_readme("VS Code", "copilot-instructions.generated.md"),
-        settings.metacognition_dir / "README.md": metacognition_readme(),
-        settings.feedback_example: feedback_example(),
-    }
-    for pilot in settings.pilots:
-        files[settings.root / "projects" / pilot.slug / "README.md"] = project_readme(pilot.slug)
-    return files
-
-
-def baseline_readme() -> str:
-    return """# Engineering Baseline
-
-This directory holds reviewed engineering guardrails, project memory, and
-agent-specific generated views derived from archived sessions and repo evidence.
-
-Candidate files are suggestions. Promoted files are reviewed baseline guidance.
-Generated agent files should stay separate from hand-written project instruction
-files until their output proves useful.
-"""
-
-
-def candidates_readme() -> str:
-    return """# Baseline Candidates
-
-Candidate files are generated suggestions with provenance, confidence, risk, and
-promotion checkboxes. Review these in PRs before promoting anything into the
-global or project baseline.
-"""
-
-
-def agent_readme(agent_name: str, generated_name: str) -> str:
-    return f"""# {agent_name} Baseline View
-
-Generated {agent_name} instructions will land in `{generated_name}` later. Keep
-this separate from hand-written project instructions until the publisher is
-trusted.
-"""
-
-
-def project_readme(slug: str) -> str:
-    return f"""# {slug}
-
-Project-specific promoted baseline notes for `{slug}` will land here.
-"""
-
-
-def feedback_example() -> str:
-    return """# Copy to feedback.toml and mark predictions after reviewing a candidate file.
-
-[feedback."profile.multi-agent-builder"]
-verdict = "accept"
-note = "This matches the user's actual working style."
-
-[feedback."profile.local-first-private-compute"]
-verdict = "edit"
-note = "Keep the local-first point, but mention that cloud APIs are acceptable when explicitly authorized."
-
-[feedback."profile.business-productivity-engineer"]
-verdict = "reject"
-note = "Example of a rejected hypothesis."
-"""
-
-
-def metacognition_readme() -> str:
-    return """# Metacognition
-
-This folder holds machine-readable prediction history and calibration summaries.
-The loop is: generate predictions from local evidence, collect feedback, compare
-error, and make the next candidate report sharper.
-"""
-
-
 def load_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
     index_path = config.archive_dir / "index.jsonl"
     if not index_path.exists():
         raise SystemExit("archive/index.jsonl does not exist. Run export first.")
     return read_jsonl_dicts(index_path, label="archive/index.jsonl")
-
-
-def load_feedback(config: ArchiveConfig, feedback: Path | None) -> dict[str, dict[str, str]]:
-    if feedback is None:
-        default = config.repo_root / "baseline" / "calibration" / "feedback.toml"
-        feedback = default if default.exists() else None
-    if feedback is None:
-        return {}
-    if not feedback.is_absolute():
-        feedback = config.repo_root / feedback
-    if not feedback.exists():
-        raise SystemExit(f"Feedback file does not exist: {feedback}")
-    data = read_toml(feedback)
-    raw = data.get("feedback", {})
-    return {str(key): dict(value) for key, value in raw.items() if isinstance(value, dict)}
-
-
-def parse_verdict(feedback_item: dict[str, str] | None) -> str:
-    """Normalize a feedback entry's verdict to a lowercased string ("" if absent).
-
-    The single canonical parse for accept/edit/reject verdicts, shared by every
-    consumer instead of re-implementing ``str(item.get("verdict","")).strip().lower()``.
-    """
-    if not feedback_item:
-        return ""
-    return str(feedback_item.get("verdict", "")).strip().lower()
 
 
 def apply_feedback(prediction: Prediction, feedback_map: dict[str, dict[str, str]]) -> Prediction:
@@ -363,18 +260,18 @@ def apply_feedback(prediction: Prediction, feedback_map: dict[str, dict[str, str
         return prediction
     verdict = parse_verdict(item)
     note = str(item.get("note", "")).strip()
-    status, confidence = prediction.status, prediction.confidence
+    status, adjusted = prediction.status, prediction.confidence
     if verdict == "accept":
         status = "accepted-feedback"
-        confidence = min(0.99, prediction.confidence + 0.08)
+        adjusted = min(0.99, prediction.confidence + 0.08)
     elif verdict == "reject":
         status = "rejected-feedback"
-        confidence = max(0.01, prediction.confidence - 0.35)
+        adjusted = max(0.01, prediction.confidence - 0.35)
     elif verdict == "edit":
         status = "edit-requested"
-        confidence = max(0.01, prediction.confidence - 0.08)
+        adjusted = max(0.01, prediction.confidence - 0.08)
     feedback = f"{verdict}: {note}" if note else verdict or "present"
-    return replace(prediction, status=status, confidence=confidence, feedback=feedback)
+    return replace(prediction, status=status, confidence=adjusted, feedback=feedback)
 
 
 def write_prediction_artifacts(
@@ -402,21 +299,6 @@ def write_prediction_artifacts(
     upsert_ledger(settings.ledger_path, run_id, cast(list[dict[str, Any]], payload["predictions"]))
 
 
-def prediction_to_dict(prediction: Prediction) -> dict[str, Any]:
-    return {
-        "id": prediction.id,
-        "title": prediction.title,
-        "scope": prediction.scope,
-        "risk": prediction.risk,
-        "category": prediction.category,
-        "confidence": round(prediction.confidence, 4),
-        "status": prediction.status,
-        "feedback": prediction.feedback,
-        "evidence": prediction.evidence,
-        "text": prediction.text,
-    }
-
-
 def upsert_ledger(ledger_path: Path, run_id: str, predictions: list[dict[str, Any]]) -> None:
     existing: list[dict[str, Any]] = []
     if ledger_path.exists():
@@ -442,603 +324,9 @@ def upsert_ledger(ledger_path: Path, run_id: str, predictions: list[dict[str, An
     os.replace(tmp_path, ledger_path)
 
 
-def resolve_prediction_sidecar(settings: BaselineSettings, predictions: Path | None) -> Path:
-    if predictions is not None:
-        if not predictions.is_absolute():
-            predictions = settings.root.parent / predictions
-        if not predictions.exists():
-            raise SystemExit(f"Prediction sidecar does not exist: {predictions}")
-        return predictions
-    sidecars = sorted(settings.candidates_dir.glob("*.predictions.json"), key=lambda path: path.stat().st_mtime)
-    if not sidecars:
-        raise SystemExit("No prediction sidecar found. Run `baseline suggest` first.")
-    return sidecars[-1]
-
-
-def render_calibration_summary(
-    prediction_data: dict[str, Any],
-    feedback_map: dict[str, dict[str, str]],
-    feedback_path: Path,
-    prediction_path: Path,
-) -> str:
-    predictions = prediction_data.get("predictions", [])
-    accepted: list[str] = []
-    edited: list[str] = []
-    rejected: list[str] = []
-    missing: list[str] = []
-    for prediction in predictions:
-        prediction_id = prediction.get("id", "")
-        feedback = feedback_map.get(prediction_id)
-        if not feedback:
-            missing.append(prediction_id)
-            continue
-        verdict = parse_verdict(feedback)
-        if verdict == "accept":
-            accepted.append(prediction_id)
-        elif verdict == "edit":
-            edited.append(prediction_id)
-        elif verdict == "reject":
-            rejected.append(prediction_id)
-    lines = [
-        f"# Calibration Summary ({dt.date.today().isoformat()})",
-        "",
-        f"- Prediction run: `{prediction_data.get('run_id', prediction_path.stem)}`",
-        f"- Prediction sidecar: `{prediction_path}`",
-        f"- Feedback file: `{feedback_path}`",
-        f"- Predictions reviewed: `{len(predictions)}`",
-        f"- Accepted: `{len(accepted)}`",
-        f"- Edited: `{len(edited)}`",
-        f"- Rejected: `{len(rejected)}`",
-        f"- Awaiting feedback: `{len(missing)}`",
-        "",
-        "## Accepted",
-        "",
-        *render_id_list(accepted),
-        "",
-        "## Edit Requested",
-        "",
-        *render_id_list(edited),
-        "",
-        "## Rejected",
-        "",
-        *render_id_list(rejected),
-        "",
-        "## Awaiting Feedback",
-        "",
-        *render_id_list(missing),
-        "",
-        "## Next Correction",
-        "",
-        "Use accepted predictions as stronger priors, rewrite edited predictions before promotion, and suppress",
-        "or reframe rejected predictions in the next candidate report.",
-    ]
-    return "\n".join(lines) + "\n"
-
-
-def render_id_list(values: list[str]) -> list[str]:
-    if not values:
-        return ["- None"]
-    return [f"- `{value}`" for value in values]
-
-
 def is_relative_to(path: Path, parent: Path) -> bool:
     try:
         path.resolve().relative_to(parent.resolve())
     except ValueError:
         return False
     return True
-
-
-def project_signal_counts(settings: BaselineSettings, records: list[dict[str, Any]]) -> Counter[str]:
-    counts: Counter[str] = Counter()
-    for record in records:
-        haystack = " ".join(
-            [
-                str(record.get("source_file", "")),
-                str(record.get("markdown", "")),
-                json.dumps(record.get("metadata", {}), ensure_ascii=False),
-            ]
-        ).lower()
-        for pilot in settings.pilots:
-            names = (pilot.slug, *pilot.aliases)
-            if any(name.lower() in haystack for name in names):
-                counts[pilot.slug] += 1
-    return counts
-
-
-def scan_text_signals(config: ArchiveConfig, records: list[dict[str, Any]], max_sessions: int) -> dict[str, list[TextSignal]]:
-    selected = records if max_sessions == 0 else records[:max_sessions]
-    grouped: dict[str, list[TextSignal]] = {key: [] for key in KEYWORD_GROUPS}
-    for record in selected:
-        markdown_path = archive_markdown_path(config.repo_root, str(record.get("markdown", "")))
-        if not markdown_path.exists():
-            continue
-        text = markdown_path.read_text(encoding="utf-8", errors="replace").lower()
-        for group, keywords in KEYWORD_GROUPS.items():
-            count = keyword_hits(text, keywords)
-            if count:
-                grouped[group].append(
-                    TextSignal(
-                        source=str(record.get("source", "")),
-                        markdown=str(record.get("markdown", "")),
-                        count=count,
-                    )
-                )
-    return {group: sorted(signals, key=lambda signal: signal.count, reverse=True) for group, signals in grouped.items()}
-
-
-def keyword_hits(text: str, keywords: tuple[str, ...]) -> int:
-    count = 0
-    for keyword in keywords:
-        escaped = re.escape(keyword.lower())
-        if re.fullmatch(r"[a-z0-9_]+", keyword.lower()):
-            pattern = rf"\b{escaped}\b"
-        else:
-            pattern = escaped
-        count += len(re.findall(pattern, text))
-    return count
-
-
-def build_predictions(
-    settings: BaselineSettings,
-    source_counts: Counter[str],
-    kind_counts: Counter[str],
-    project_hits: Counter[str],
-    text_signals: dict[str, list[TextSignal]],
-) -> list[Prediction]:
-    total_records = sum(source_counts.values())
-    active_sources = sum(1 for count in source_counts.values() if count)
-    predictions = [
-        Prediction(
-            id="profile.multi-agent-builder",
-            title="Multi-Agent Builder",
-            scope="user-profile",
-            risk="low",
-            category="metacognition",
-            confidence=confidence(0.46 + active_sources * 0.06 + math.log10(max(total_records, 1)) * 0.08),
-            status="proposed",
-            evidence=[
-                f"{total_records} archived session files across {active_sources} configured sources.",
-                "Active source mix: " + ", ".join(f"{name}={count}" for name, count in source_counts.most_common(6)),
-            ],
-            text=(
-                "The user appears to be a heavy multi-agent builder who uses several local coding agents as part of "
-                "an active engineering workflow rather than as an occasional chat-only assistant."
-            ),
-        ),
-        Prediction(
-            id="profile.local-first-private-compute",
-            title="Local-First Private Compute Preference",
-            scope="user-profile",
-            risk="low",
-            category="metacognition",
-            confidence=confidence(0.55 + bool(source_counts.get("grok-wsl-ubuntu")) * 0.12 + bool(kind_counts.get("codex")) * 0.08),
-            status="proposed",
-            evidence=[
-                "Windows and WSL local stores are first-class archive sources.",
-                "Grok, Claude, Codex, DeepSeek, and Gemini sources are read from local disk paths.",
-            ],
-            text=(
-                "The user strongly prefers owned/local CPU, RAM, and disk as the default source of truth, while still "
-                "allowing explicit, bounded access to external services when useful."
-            ),
-        ),
-        Prediction(
-            id="profile.business-productivity-engineer",
-            title="Business/Productivity-Oriented Engineer",
-            scope="user-profile",
-            risk="medium",
-            category="metacognition",
-            confidence=confidence(0.43 + min(sum(project_hits.values()), 100) / 500),
-            status="proposed",
-            evidence=project_evidence(project_hits),
-            text=(
-                "The user looks like a builder who blends software engineering, product/business workflows, and agent "
-                "automation to improve productivity across several durable projects."
-            ),
-        ),
-        Prediction(
-            id="guardrail.pr-only-repo-writes",
-            title="PR-Only Repo Writes",
-            scope="global",
-            risk="high",
-            category="repo-governance",
-            confidence=signal_confidence(text_signals, "repo-governance", base=0.68),
-            status="proposed",
-            evidence=signal_evidence(text_signals, "repo-governance"),
-            text=PR_ONLY_REPO_WRITES_TEXT,
-        ),
-        Prediction(
-            id="guardrail.verified-regression-gates",
-            title="Verified Regression Gates",
-            scope="global",
-            risk="high",
-            category="regression-frameworks",
-            confidence=signal_confidence(text_signals, "regression-frameworks", base=0.58),
-            status="proposed",
-            evidence=signal_evidence(text_signals, "regression-frameworks"),
-            text=(
-                "Agents should discover and run the repo's real test, lint, type, coverage, and smoke gates before "
-                "claiming a change is ready, and clearly state anything that could not be verified."
-            ),
-        ),
-        Prediction(
-            id="guardrail.handoff-and-resume",
-            title="Handoff And Resume Discipline",
-            scope="global",
-            risk="medium",
-            category="checkpointing",
-            confidence=signal_confidence(text_signals, "checkpointing", base=0.52),
-            status="proposed",
-            evidence=signal_evidence(text_signals, "checkpointing"),
-            text=(
-                "Projects should maintain a short session handoff or start-here file so future agents can resume from "
-                "real state instead of replaying old conversation."
-            ),
-        ),
-        Prediction(
-            id="guardrail.tracked-project-docs",
-            title="Tracked Project Docs For Substantial Work",
-            scope="global",
-            risk="medium",
-            category="docs",
-            confidence=tracked_project_doc_confidence(text_signals, settings),
-            status="proposed",
-            evidence=tracked_project_doc_evidence(text_signals, settings),
-            text=(
-                "Substantial design or multi-PR project work should use a tracked project doc following "
-                "`docs/PROJECT_DOC_TEMPLATE.md`: status header, decisions locked, §7 progress tracker with one small "
-                "PR per row, definition of done, then archive on completion. Precedent: `badminton-highlight-indexer`."
-            ),
-        ),
-        Prediction(
-            id="harness.predict-then-calibrate",
-            title="Predict Then Calibrate",
-            scope="global",
-            risk="medium",
-            category="metacognition",
-            confidence=signal_confidence(text_signals, "metacognition", base=0.5),
-            status="proposed",
-            evidence=signal_evidence(text_signals, "metacognition"),
-            text=(
-                "The baseline system should regularly make explicit predictions about user/project patterns, ask for "
-                "calibration feedback, and adjust confidence or wording based on accepted, edited, or rejected guesses."
-            ),
-        ),
-    ]
-    return predictions
-
-
-def confidence(value: float) -> float:
-    return max(0.01, min(0.99, value))
-
-
-def signal_confidence(text_signals: dict[str, list[TextSignal]], group: str, base: float) -> float:
-    total = sum(signal.count for signal in text_signals.get(group, []))
-    return confidence(base + min(total, 250) / 1000)
-
-
-def project_evidence(project_hits: Counter[str]) -> list[str]:
-    if not project_hits:
-        return ["No configured pilot project names were detected in the archive index yet."]
-    return [f"{slug}: {count} archive records" for slug, count in project_hits.most_common()]
-
-
-def signal_evidence(text_signals: dict[str, list[TextSignal]], group: str) -> list[str]:
-    signals = text_signals.get(group, [])
-    if not signals:
-        return [f"No `{group}` text signals found in scanned Markdown sessions yet."]
-    evidence = [f"{len(signals)} scanned sessions contain `{group}` signals."]
-    for signal in signals[:4]:
-        markdown = signal.markdown.replace("\\", "/")
-        evidence.append(f"{markdown} ({signal.count} keyword hits)")
-    return evidence
-
-
-def tracked_project_doc_confidence(
-    text_signals: dict[str, list[TextSignal]],
-    settings: BaselineSettings,
-) -> float:
-    conf = signal_confidence(text_signals, "tracked-project-docs", base=0.55)
-    path = settings.root.parent / BASELINE_CONFIG
-    data = read_toml(path) if path.exists() else {}
-    for anchor in data.get("calibration_anchors", []):
-        if anchor.get("kind") != "tracked-project-doc":
-            continue
-        hits = int(anchor.get("archive_hits") or 0)
-        if hits:
-            conf = confidence(conf + min(hits, 500) / 800)
-    return conf
-
-
-def tracked_project_doc_evidence(
-    text_signals: dict[str, list[TextSignal]],
-    settings: BaselineSettings,
-) -> list[str]:
-    evidence = signal_evidence(text_signals, "tracked-project-docs")
-    path = settings.root.parent / BASELINE_CONFIG
-    data = read_toml(path) if path.exists() else {}
-    for anchor in data.get("calibration_anchors", []):
-        if anchor.get("kind") != "tracked-project-doc":
-            continue
-        repo = anchor.get("source_repo", "unknown")
-        path = anchor.get("source_path", "")
-        hits = anchor.get("archive_hits")
-        hit_note = f"{hits} archive sessions mention `{anchor.get('archive_signal', '')}`" if hits else ""
-        evidence.append(f"Calibration anchor: `{repo}/{path}` ({hit_note})".strip())
-    return evidence
-
-
-def render_candidate_report(
-    settings: BaselineSettings,
-    index_records: list[dict[str, Any]],
-    source_counts: Counter[str],
-    kind_counts: Counter[str],
-    project_hits: Counter[str],
-    text_signals: dict[str, list[TextSignal]],
-    predictions: list[Prediction],
-    max_sessions: int,
-    feedback_path: Path | None,
-) -> str:
-    scanned_count = len(index_records) if max_sessions == 0 else min(max_sessions, len(index_records))
-    lines = [
-        f"# Baseline Candidate Extraction ({dt.date.today().isoformat()})",
-        "",
-        "Status: proposed",
-        "Generated by: `python .\\tools\\agent_archive.py baseline suggest`",
-        "",
-        "## Summary",
-        "",
-        f"- Indexed sessions: `{len(index_records)}`",
-        f"- Markdown sessions scanned for text signals: `{scanned_count}`",
-        f"- Sources represented: `{len(source_counts)}`",
-        f"- Feedback file: `{feedback_path or 'none'}`",
-        "",
-        "## Source Mix",
-        "",
-    ]
-    for source, count in source_counts.most_common():
-        lines.append(f"- `{source}`: {count}")
-    lines.extend(["", "## Kind Mix", ""])
-    for kind, count in kind_counts.most_common():
-        lines.append(f"- `{kind}`: {count}")
-    lines.extend(["", "## Pilot Project Signals", ""])
-    if project_hits:
-        for slug, count in project_hits.most_common():
-            lines.append(f"- `{slug}`: {count}")
-    else:
-        lines.append("- No configured pilot project names were detected in the archive index yet.")
-    lines.extend(["", "## Text Signal Counts", ""])
-    for group, signals in text_signals.items():
-        lines.append(f"- `{group}`: {sum(signal.count for signal in signals)} hits across {len(signals)} scanned sessions")
-    lines.extend(["", "## Predictions And Candidate Rules", ""])
-    for prediction in predictions:
-        lines.extend(render_prediction(prediction))
-    lines.extend(
-        [
-            "",
-            "## Calibration Loop",
-            "",
-            "Copy `baseline/calibration/feedback.example.toml` to `baseline/calibration/feedback.toml`, then mark each",
-            "prediction as `accept`, `edit`, or `reject`. Rerun this command with `--feedback` to let the next report",
-            "show where the system was right, wrong, or too vague.",
-            "",
-            "The first version only adjusts confidence and status. Later versions should compare prediction history",
-            "against accepted feedback and make the next proposal sharper.",
-        ]
-    )
-    return "\n".join(lines) + "\n"
-
-
-def render_prediction(prediction: Prediction) -> list[str]:
-    lines = [
-        f"### {prediction.title}",
-        "",
-        f"Prediction id: `{prediction.id}`",
-        f"Status: {prediction.status}",
-        f"Scope: {prediction.scope}",
-        f"Risk: {prediction.risk}",
-        f"Category: {prediction.category}",
-        f"Confidence: {prediction.confidence:.2f}",
-        f"Feedback: {prediction.feedback}",
-        "",
-        "Evidence:",
-    ]
-    for item in prediction.evidence:
-        lines.append(f"- {item}")
-    lines.extend(
-        [
-            "",
-            "Suggested baseline text:",
-            prediction.text,
-            "",
-            "Promotion:",
-            "- [ ] Accept",
-            "- [ ] Edit and accept",
-            "- [ ] Reject",
-            "- [ ] Project-specific only",
-            "",
-        ]
-    )
-    return lines
-
-
-PROMOTION_BEGIN = '<!-- baseline:begin id="{id}" -->'
-PROMOTION_END = '<!-- baseline:end id="{id}" -->'
-PROMOTED_PLACEHOLDER = "Promoted guidance will land here."
-
-
-def category_promotion_target(category: str) -> str:
-    if category == "regression-frameworks":
-        return "regression-frameworks.md"
-    return "engineering-guardrails.md"
-
-
-def parse_promoted_blocks(content: str) -> dict[str, str]:
-    blocks: dict[str, str] = {}
-    pattern = re.compile(
-        r'<!-- baseline:begin id="([^"]+)" -->\n?(.*?)<!-- baseline:end id="\1" -->',
-        re.DOTALL,
-    )
-    for match in pattern.finditer(content):
-        blocks[match.group(1)] = match.group(0).strip()
-    return blocks
-
-
-def render_promoted_block(
-    prediction: dict[str, Any],
-    run_id: str,
-    feedback_note: str,
-    promoted_at: str,
-) -> str:
-    prediction_id = str(prediction.get("id", ""))
-    title = str(prediction.get("title", prediction_id))
-    confidence = float(prediction.get("confidence", 0))
-    text = str(prediction.get("text", "")).strip()
-    evidence = prediction.get("evidence", [])
-    lines = [
-        PROMOTION_BEGIN.format(id=prediction_id),
-        f"## {title}",
-        "",
-        f"**ID:** `{prediction_id}`",
-        f"**Promoted:** {promoted_at}",
-        f"**Run:** {run_id}",
-        f"**Confidence:** {confidence:.2f}",
-    ]
-    if feedback_note:
-        lines.append(f"**Review note:** {feedback_note}")
-    lines.extend(["", text, "", "### Evidence"])
-    if isinstance(evidence, list) and evidence:
-        for item in evidence:
-            lines.append(f"- {item}")
-    else:
-        lines.append("- No evidence recorded in prediction sidecar.")
-    lines.append(PROMOTION_END.format(id=prediction_id))
-    return "\n".join(lines)
-
-
-def global_baseline_header(filename: str) -> str:
-    titles = {
-        "engineering-guardrails.md": "Engineering Guardrails",
-        "regression-frameworks.md": "Regression Frameworks",
-    }
-    title = titles.get(filename, filename.replace(".md", "").replace("-", " ").title())
-    return (
-        f"# {title}\n\n"
-        "Promoted guidance derived from reviewed baseline candidates.\n"
-    )
-
-
-def upsert_promoted_content(existing: str, blocks: dict[str, str], filename: str) -> str:
-    if not blocks:
-        return existing
-    # Fresh/empty file: lay down the standard header plus the new blocks.
-    if not existing.strip():
-        body = "\n\n".join(blocks[prediction_id] for prediction_id in sorted(blocks))
-        return global_baseline_header(filename) + "\n" + body + "\n"
-    # Existing file: preserve all hand-written prose. Drop only the scaffold
-    # placeholder line, replace same-id blocks in place, and append new ones.
-    result = existing
-    if PROMOTED_PLACEHOLDER in result:
-        result = (
-            "\n".join(line for line in result.splitlines() if PROMOTED_PLACEHOLDER not in line).rstrip("\n") + "\n"
-        )
-    appended: list[str] = []
-    for prediction_id in sorted(blocks):
-        block = blocks[prediction_id]
-        marker = re.compile(
-            r'<!-- baseline:begin id="' + re.escape(prediction_id) + r'" -->\n?.*?'
-            r'<!-- baseline:end id="' + re.escape(prediction_id) + r'" -->',
-            re.DOTALL,
-        )
-        if marker.search(result):
-            result = marker.sub(lambda _match: block, result, count=1)
-        else:
-            appended.append(block)
-    if appended:
-        result = result.rstrip("\n") + "\n\n" + "\n\n".join(appended) + "\n"
-    return result
-
-
-def select_promotable_predictions(
-    predictions: list[dict[str, Any]],
-    feedback_map: dict[str, dict[str, str]],
-    ids: tuple[str, ...] | None = None,
-) -> list[dict[str, Any]]:
-    selected: list[dict[str, Any]] = []
-    for prediction in predictions:
-        prediction_id = str(prediction.get("id", ""))
-        if ids and prediction_id not in ids:
-            continue
-        if not prediction_id.startswith("guardrail."):
-            continue
-        feedback = feedback_map.get(prediction_id)
-        if not feedback:
-            continue
-        if parse_verdict(feedback) != "accept":
-            continue
-        selected.append(prediction)
-    return selected
-
-
-def promote_predictions(
-    settings: BaselineSettings,
-    predictions: list[dict[str, Any]],
-    feedback_map: dict[str, dict[str, str]],
-    run_id: str,
-    promoted_at: str,
-    ids: tuple[str, ...] | None = None,
-) -> dict[Path, str]:
-    promotable = select_promotable_predictions(predictions, feedback_map, ids=ids)
-    grouped: dict[str, dict[str, str]] = {}
-    for prediction in promotable:
-        prediction_id = str(prediction.get("id", ""))
-        feedback_note = str(feedback_map.get(prediction_id, {}).get("note", "")).strip()
-        target_name = category_promotion_target(str(prediction.get("category", "")))
-        grouped.setdefault(target_name, {})[prediction_id] = render_promoted_block(
-            prediction,
-            run_id=run_id,
-            feedback_note=feedback_note,
-            promoted_at=promoted_at,
-        )
-    updates: dict[Path, str] = {}
-    for target_name, blocks in grouped.items():
-        path = settings.root / "global" / target_name
-        existing = path.read_text(encoding="utf-8") if path.exists() else ""
-        updates[path] = upsert_promoted_content(existing, blocks, target_name)
-    return updates
-
-
-def baseline_promote(
-    config: ArchiveConfig,
-    feedback: Path,
-    predictions: Path | None = None,
-    dry_run: bool = False,
-    ids: tuple[str, ...] | None = None,
-) -> int:
-    settings = load_baseline_settings(config)
-    feedback_map = load_feedback(config, feedback)
-    prediction_path = resolve_prediction_sidecar(settings, predictions)
-    prediction_data = json.loads(prediction_path.read_text(encoding="utf-8"))
-    run_id = str(prediction_data.get("run_id", prediction_path.stem.replace(".predictions", "")))
-    promoted_at = dt.date.today().isoformat()
-    updates = promote_predictions(
-        settings=settings,
-        predictions=cast(list[dict[str, Any]], prediction_data.get("predictions", [])),
-        feedback_map=feedback_map,
-        run_id=run_id,
-        promoted_at=promoted_at,
-        ids=ids,
-    )
-    if not updates:
-        print("No accepted guardrail predictions to promote.")
-        return 0
-    for path, content in updates.items():
-        if dry_run:
-            print(f"Would write {path}")
-            print(content)
-            continue
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8", newline="\n")
-        print(f"Wrote {path}")
-    return 0
