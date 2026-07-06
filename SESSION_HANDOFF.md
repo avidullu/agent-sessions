@@ -9,14 +9,18 @@ source kind. It exports local session data to Markdown and PDF from Codex,
 Claude, Grok, DeepSeek, Gemini Antigravity, and known VS Code extension
 locations where transcript-like files are discoverable.
 
+The archive now has merge-aware indexing, `python .\tools\agent_archive.py
+status`, and docs for multi-machine archive convergence. Local status on
+2026-07-06 showed 3,114 indexed records, 0 new visible files, 2 changed visible
+files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
+`wsl-user:Ubuntu:/home/avidullu`.
+
 ## Next Steps / Open Threads
 
 - **Active tracked project:** `docs/BASELINE_LOOP_CLOSURE.md` (§7 closure tracker).
 - **Efficacy gates:** `docs/CALIBRATION_EFFICACY.md` and `baseline/calibration/efficacy.toml`.
-- **P1 in review (PR #13):** `baseline promote` → `baseline/global/`.
-- **P2 in review (PR #14):** `baseline publish` → `baseline/agents/*/ *.generated.md`.
-- **P3 in review:** calibration loop + `baseline eval` efficacy harness.
-- **Next:** P4 `baseline ingest` from `baseline/proposals/`.
+- **Merged:** PRs #13-#17 cover baseline promote, publish, calibration/eval,
+  structured proposal ingest, and multi-machine archive status/merge behavior.
 - Add a daily Codex automation for pull/export/PDF/commit/push once the desired
   schedule is chosen.
 - Keep hosted/cloud session imports as optional future work only; the current
@@ -52,6 +56,7 @@ locations where transcript-like files are discoverable.
 - `docs/PROJECT_DOC_TEMPLATE.md`
 - `docs/COMPOSE_STACK.md`
 - `docs/AUTOMATION.md`
+- `docs/MULTI_MACHINE.md`
 - `baseline/calibration/efficacy.toml`
 - `tools/agent_archive.py`
 - `agent_sessions/`

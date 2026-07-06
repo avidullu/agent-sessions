@@ -16,8 +16,10 @@ from agent_sessions.archive import (
     export_sources,
     iter_source_files,
     load_index_records,
+    merge_index_records,
     pdf_existing,
     preserve_generated_at,
+    read_existing_index_records,
     select_sources,
     sha256_file,
     source_modified_date,
@@ -346,6 +348,60 @@ class TestLoadIndexRecords:
 
         with pytest.raises(SystemExit, match="index.jsonl"):
             load_index_records(archive_config)
+
+
+class TestMergeIndexRecords:
+    def test_current_replaces_existing_same_source_file(self) -> None:
+        existing = [
+            {
+                "source": "test-claude",
+                "source_file": "/same/session.jsonl",
+                "sha256": "old",
+                "markdown": "archive/test/old.md",
+            }
+        ]
+        current = [
+            {
+                "source": "test-claude",
+                "source_file": "/same/session.jsonl",
+                "sha256": "new",
+                "markdown": "archive/test/new.md",
+            }
+        ]
+
+        merged = merge_index_records(existing, current)
+
+        assert len(merged) == 1
+        assert merged[0]["sha256"] == "new"
+        assert merged[0]["markdown"] == "archive/test/new.md"
+
+    def test_export_preserves_records_from_other_machines(
+        self, archive_config: ArchiveConfig
+    ) -> None:
+        remote = {
+            "source": "remote-claude",
+            "kind": "claude",
+            "source_file": r"C:\Users\other\.claude\projects\session.jsonl",
+            "sha256": "remote",
+            "messages": 1,
+            "markdown": "archive/remote-claude/session.md",
+            "pdf": None,
+            "raw": None,
+            "metadata": {},
+        }
+        write_indexes(archive_config, [remote])
+        root = archive_config.sources[0].roots[0]
+        root.mkdir(parents=True)
+        (root / "local.jsonl").write_text(
+            '{"sessionId":"local","message":{"role":"user","content":[{"text":"Hi"}]}}\n',
+            encoding="utf-8",
+        )
+
+        export_sources(archive_config)
+        records = read_existing_index_records(archive_config)
+
+        assert any(record["source"] == "remote-claude" for record in records)
+        assert any(record["source"] == "test-claude" for record in records)
 
 
 class TestDiscoverSources:

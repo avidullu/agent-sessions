@@ -80,6 +80,13 @@ class TestBuildParser:
         assert args.limit == 10
         assert args.force is True
 
+    def test_status(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["status", "--source", "codex", "--json"])
+        assert args.cmd == "status"
+        assert args.source == ["codex"]
+        assert args.json is True
+
     def test_baseline_scaffold(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["baseline", "scaffold"])
@@ -246,6 +253,17 @@ class TestMain:
         )
         with pytest.raises(SystemExit):
             main(["pdf"])
+
+    def test_status_main(self, repo_root: Path) -> None:
+        (repo_root / "config" / "default_sources.toml").parent.mkdir(
+            parents=True, exist_ok=True
+        )
+        (repo_root / "config" / "default_sources.toml").write_text(
+            '[archive]\narchive_dir = "archive"\nraw_dir = "raw"\n',
+            encoding="utf-8",
+        )
+        result = main(["status", "--json"])
+        assert result == 0
 
     def test_baseline_scaffold_main(self, repo_root: Path) -> None:
         (repo_root / "config" / "default_sources.toml").parent.mkdir(

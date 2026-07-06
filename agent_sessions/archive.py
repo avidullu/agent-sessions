@@ -131,8 +131,36 @@ def export_sources(
             break
 
     if not dry_run:
-        write_indexes(config, records)
+        write_indexes(config, merge_index_records(read_existing_index_records(config), records))
     return ExportResult(exported=exported, pdf_missing=pdf_missing, skipped_sources=tuple(skipped_sources))
+
+
+def index_record_key(record: dict[str, Any]) -> tuple[str, str]:
+    return (str(record.get("source", "")), str(record.get("source_file", "")))
+
+
+def read_existing_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
+    index_path = config.archive_dir / "index.jsonl"
+    if not index_path.exists():
+        return []
+    records: list[dict[str, Any]] = []
+    with index_path.open("r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                records.append(json.loads(line))
+    return records
+
+
+def merge_index_records(existing: list[dict[str, Any]], current: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: dict[tuple[str, str], dict[str, Any]] = {}
+    order: list[tuple[str, str]] = []
+    for record in [*existing, *current]:
+        key = index_record_key(record)
+        if key not in merged:
+            order.append(key)
+        merged[key] = record
+    return [merged[key] for key in order]
 
 
 def write_indexes(config: ArchiveConfig, records: list[dict[str, Any]]) -> None:
