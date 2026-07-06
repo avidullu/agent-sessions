@@ -68,6 +68,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_baseline_promote.add_argument("--id", action="append", dest="promote_ids", help="Promote only this prediction id.")
     p_baseline_promote.add_argument("--dry-run", action="store_true")
 
+    p_baseline_publish = baseline_sub.add_parser(
+        "publish",
+        help="Generate agent-specific baseline slices from promoted global files.",
+    )
+    p_baseline_publish.add_argument(
+        "--agent",
+        action="append",
+        dest="publish_agents",
+        choices=("codex", "claude", "vscode"),
+        help="Publish only selected agent targets. Default: all.",
+    )
+    p_baseline_publish.add_argument("--dry-run", action="store_true")
+
     p_baseline_bundle = baseline_sub.add_parser("bundle", help="Create a bounded evidence bundle for an AI agent.")
     p_baseline_bundle.add_argument("--output-dir", type=Path, help="Bundle output directory.")
     p_baseline_bundle.add_argument("--max-sessions", type=int, default=12)
@@ -151,6 +164,11 @@ def main(argv: list[str] | None = None) -> int:
                 dry_run=args.dry_run,
                 ids=promote_ids,
             )
+        if args.baseline_cmd == "publish":
+            from .baseline_publish import baseline_publish
+
+            publish_agents = tuple(args.publish_agents) if args.publish_agents else None
+            return baseline_publish(config, dry_run=args.dry_run, agents=publish_agents)
         if args.baseline_cmd == "bundle":
             from .baseline_agent import baseline_bundle
 

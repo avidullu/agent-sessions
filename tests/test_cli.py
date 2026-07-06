@@ -108,6 +108,15 @@ class TestBuildParser:
         assert args.baseline_cmd == "calibrate"
         assert args.feedback == Path("fb.toml")
 
+    def test_baseline_publish(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["baseline", "publish", "--agent", "claude", "--agent", "codex", "--dry-run"]
+        )
+        assert args.baseline_cmd == "publish"
+        assert args.publish_agents == ["claude", "codex"]
+        assert args.dry_run is True
+
     def test_baseline_promote(self) -> None:
         parser = build_parser()
         args = parser.parse_args(

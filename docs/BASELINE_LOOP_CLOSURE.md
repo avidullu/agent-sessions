@@ -101,7 +101,7 @@ Reuse map:
 |----|-------------|-----------|--------|--------|----|
 | P0 | Tracked project + efficacy framework (this doc, template, `efficacy.toml`) | — | No | ☑ | — |
 | P1 | `baseline promote` — write accepted candidates to `baseline/global/` or `projects/` | P0 | Yes | ◐ | — |
-| P2 | `baseline publish` — generate `baseline/agents/*/ *.generated.md` | P1 | Yes | ☐ | — |
+| P2 | `baseline publish` — generate `baseline/agents/*/ *.generated.md` | P1 | Yes | ◐ | — |
 | P3 | Calibration loop — `suggest` reads feedback + ledger; adjusts confidence | P0 | No | ☐ | — |
 | P4 | `baseline ingest` — structured proposals from `baseline/proposals/` | P0 | No | ☐ | — |
 | P5 | Cross-agent project correlation in `archive/index.jsonl` | P0 | No | ☐ | — |
