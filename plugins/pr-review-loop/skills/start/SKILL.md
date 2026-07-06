@@ -1,8 +1,8 @@
 ---
-name: pr-review-loop
+name: start
 description: >-
   Stand up a self-pacing PR reviewer that sleeps ~15 min, wakes to review open
-  PRs (validate locally, post LGTM as a comment or actionable feedback, let the
+  PRs (validate locally, LGTM as a comment or actionable feedback, let the
   author merge), and auto-stops its own sleep-wake alarm after N consecutive
   empty polls. Use when the user asks to "watch"/"review"/"babysit" incoming PRs
   on a repo or a tracker as the designated reviewer across a session or siblings.
@@ -17,6 +17,8 @@ running the tests locally), posts an **LGTM comment** when satisfied — the PR
 **author merges**, the reviewer never does — and **shuts its own alarm off**
 after a configurable number of consecutive empty polls so it never idles
 forever.
+
+Invoke as `/pr-review-loop:start` (or just ask to "watch/review incoming PRs").
 
 ## When to use
 
@@ -33,7 +35,7 @@ forever.
 | `filter` | all open PRs | Which PRs count — e.g. a tracker (TD1–TD15), a label, a branch prefix, a title substring. State it explicitly in the alarm message. |
 | `cadence_min` | `15` | Minutes to sleep between polls (self-re-arm; the recurring-cron floor of 60 min does not apply to one-shot wake-ups). |
 | `idle_stop` | `3` | Stop the alarm after this many **consecutive** polls that found no PR needing review. |
-| `worktree` | `/home/user/agent-sessions` (or the session repo path) | Where to check out branches for local validation. |
+| `worktree` | the session's repo checkout path | Where to check out branches for local validation. |
 
 ## Setup (run once when invoked)
 
@@ -77,9 +79,9 @@ forever.
    UTC-consistent stems, the `baseline`↔`baseline_calibration` import cycle, and
    `REPO_ROOT` resolution after packaging/CLI changes).
 4. **Validate locally** in `<worktree>`: `git fetch origin <head-ref>` &&
-   checkout; run `python -m pytest -q` and, if configured, `python -m ruff check .`
-   and `python -m mypy agent_sessions tools`. Confirm the change actually works —
-   not just that tests pass. Return to the prior branch afterward.
+   checkout; run the repo's test command (e.g. `python -m pytest -q`) and, if
+   configured, its lint/type checks (`ruff`, `mypy`). Confirm the change actually
+   works — not just that tests pass. Return to the prior branch afterward.
 5. **Comment** (`add_issue_comment`):
    - Correct → start with **`LGTM`** and a short bullet list of what you
      validated (tests/lint result, side effects checked) so the author can merge.

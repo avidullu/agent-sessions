@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "agent-sessions-tools",
+  "owner": {
+    "name": "avidullu"
+  },
+  "description": "Reusable Claude Code plugins from the agent-sessions repo.",
+  "plugins": [
+    {
+      "name": "pr-review-loop",
+      "source": "./plugins/pr-review-loop",
+      "description": "Self-pacing PR reviewer: sleeps ~15 min, wakes to review open PRs (validate locally, LGTM as a comment, author merges), and auto-stops its own alarm after N consecutive empty polls.",
+      "version": "0.1.0",
+      "author": {
+        "name": "avidullu"
+      },
+      "category": "workflow",
+      "tags": ["pr-review", "automation", "reviewer", "polling"]
+    }
+  ]
+}
