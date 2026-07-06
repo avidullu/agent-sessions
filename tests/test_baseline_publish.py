@@ -66,6 +66,16 @@ class TestPublishAgentFiles:
         assert "baseline:generated:begin" in claude_text
         assert claude_text.count("### ") >= 3
 
+    def test_generated_slices_exclude_global_promotion_markers(self, repo_root: Path) -> None:
+        _write_promoted_guardrails(repo_root)
+        settings = _baseline_settings(repo_root)
+        outputs = publish_agent_files(settings, generated_at="2026-07-06")
+        claude_text = outputs[settings.root / "agents" / "claude" / "CLAUDE.generated.md"]
+        assert "baseline:generated:begin" in claude_text
+        assert "baseline:generated:end" in claude_text
+        assert "baseline:begin id=" not in claude_text
+        assert "baseline:end id=" not in claude_text
+
     def test_render_agent_document_empty(self) -> None:
         text = render_agent_document("claude", [], "2026-07-06")
         assert "No promoted guardrails found" in text

@@ -6,7 +6,13 @@ import datetime as dt
 from dataclasses import dataclass
 from pathlib import Path
 
-from .baseline import BaselineSettings, load_baseline_settings, parse_promoted_blocks
+from .baseline import (
+    PROMOTION_BEGIN,
+    PROMOTION_END,
+    BaselineSettings,
+    load_baseline_settings,
+    parse_promoted_blocks,
+)
 from .config import ArchiveConfig
 
 
@@ -32,8 +38,20 @@ class PromotedRule:
     source_file: str
 
 
-def extract_rule_title(block: str, rule_id: str) -> str:
+def strip_promotion_markers(block: str) -> str:
+    begin_prefix = PROMOTION_BEGIN.split("{", 1)[0]
+    end_prefix = PROMOTION_END.split("{", 1)[0]
+    lines = []
     for line in block.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(begin_prefix) or stripped.startswith(end_prefix):
+            continue
+        lines.append(line)
+    return "\n".join(lines).strip()
+
+
+def extract_rule_title(block: str, rule_id: str) -> str:
+    for line in strip_promotion_markers(block).splitlines():
         if line.startswith("## "):
             return line[3:].strip()
     return rule_id
@@ -52,7 +70,7 @@ def collect_promoted_rules(settings: BaselineSettings) -> list[PromotedRule]:
                 PromotedRule(
                     rule_id=rule_id,
                     title=extract_rule_title(block, rule_id),
-                    body=block,
+                    body=strip_promotion_markers(block),
                     source_file=f"baseline/global/{filename}",
                 )
             )
