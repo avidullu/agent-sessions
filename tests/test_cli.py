@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -305,3 +306,109 @@ class TestMain:
     def test_unknown_command(self, repo_root: Path) -> None:
         with pytest.raises(SystemExit):
             main(["nonexistent"])
+
+
+class TestMainBaselineSubcommands:
+    """Drive the baseline subcommands end-to-end through main() (TD12)."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, repo_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.chdir(repo_root)
+        cfg = repo_root / "config"
+        cfg.mkdir(parents=True, exist_ok=True)
+        (cfg / "default_sources.toml").write_text(
+            '[archive]\narchive_dir = "archive"\nraw_dir = "raw"\n', encoding="utf-8"
+        )
+        (cfg / "baseline.toml").write_text('[baseline]\nroot = "baseline"\n', encoding="utf-8")
+        assert main(["baseline", "scaffold"]) == 0
+        self.repo_root = repo_root
+
+    def _write_sidecar(self) -> Path:
+        sidecar = self.repo_root / "baseline" / "candidates" / "2026-07-05-extraction.predictions.json"
+        sidecar.parent.mkdir(parents=True, exist_ok=True)
+        sidecar.write_text(
+            json.dumps(
+                {
+                    "run_id": "2026-07-05-extraction",
+                    "predictions": [
+                        {
+                            "id": "guardrail.pr-only-repo-writes",
+                            "title": "PR-Only Repo Writes",
+                            "category": "repo-governance",
+                            "confidence": 0.99,
+                            "text": "Use PRs for durable repo writes.",
+                            "evidence": ["333 sessions mention repo-governance."],
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return sidecar
+
+    def _write_feedback(self) -> Path:
+        fb = self.repo_root / "baseline" / "calibration" / "feedback.toml"
+        fb.parent.mkdir(parents=True, exist_ok=True)
+        fb.write_text(
+            '[feedback."guardrail.pr-only-repo-writes"]\nverdict = "accept"\nnote = "Promote."\n',
+            encoding="utf-8",
+        )
+        return fb
+
+    def test_eval(self) -> None:
+        # A scaffold-only repo fails most gates; eval returns 1 in that case and
+        # 0 when all pass. Either way the subcommand dispatches and exits cleanly.
+        assert main(["baseline", "eval", "--dry-run"]) in (0, 1)
+
+    def test_publish(self) -> None:
+        assert main(["baseline", "publish", "--dry-run"]) == 0
+
+    def test_bundle(self) -> None:
+        archive_dir = self.repo_root / "archive"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / "index.jsonl").write_text(
+            '{"source":"s","kind":"k","source_file":"/f","sha256":"a","messages":1,"markdown":"a/s.md","metadata":{}}\n',
+            encoding="utf-8",
+        )
+        assert main(["baseline", "bundle", "--dry-run"]) == 0
+
+    def test_ingest(self) -> None:
+        proposal = self.repo_root / "baseline" / "proposals" / "guardrail.test.json"
+        proposal.parent.mkdir(parents=True, exist_ok=True)
+        proposal.write_text(
+            json.dumps(
+                {
+                    "id": "guardrail.test",
+                    "title": "Test Guardrail",
+                    "scope": "global",
+                    "category": "regression-frameworks",
+                    "risk": "high",
+                    "confidence": 0.8,
+                    "approval_mode": "strict",
+                    "evidence": ["archive/example/session.md mentions pytest"],
+                    "suggested_baseline_text": "Run the gates before claiming done.",
+                    "open_questions": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        assert main(["baseline", "ingest", "--proposal", str(proposal), "--dry-run"]) == 0
+
+    def test_calibrate(self) -> None:
+        sidecar = self._write_sidecar()
+        feedback = self._write_feedback()
+        assert main(["baseline", "calibrate", "--feedback", str(feedback), "--predictions", str(sidecar), "--dry-run"]) == 0
+
+    def test_promote(self) -> None:
+        sidecar = self._write_sidecar()
+        feedback = self._write_feedback()
+        assert main(["baseline", "promote", "--feedback", str(feedback), "--predictions", str(sidecar), "--dry-run"]) == 0
+
+    def test_calibrate_without_feedback_errors(self) -> None:
+        # --feedback is required; argparse must exit non-zero rather than dispatch.
+        with pytest.raises(SystemExit):
+            main(["baseline", "calibrate", "--dry-run"])
+
+    def test_promote_without_feedback_errors(self) -> None:
+        with pytest.raises(SystemExit):
+            main(["baseline", "promote", "--dry-run"])
