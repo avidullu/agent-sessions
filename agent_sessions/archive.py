@@ -88,7 +88,12 @@ def _can_reuse_record(
     """Skip re-hashing/re-extracting a source file that is unchanged since the
     last export (matching size + mtime) as long as the outputs it would produce
     already exist on disk. Records written before TD15 lack size/mtime and never
-    match, so they fall through to a full re-export."""
+    match, so they fall through to a full re-export.
+
+    Tradeoff: identity is (size, mtime), not a content hash — a same-size,
+    same-mtime in-place edit (unusual for append-only agent logs) would be
+    missed. Run `export` after touching a file, or `prune`/re-export, to force a
+    fresh hash if that ever matters."""
     if prior is None or prior.get("size") != size or prior.get("mtime") != mtime:
         return False
     if not _index_path_exists(config, prior.get("markdown")):
