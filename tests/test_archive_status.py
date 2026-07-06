@@ -90,6 +90,38 @@ class TestStatusSummary:
         assert summary.source_counts["remote-claude"] == 1
         assert any(origin.startswith("windows-user:") for origin in summary.origin_counts)
 
+    def test_size_mtime_short_circuit_skips_hashing(self, archive_config: ArchiveConfig, monkeypatch) -> None:
+        root = archive_config.sources[0].roots[0]
+        root.mkdir(parents=True)
+        same = root / "same.jsonl"
+        same.write_text('{"sessionId":"same"}\n', encoding="utf-8")
+        stat_result = same.stat()
+        write_indexes(
+            archive_config,
+            [
+                {
+                    "source": "test-claude",
+                    "kind": "claude",
+                    "source_file": str(same),
+                    "sha256": "stale-digest-should-not-be-read",
+                    "size": stat_result.st_size,
+                    "mtime": stat_result.st_mtime,
+                    "messages": 0,
+                    "markdown": "archive/test-claude/same.md",
+                    "metadata": {},
+                }
+            ],
+        )
+
+        def _boom(_path: object) -> str:
+            raise AssertionError("sha256_file must not be called when size+mtime match")
+
+        monkeypatch.setattr("agent_sessions.archive_status.sha256_file", _boom)
+        summary = status_summary(archive_config)
+        assert summary.visible_files == 1
+        assert summary.new_files == 0
+        assert summary.changed_files == 0
+
     def test_render_status(self, archive_config: ArchiveConfig) -> None:
         write_indexes(
             archive_config,
