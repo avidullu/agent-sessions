@@ -403,3 +403,12 @@ class TestMainBaselineSubcommands:
         sidecar = self._write_sidecar()
         feedback = self._write_feedback()
         assert main(["baseline", "promote", "--feedback", str(feedback), "--predictions", str(sidecar), "--dry-run"]) == 0
+
+    def test_calibrate_without_feedback_errors(self) -> None:
+        # --feedback is required; argparse must exit non-zero rather than dispatch.
+        with pytest.raises(SystemExit):
+            main(["baseline", "calibrate", "--dry-run"])
+
+    def test_promote_without_feedback_errors(self) -> None:
+        with pytest.raises(SystemExit):
+            main(["baseline", "promote", "--dry-run"])
