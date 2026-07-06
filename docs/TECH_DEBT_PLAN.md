@@ -6,7 +6,7 @@ Tracked project doc per docs/PROJECT_DOC_TEMPLATE.md.
 
 > **Status:** `IN PROGRESS` · **Owner:** `avidullu` · **Created:** `2026-07-06` · **Last updated:** `2026-07-06`
 > **Lifecycle:** `DRAFT → IN PROGRESS → DONE → archived` (move to `docs/archives/` when DONE)
-> **Progress:** 10 of 15 landed (TD1–TD9, TD12). Remaining: TD11, TD13, TD14, TD15; TD10 split spun out to issue #34.
+> **Progress:** 14 of 15 landed (TD1–TD9, TD11–TD15). Only TD10 (the `baseline.py` split) remains, spun out to issue #34.
 > **Tracking anchors:** §7 progress tracker is the source of truth; indexed in `docs/README.md`; pointer in `SESSION_HANDOFF.md`.
 > **Relation to existing docs:** peer-of `docs/BASELINE_LOOP_CLOSURE.md`; complements `docs/TEST_PLAN.md`.
 > **Honesty note:** each finding below is `[verified]` unless marked otherwise — all were reproduced against the working tree at commit `5d81234` (tests: 362 passed / 2 skipped, coverage 93.30%).
@@ -166,23 +166,20 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated. **One smal
 | TD8 | Unified tolerant JSONL reader; de-dupe `load_index_records` | — | No | ☑ | #33 |
 | TD9 | Warnings/typed errors for unknown sources, missing WSL roots, bad config | — | No | ☑ | #33 |
 | TD10 | Split `baseline.py`; break `baseline`↔`baseline_calibration` cycle | TD4 | No | ☐ (spun out) | #34 |
-| TD11 | CLI restructure: per-command registration, portable repo-root | TD1 | No | ◐ | #28 (repo-root + sys.path); per-command registration remains |
+| TD11 | CLI restructure: per-command registration, portable repo-root | TD1 | No | ☑ | #28 + #37 |
 | TD12 | Integration tests: six baseline subcommands via `main()`, PDF paths | TD11 | No | ☑ | #35 |
-| TD13 | Config-driven `baseline_eval` gates; uniform `ArchiveConfig` API | TD10 | No | ☐ | — |
-| TD14 | Consistency sweep: frozen Prediction, parse_verdict, dead code, docstrings | TD10 | No | ☐ | — |
-| TD15 | Incremental export/status via (size, mtime) short-circuit | TD7 | Optional | ☐ | — |
+| TD13 | Config-driven `baseline_eval` gates; uniform `ArchiveConfig` API | TD10 | No | ☑ | #37 |
+| TD14 | Consistency sweep: frozen Prediction, parse_verdict, dead code, docstrings | TD10 | No | ☑ | #37 |
+| TD15 | Incremental export/status via (size, mtime) short-circuit | TD7 | Optional | ☑ | #38 |
 
-**Landed:** TD1–TD9 and TD12 are merged. TD11 is partially done (#28 added
-`--repo-root` and dropped the `sys.path` hack; the per-command `set_defaults`
-registration is still outstanding).
+**Landed:** TD1–TD9, TD11–TD15 are all merged. TD11's two halves shipped across
+#28 (`--repo-root` + `sys.path` removal) and #37 (per-command `set_defaults`
+registration).
 
-**Remaining to close this project:** TD11 (finish CLI registration), TD13, TD14,
-TD15, and TD10 (tracked separately in #34 as a focused refactor). Related
-follow-up: #32 (one-time index backfill + `regenerate`).
-
-Suggested next batch: TD11 + TD13 + TD14 (structure) in one PR, TD15 (perf) in
-another; TD10 (#34) as its own focused refactor since it is the largest and
-riskiest.
+**Remaining to close this project:** only **TD10** — the `baseline.py` split —
+tracked in #34 as its own focused refactor (module split + breaking the
+`baseline`↔`baseline_calibration` import cycle). Related follow-up: #32 (one-time
+index backfill + `regenerate`).
 
 ## 8. Open questions — owner / external
 
