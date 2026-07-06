@@ -95,6 +95,13 @@ KEYWORD_GROUPS = {
     ),
 }
 
+PR_ONLY_REPO_WRITES_TEXT = (
+    "Agents must not push directly to durable/shared repos. They should branch from the remote base, stage "
+    "explicit paths, open a PR, and merge only after explicit approval or a scoped umbrella approval. Scoped "
+    "approval is limited to the named project, PR set, task, and time/context in which it was granted; it must "
+    "not be reused for adjacent work, self-authored PRs, or later PRs without renewed confirmation."
+)
+
 
 def baseline_scaffold(config: ArchiveConfig, dry_run: bool = False) -> int:
     settings = load_baseline_settings(config)
@@ -628,10 +635,7 @@ def build_predictions(
             confidence=signal_confidence(text_signals, "repo-governance", base=0.68),
             status="proposed",
             evidence=signal_evidence(text_signals, "repo-governance"),
-            text=(
-                "Agents must not push directly to durable/shared repos. They should branch from the remote base, stage "
-                "explicit paths, open a PR, and merge only after explicit approval or a scoped umbrella approval."
-            ),
+            text=PR_ONLY_REPO_WRITES_TEXT,
         ),
         Prediction(
             id="guardrail.verified-regression-gates",

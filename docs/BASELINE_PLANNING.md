@@ -91,9 +91,12 @@ Evidence:
 - User correction or incident reference
 
 Suggested baseline text:
-Agents must not push directly to shared or durable repos. Create a branch,
-commit there, open a PR, and merge only after explicit approval or scoped
-umbrella authorization.
+Agents must not push directly to durable/shared repos. They should branch from
+the remote base, stage explicit paths, open a PR, and merge only after explicit
+approval or a scoped umbrella approval. Scoped approval is limited to the named
+project, PR set, task, and time/context in which it was granted; it must not be
+reused for adjacent work, self-authored PRs, or later PRs without renewed
+confirmation.
 
 Promotion:
 - [ ] Accept
@@ -119,6 +122,10 @@ Approval policy should be explicit and machine-readable:
 
 Direct pushes to durable repos should be treated as a cardinal violation unless
 the repo policy explicitly allows it or the user grants an explicit exception.
+Merge authorization is context-bound: an instruction such as "merge the PRs" is
+scoped to the active project or PR set being discussed, and does not carry over
+to unrelated PRs, self-authored PRs, or later work unless the user renews that
+approval explicitly.
 
 ## What To Extract
 
