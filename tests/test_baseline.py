@@ -980,6 +980,39 @@ class TestPromotionHelpers:
         blocks = parse_promoted_blocks(content)
         assert "guardrail.one" in blocks
         assert "Rule one." in blocks["guardrail.one"]
+        assert '<!-- baseline:begin id="guardrail.one" -->' in blocks["guardrail.one"]
+        assert '<!-- baseline:end id="guardrail.one" -->' in blocks["guardrail.one"]
+
+    def test_upsert_preserves_markers_on_incremental_promote(self) -> None:
+        from agent_sessions.baseline import render_promoted_block, upsert_promoted_content
+
+        existing = (
+            "# Engineering Guardrails\n\n"
+            "Promoted guidance derived from reviewed baseline candidates.\n\n"
+            '<!-- baseline:begin id="guardrail.old" -->\n'
+            "## Old\n\nRule old.\n"
+            '<!-- baseline:end id="guardrail.old" -->\n'
+        )
+        new_block = render_promoted_block(
+            {
+                "id": "guardrail.new",
+                "title": "New",
+                "confidence": 0.8,
+                "text": "Rule new.",
+                "evidence": [],
+            },
+            run_id="run",
+            feedback_note="",
+            promoted_at="2026-07-06",
+        )
+        output = upsert_promoted_content(
+            existing,
+            {"guardrail.new": new_block},
+            "engineering-guardrails.md",
+        )
+        assert '<!-- baseline:begin id="guardrail.old" -->' in output
+        assert '<!-- baseline:begin id="guardrail.new" -->' in output
+        assert sorted(parse_promoted_blocks(output)) == ["guardrail.new", "guardrail.old"]
 
     def test_select_promotable_predictions_filters_guardrails(self) -> None:
         predictions = [

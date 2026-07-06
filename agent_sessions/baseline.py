@@ -857,7 +857,7 @@ def parse_promoted_blocks(content: str) -> dict[str, str]:
         re.DOTALL,
     )
     for match in pattern.finditer(content):
-        blocks[match.group(1)] = match.group(2).strip()
+        blocks[match.group(1)] = match.group(0).strip()
     return blocks
 
 
