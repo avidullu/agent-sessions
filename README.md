@@ -46,6 +46,81 @@ python .\tools\agent_archive.py export --all --copy-raw
 Raw files land under `raw/`, which is ignored by Git unless you intentionally
 force-add it.
 
+## Agent-Assisted Setup
+
+To set this up on a new computer with Codex, Claude, Gemini, Grok, DeepSeek, or
+another capable local agent, give the agent this prompt from the machine you
+want to add:
+
+```text
+Set up my private agent-sessions archive on this computer.
+
+1. Clone or open the repo:
+   https://github.com/avidullu/agent-sessions
+   Pull with `git pull --ff-only` before reading files.
+2. Install local tooling in a Python 3.11+ environment. Prefer:
+   `python -m pip install -e ".[dev]" reportlab ruff mypy`
+3. Validate the repo and report results. Use POSIX-style paths in the prompt;
+   PowerShell users may substitute `.\tools\...` and `docs\DISCOVERY.md` if
+   they prefer:
+   - `python -m pytest --cov=agent_sessions --cov-report=term-missing`
+   - `python -m ruff check .`
+   - `python -m mypy agent_sessions tools`
+   - optional/informational: `python tools/agent_archive.py baseline eval --dry-run`
+4. Discover local agent stores:
+   - `python tools/agent_archive.py discover --write docs/DISCOVERY.md`
+   - `python tools/agent_archive.py status`
+   If defaults miss a local path, create or edit ignored `sources.toml`; do not
+   commit `sources.toml`.
+5. Ask me which sync mode I want before enabling it:
+   - manual: export only when I ask
+   - scheduled: daily Task Scheduler/cron export
+   - triggered: filesystem watcher with debounce
+   Ask separately whether to generate PDFs.
+6. If I approve the first sync, run:
+   `python tools/agent_archive.py export --all --pdf`
+   Then stage only `archive/` changes. Push directly only if I explicitly
+   approve this as a one-time archive sync; otherwise branch and open a PR.
+7. Finish with a short setup report: validation status, agents discovered,
+   total indexed sessions, new/changed files, origin environments, sync mode,
+   and 1-2 promoted guardrails from `baseline/global/` or optional
+   `baseline suggest --dry-run` output that show the value.
+
+Do not commit raw logs, `sources.toml`, unrelated files, or merge PRs without
+explicit approval scoped to that PR or project.
+```
+
+The final setup report should be plain enough to review at a glance:
+
+```text
+Repo validation:
+- Tests/coverage:
+- Ruff:
+- Mypy:
+- Baseline eval:
+
+Local archive status:
+- Agents/sources discovered:
+- Indexed sessions:
+- New files:
+- Changed files:
+- Origin environments:
+
+Sync:
+- Selected mode:
+- PDF export:
+- Last export/commit:
+
+Value preview:
+- Guardrail/pattern 1:
+- Guardrail/pattern 2:
+- Evidence breadcrumbs:
+```
+
+See [docs/AUTOMATION.md](docs/AUTOMATION.md) for scheduled export details and
+[docs/MULTI_MACHINE.md](docs/MULTI_MACHINE.md) for how indexes converge across
+computers.
+
 ## Adding Agents
 
 1. Add a source entry in `config/default_sources.toml` or local `sources.toml`.
