@@ -4,8 +4,9 @@ Tracked project doc per docs/PROJECT_DOC_TEMPLATE.md.
 
 # Tech Debt Remediation Plan
 
-> **Status:** `DRAFT` · **Owner:** `avidullu` · **Created:** `2026-07-06` · **Last updated:** `2026-07-06`
+> **Status:** `IN PROGRESS` · **Owner:** `avidullu` · **Created:** `2026-07-06` · **Last updated:** `2026-07-06`
 > **Lifecycle:** `DRAFT → IN PROGRESS → DONE → archived` (move to `docs/archives/` when DONE)
+> **Progress:** 10 of 15 landed (TD1–TD9, TD12). Remaining: TD11, TD13, TD14, TD15; TD10 split spun out to issue #34.
 > **Tracking anchors:** §7 progress tracker is the source of truth; indexed in `docs/README.md`; pointer in `SESSION_HANDOFF.md`.
 > **Relation to existing docs:** peer-of `docs/BASELINE_LOOP_CLOSURE.md`; complements `docs/TEST_PLAN.md`.
 > **Honesty note:** each finding below is `[verified]` unless marked otherwise — all were reproduced against the working tree at commit `5d81234` (tests: 362 passed / 2 skipped, coverage 93.30%).
@@ -155,25 +156,33 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated. **One smal
 
 | ID | Deliverable | Depends on | Gated? | Status | PR |
 |----|-------------|-----------|--------|--------|----|
-| TD1 | Packaging: build-system, packages, console script, drop sys.path hack | — | No | ☐ | — |
-| TD2 | Dev extras + committed ruff/mypy config matching README claims | TD1 | No | ☐ | — |
-| TD3 | GitHub Actions CI: pytest+cov, ruff, mypy | TD2 | No | ☐ | — |
-| TD4 | Content-preserving (or `--force`-guarded) `baseline promote` | — | No | ☐ | — |
-| TD5 | Atomic ledger writes (temp file + `os.replace`) | — | No | ☐ | — |
-| TD6 | UTC-consistent archive stems | — | No | ☐ | — |
-| TD7 | Index identity: sha256 keys, POSIX paths at write time, `prune` command | TD6 | No | ☐ | — |
-| TD8 | Unified tolerant JSONL reader; de-dupe `load_index_records` | — | No | ☐ | — |
-| TD9 | Warnings/typed errors for unknown sources, missing WSL roots, bad config | — | No | ☐ | — |
-| TD10 | Split `baseline.py`; break `baseline`↔`baseline_calibration` cycle | TD4 | No | ☐ | — |
-| TD11 | CLI restructure: per-command registration, portable repo-root | TD1 | No | ☐ | — |
-| TD12 | Integration tests: six baseline subcommands via `main()`, PDF paths | TD11 | No | ☐ | — |
+| TD1 | Packaging: build-system, packages, console script, drop sys.path hack | — | No | ☑ | #28 |
+| TD2 | Dev extras + committed ruff/mypy config matching README claims | TD1 | No | ☑ | #28 |
+| TD3 | GitHub Actions CI: pytest+cov, ruff, mypy | TD2 | No | ☑ | #28 |
+| TD4 | Content-preserving (or `--force`-guarded) `baseline promote` | — | No | ☑ | #31 |
+| TD5 | Atomic ledger writes (temp file + `os.replace`) | — | No | ☑ | #31 |
+| TD6 | UTC-consistent archive stems | — | No | ☑ | #31 |
+| TD7 | Index identity: session-id keys, POSIX paths at write time, `prune` command | TD6 | No | ☑ | #33 |
+| TD8 | Unified tolerant JSONL reader; de-dupe `load_index_records` | — | No | ☑ | #33 |
+| TD9 | Warnings/typed errors for unknown sources, missing WSL roots, bad config | — | No | ☑ | #33 |
+| TD10 | Split `baseline.py`; break `baseline`↔`baseline_calibration` cycle | TD4 | No | ☐ (spun out) | #34 |
+| TD11 | CLI restructure: per-command registration, portable repo-root | TD1 | No | ◐ | #28 (repo-root + sys.path); per-command registration remains |
+| TD12 | Integration tests: six baseline subcommands via `main()`, PDF paths | TD11 | No | ☑ | #35 |
 | TD13 | Config-driven `baseline_eval` gates; uniform `ArchiveConfig` API | TD10 | No | ☐ | — |
 | TD14 | Consistency sweep: frozen Prediction, parse_verdict, dead code, docstrings | TD10 | No | ☐ | — |
 | TD15 | Incremental export/status via (size, mtime) short-circuit | TD7 | Optional | ☐ | — |
 
-Suggested batching: **Week 1** TD1–TD3 (unbreaks setup, adds enforcement) + TD5/TD6
-(tiny, high value). **Week 2** TD4, TD7–TD9 (data integrity). **Then** TD10–TD14 as
-review bandwidth allows; TD15 on demand.
+**Landed:** TD1–TD9 and TD12 are merged. TD11 is partially done (#28 added
+`--repo-root` and dropped the `sys.path` hack; the per-command `set_defaults`
+registration is still outstanding).
+
+**Remaining to close this project:** TD11 (finish CLI registration), TD13, TD14,
+TD15, and TD10 (tracked separately in #34 as a focused refactor). Related
+follow-up: #32 (one-time index backfill + `regenerate`).
+
+Suggested next batch: TD11 + TD13 + TD14 (structure) in one PR, TD15 (perf) in
+another; TD10 (#34) as its own focused refactor since it is the largest and
+riskiest.
 
 ## 8. Open questions — owner / external
 
