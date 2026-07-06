@@ -8,11 +8,123 @@ from pathlib import Path
 from .archive import discover_sources, export_sources, pdf_existing, prune_index_records
 from .archive_status import archive_status
 from .baseline import baseline_scaffold, baseline_suggest
-from .config import load_config
+from .config import ArchiveConfig, load_config
 
 
 def default_repo_root() -> Path:
     return Path.cwd()
+
+
+def _handle_discover(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    return discover_sources(config, samples=args.samples, write=args.write)
+
+
+def _handle_export(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    if not args.all and not args.source:
+        raise SystemExit("export requires --all or at least one --source")
+    result = export_sources(
+        config,
+        selected=args.source,
+        limit=args.limit,
+        write_pdfs=args.pdf,
+        copy_raw_files=args.copy_raw,
+        dry_run=args.dry_run,
+    )
+    print(f"Exported {result.exported} session files.")
+    if result.skipped_sources:
+        print("Skipped sources without extractors:")
+        for source in result.skipped_sources:
+            print(f"- {source}")
+    if result.pdf_missing:
+        print("PDF export requested but reportlab is not installed. Run: python -m pip install reportlab")
+    return 0
+
+
+def _handle_pdf(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    if not args.all and not args.source:
+        raise SystemExit("pdf requires --all or at least one --source")
+    return pdf_existing(config, selected=args.source, limit=args.limit, force=args.force)
+
+
+def _handle_status(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    return archive_status(config, selected=args.source, as_json=args.json)
+
+
+def _handle_prune(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    return prune_index_records(config, dry_run=args.dry_run)
+
+
+def _handle_baseline_scaffold(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    return baseline_scaffold(config, dry_run=args.dry_run)
+
+
+def _handle_baseline_suggest(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    return baseline_suggest(
+        config,
+        output=args.output,
+        max_sessions=args.max_sessions,
+        feedback=args.feedback,
+        dry_run=args.dry_run,
+        use_calibration=not args.no_calibration,
+    )
+
+
+def _handle_baseline_calibrate(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .baseline import baseline_calibrate
+
+    return baseline_calibrate(
+        config,
+        feedback=args.feedback,
+        predictions=args.predictions,
+        output=args.output,
+        dry_run=args.dry_run,
+    )
+
+
+def _handle_baseline_promote(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .baseline import baseline_promote
+
+    promote_ids = tuple(args.promote_ids) if args.promote_ids else None
+    return baseline_promote(
+        config,
+        feedback=args.feedback,
+        predictions=args.predictions,
+        dry_run=args.dry_run,
+        ids=promote_ids,
+    )
+
+
+def _handle_baseline_publish(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .baseline_publish import baseline_publish
+
+    publish_agents = tuple(args.publish_agents) if args.publish_agents else None
+    return baseline_publish(config, dry_run=args.dry_run, agents=publish_agents)
+
+
+def _handle_baseline_eval(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .baseline_eval import baseline_eval
+
+    return baseline_eval(config, output=args.output, dry_run=args.dry_run)
+
+
+def _handle_baseline_ingest(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .baseline_ingest import baseline_ingest
+
+    return baseline_ingest(config, proposal=args.proposal, output=args.output, dry_run=args.dry_run)
+
+
+def _handle_baseline_bundle(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .baseline_agent import baseline_bundle
+
+    return baseline_bundle(
+        config,
+        output_dir=args.output_dir,
+        max_sessions=args.max_sessions,
+        max_chars_per_session=args.max_chars_per_session,
+        access_level=args.access_level,
+        focus=args.focus,
+        dry_run=args.dry_run,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -24,6 +136,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_discover = sub.add_parser("discover", help="Discover configured local stores.")
     p_discover.add_argument("--samples", type=int, default=10)
     p_discover.add_argument("--write", help="Write Markdown discovery report to this path.")
+    p_discover.set_defaults(func=_handle_discover)
 
     p_export = sub.add_parser("export", help="Export configured local stores.")
     p_export.add_argument("--all", action="store_true", help="Export all configured sources.")
@@ -32,25 +145,30 @@ def build_parser() -> argparse.ArgumentParser:
     p_export.add_argument("--pdf", action="store_true", help="Also write simple PDFs when reportlab is installed.")
     p_export.add_argument("--copy-raw", action="store_true", help="Copy gzip-compressed raw source files to raw/.")
     p_export.add_argument("--dry-run", action="store_true")
+    p_export.set_defaults(func=_handle_export)
 
     p_pdf = sub.add_parser("pdf", help="Generate PDFs from existing archive Markdown.")
     p_pdf.add_argument("--all", action="store_true", help="Generate PDFs for all indexed Markdown files.")
     p_pdf.add_argument("--source", action="append", help="Source name or kind to PDF. Can be repeated.")
     p_pdf.add_argument("--limit", type=int, help="Maximum PDFs to write.")
     p_pdf.add_argument("--force", action="store_true", help="Overwrite existing PDFs.")
+    p_pdf.set_defaults(func=_handle_pdf)
 
     p_status = sub.add_parser("status", help="Show archive freshness and origin summary.")
     p_status.add_argument("--source", action="append", help="Source name or kind to check. Can be repeated.")
     p_status.add_argument("--json", action="store_true", help="Write machine-readable JSON.")
+    p_status.set_defaults(func=_handle_status)
 
     p_prune = sub.add_parser("prune", help="Drop index records whose archive Markdown is missing on disk.")
     p_prune.add_argument("--dry-run", action="store_true", help="Report what would be pruned without writing.")
+    p_prune.set_defaults(func=_handle_prune)
 
     p_baseline = sub.add_parser("baseline", help="Work with engineering baseline candidates.")
     baseline_sub = p_baseline.add_subparsers(dest="baseline_cmd", required=True)
 
     p_baseline_scaffold = baseline_sub.add_parser("scaffold", help="Create missing baseline folders/templates.")
     p_baseline_scaffold.add_argument("--dry-run", action="store_true")
+    p_baseline_scaffold.set_defaults(func=_handle_baseline_scaffold)
 
     p_baseline_suggest = baseline_sub.add_parser("suggest", help="Generate reviewable baseline candidate suggestions.")
     p_baseline_suggest.add_argument("--output", type=Path, help="Candidate Markdown output path.")
@@ -67,12 +185,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip ledger-aware calibration filtering and confidence adjustments.",
     )
     p_baseline_suggest.add_argument("--dry-run", action="store_true")
+    p_baseline_suggest.set_defaults(func=_handle_baseline_suggest)
 
     p_baseline_calibrate = baseline_sub.add_parser("calibrate", help="Summarize calibration feedback for predictions.")
     p_baseline_calibrate.add_argument("--feedback", type=Path, required=True, help="Calibration feedback TOML file.")
     p_baseline_calibrate.add_argument("--predictions", type=Path, help="Prediction JSON sidecar to calibrate.")
     p_baseline_calibrate.add_argument("--output", type=Path, help="Calibration summary Markdown output path.")
     p_baseline_calibrate.add_argument("--dry-run", action="store_true")
+    p_baseline_calibrate.set_defaults(func=_handle_baseline_calibrate)
 
     p_baseline_promote = baseline_sub.add_parser(
         "promote",
@@ -82,6 +202,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_baseline_promote.add_argument("--predictions", type=Path, help="Prediction JSON sidecar to promote from.")
     p_baseline_promote.add_argument("--id", action="append", dest="promote_ids", help="Promote only this prediction id.")
     p_baseline_promote.add_argument("--dry-run", action="store_true")
+    p_baseline_promote.set_defaults(func=_handle_baseline_promote)
 
     p_baseline_publish = baseline_sub.add_parser(
         "publish",
@@ -95,10 +216,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Publish only selected agent targets. Default: all.",
     )
     p_baseline_publish.add_argument("--dry-run", action="store_true")
+    p_baseline_publish.set_defaults(func=_handle_baseline_publish)
 
     p_baseline_eval = baseline_sub.add_parser("eval", help="Evaluate baseline loop efficacy gates E1-E6.")
     p_baseline_eval.add_argument("--output", type=Path, help="Evaluation report Markdown output path.")
     p_baseline_eval.add_argument("--dry-run", action="store_true")
+    p_baseline_eval.set_defaults(func=_handle_baseline_eval)
 
     p_baseline_ingest = baseline_sub.add_parser(
         "ingest",
@@ -107,6 +230,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_baseline_ingest.add_argument("--proposal", type=Path, help="Single proposal JSON file to ingest.")
     p_baseline_ingest.add_argument("--output", type=Path, help="Optional ingest report output path.")
     p_baseline_ingest.add_argument("--dry-run", action="store_true")
+    p_baseline_ingest.set_defaults(func=_handle_baseline_ingest)
 
     p_baseline_bundle = baseline_sub.add_parser("bundle", help="Create a bounded evidence bundle for an AI agent.")
     p_baseline_bundle.add_argument("--output-dir", type=Path, help="Bundle output directory.")
@@ -125,6 +249,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_baseline_bundle.add_argument("--focus", action="append", help="Focus keyword or project slug. Can be repeated.")
     p_baseline_bundle.add_argument("--dry-run", action="store_true")
+    p_baseline_bundle.set_defaults(func=_handle_baseline_bundle)
 
     return parser
 
@@ -133,98 +258,4 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     config = load_config(args.repo_root.resolve(), args.config)
-
-    if args.cmd == "discover":
-        return discover_sources(config, samples=args.samples, write=args.write)
-    if args.cmd == "export":
-        if not args.all and not args.source:
-            parser.error("export requires --all or at least one --source")
-        result = export_sources(
-            config,
-            selected=args.source,
-            limit=args.limit,
-            write_pdfs=args.pdf,
-            copy_raw_files=args.copy_raw,
-            dry_run=args.dry_run,
-        )
-        print(f"Exported {result.exported} session files.")
-        if result.skipped_sources:
-            print("Skipped sources without extractors:")
-            for source in result.skipped_sources:
-                print(f"- {source}")
-        if result.pdf_missing:
-            print("PDF export requested but reportlab is not installed. Run: python -m pip install reportlab")
-        return 0
-    if args.cmd == "pdf":
-        if not args.all and not args.source:
-            parser.error("pdf requires --all or at least one --source")
-        return pdf_existing(config, selected=args.source, limit=args.limit, force=args.force)
-    if args.cmd == "status":
-        return archive_status(config, selected=args.source, as_json=args.json)
-    if args.cmd == "prune":
-        return prune_index_records(config, dry_run=args.dry_run)
-    if args.cmd == "baseline":
-        if args.baseline_cmd == "scaffold":
-            return baseline_scaffold(config, dry_run=args.dry_run)
-        if args.baseline_cmd == "suggest":
-            return baseline_suggest(
-                config,
-                output=args.output,
-                max_sessions=args.max_sessions,
-                feedback=args.feedback,
-                dry_run=args.dry_run,
-                use_calibration=not args.no_calibration,
-            )
-        if args.baseline_cmd == "calibrate":
-            from .baseline import baseline_calibrate
-
-            return baseline_calibrate(
-                config,
-                feedback=args.feedback,
-                predictions=args.predictions,
-                output=args.output,
-                dry_run=args.dry_run,
-            )
-        if args.baseline_cmd == "promote":
-            from .baseline import baseline_promote
-
-            promote_ids = tuple(args.promote_ids) if args.promote_ids else None
-            return baseline_promote(
-                config,
-                feedback=args.feedback,
-                predictions=args.predictions,
-                dry_run=args.dry_run,
-                ids=promote_ids,
-            )
-        if args.baseline_cmd == "publish":
-            from .baseline_publish import baseline_publish
-
-            publish_agents = tuple(args.publish_agents) if args.publish_agents else None
-            return baseline_publish(config, dry_run=args.dry_run, agents=publish_agents)
-        if args.baseline_cmd == "eval":
-            from .baseline_eval import baseline_eval
-
-            return baseline_eval(config, output=args.output, dry_run=args.dry_run)
-        if args.baseline_cmd == "ingest":
-            from .baseline_ingest import baseline_ingest
-
-            return baseline_ingest(
-                config,
-                proposal=args.proposal,
-                output=args.output,
-                dry_run=args.dry_run,
-            )
-        if args.baseline_cmd == "bundle":
-            from .baseline_agent import baseline_bundle
-
-            return baseline_bundle(
-                config,
-                output_dir=args.output_dir,
-                max_sessions=args.max_sessions,
-                max_chars_per_session=args.max_chars_per_session,
-                access_level=args.access_level,
-                focus=args.focus,
-                dry_run=args.dry_run,
-            )
-    parser.error(f"Unknown command: {args.cmd}")
-    return 2
+    return int(args.func(config, args))

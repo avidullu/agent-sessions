@@ -18,7 +18,9 @@ from agent_sessions.baseline_calibration import (
 )
 
 
-def _prediction(prediction_id: str, status: str = "proposed", confidence: float = 0.6) -> Prediction:
+def _prediction(
+    prediction_id: str, status: str = "proposed", confidence: float = 0.6, feedback: str = "none"
+) -> Prediction:
     return Prediction(
         id=prediction_id,
         title=prediction_id,
@@ -29,6 +31,7 @@ def _prediction(prediction_id: str, status: str = "proposed", confidence: float 
         status=status,
         evidence=[],
         text="text",
+        feedback=feedback,
     )
 
 
@@ -136,8 +139,7 @@ class TestCalibrationLoop:
         assert ledger_confidence_adjustment(summary) < 0
 
     def test_apply_ledger_note_appends_existing_feedback(self) -> None:
-        prediction = _prediction("guardrail.one")
-        prediction.feedback = "accept: yes"
+        prediction = _prediction("guardrail.one", feedback="accept: yes")
         summary = summarize_ledger(
             [{"id": "guardrail.one", "status": "accepted-feedback", "confidence": 0.8}]
         )["guardrail.one"]

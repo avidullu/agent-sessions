@@ -8,7 +8,7 @@ import math
 import os
 import re
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
@@ -38,7 +38,7 @@ class BaselineSettings:
     pilots: tuple[Pilot, ...]
 
 
-@dataclass
+@dataclass(frozen=True)
 class Prediction:
     id: str
     title: str
@@ -346,23 +346,35 @@ def load_feedback(config: ArchiveConfig, feedback: Path | None) -> dict[str, dic
     return {str(key): dict(value) for key, value in raw.items() if isinstance(value, dict)}
 
 
+def parse_verdict(feedback_item: dict[str, str] | None) -> str:
+    """Normalize a feedback entry's verdict to a lowercased string ("" if absent).
+
+    The single canonical parse for accept/edit/reject verdicts, shared by every
+    consumer instead of re-implementing ``str(item.get("verdict","")).strip().lower()``.
+    """
+    if not feedback_item:
+        return ""
+    return str(feedback_item.get("verdict", "")).strip().lower()
+
+
 def apply_feedback(prediction: Prediction, feedback_map: dict[str, dict[str, str]]) -> Prediction:
     item = feedback_map.get(prediction.id)
     if not item:
         return prediction
-    verdict = str(item.get("verdict", "")).strip().lower()
+    verdict = parse_verdict(item)
     note = str(item.get("note", "")).strip()
+    status, confidence = prediction.status, prediction.confidence
     if verdict == "accept":
-        prediction.status = "accepted-feedback"
-        prediction.confidence = min(0.99, prediction.confidence + 0.08)
+        status = "accepted-feedback"
+        confidence = min(0.99, prediction.confidence + 0.08)
     elif verdict == "reject":
-        prediction.status = "rejected-feedback"
-        prediction.confidence = max(0.01, prediction.confidence - 0.35)
+        status = "rejected-feedback"
+        confidence = max(0.01, prediction.confidence - 0.35)
     elif verdict == "edit":
-        prediction.status = "edit-requested"
-        prediction.confidence = max(0.01, prediction.confidence - 0.08)
-    prediction.feedback = f"{verdict}: {note}" if note else verdict or "present"
-    return prediction
+        status = "edit-requested"
+        confidence = max(0.01, prediction.confidence - 0.08)
+    feedback = f"{verdict}: {note}" if note else verdict or "present"
+    return replace(prediction, status=status, confidence=confidence, feedback=feedback)
 
 
 def write_prediction_artifacts(
@@ -460,7 +472,7 @@ def render_calibration_summary(
         if not feedback:
             missing.append(prediction_id)
             continue
-        verdict = str(feedback.get("verdict", "")).strip().lower()
+        verdict = parse_verdict(feedback)
         if verdict == "accept":
             accepted.append(prediction_id)
         elif verdict == "edit":
@@ -963,8 +975,7 @@ def select_promotable_predictions(
         feedback = feedback_map.get(prediction_id)
         if not feedback:
             continue
-        verdict = str(feedback.get("verdict", "")).strip().lower()
-        if verdict != "accept":
+        if parse_verdict(feedback) != "accept":
             continue
         selected.append(prediction)
     return selected

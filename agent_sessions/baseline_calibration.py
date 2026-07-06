@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from .baseline import Prediction, confidence
+from .baseline import Prediction, confidence, parse_verdict
 
 
 LEDGER_ACCEPTED = "accepted-feedback"
@@ -66,10 +66,7 @@ def summarize_ledger(entries: list[dict[str, Any]]) -> dict[str, LedgerSummary]:
 
 
 def feedback_verdict(feedback_map: dict[str, dict[str, str]], prediction_id: str) -> str:
-    item = feedback_map.get(prediction_id)
-    if not item:
-        return ""
-    return str(item.get("verdict", "")).strip().lower()
+    return parse_verdict(feedback_map.get(prediction_id))
 
 
 def should_suppress_prediction(
