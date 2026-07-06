@@ -455,6 +455,30 @@ class TestBaselineSuggest:
         result = baseline_suggest(config, max_sessions=1, feedback=feedback_file)
         assert result == 0
 
+    def test_suggest_suppresses_rejected_with_calibration(self, repo_root: Path) -> None:
+        config = self._setup_config(repo_root)
+        feedback_dir = repo_root / "baseline" / "calibration"
+        feedback_dir.mkdir(parents=True, exist_ok=True)
+        feedback_file = feedback_dir / "feedback.toml"
+        feedback_file.write_text(
+            '[feedback."profile.business-productivity-engineer"]\nverdict = "reject"\nnote = "Too broad."\n'
+            '[feedback."guardrail.pr-only-repo-writes"]\nverdict = "accept"\nnote = "Promote."\n',
+            encoding="utf-8",
+        )
+        output = repo_root / "baseline" / "candidates" / "calibrated-extraction.md"
+        result = baseline_suggest(
+            config,
+            output=output,
+            max_sessions=1,
+            feedback=feedback_file,
+        )
+        assert result == 0
+        sidecar = output.with_suffix(".predictions.json")
+        payload = json.loads(sidecar.read_text(encoding="utf-8"))
+        ids = {item["id"] for item in payload["predictions"]}
+        assert "profile.business-productivity-engineer" not in ids
+        assert "guardrail.pr-only-repo-writes" in ids
+
 
 def _baseline_settings(repo_root: Path) -> BaselineSettings:
     return BaselineSettings(
