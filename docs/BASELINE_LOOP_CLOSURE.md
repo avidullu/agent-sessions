@@ -100,10 +100,12 @@ Reuse map:
 | ID | Deliverable | Depends on | Gated? | Status | PR |
 |----|-------------|-----------|--------|--------|----|
 | P0 | Tracked project + efficacy framework (this doc, template, `efficacy.toml`) | — | No | ☑ | — |
-| P1 | `baseline promote` — write accepted candidates to `baseline/global/` or `projects/` | P0 | Yes | ◐ | — |
-| P2 | `baseline publish` — generate `baseline/agents/*/ *.generated.md` | P1 | Yes | ◐ | — |
+| P1 | `baseline promote` — write accepted candidates to `baseline/global/` or `projects/` | P0 | Yes | ☑ | #13 |
+| P2 | `baseline publish` — generate `baseline/agents/*/ *.generated.md` | P1 | Yes | ☑ | #14 |
 | P3 | Calibration loop — `suggest` reads feedback + ledger; adjusts confidence | P0 | No | ☑ | #15 |
-| P4 | `baseline ingest` — structured proposals from `baseline/proposals/` | P0 | No | ◐ | #16 |
+| P4 | `baseline ingest` — structured proposals from `baseline/proposals/` | P0 | No | ☑ | #16 |
+| P10 | Watchlist tier + `baseline backlog` — promotability backlog for non-promoted predictions | P3 | No | ☐ | [design](BASELINE_WATCHLIST_TOMBSTONES.md) |
+| P11 | Rejection tombstones + deterministic dedup — block relearned rejects | P3 | No | ☐ | [design](BASELINE_WATCHLIST_TOMBSTONES.md) |
 | P5 | Cross-agent project correlation in `archive/index.jsonl` | P0 | No | ☐ | — |
 | P6 | Contradiction detection vs promoted baseline | P1 | Yes | ☐ | — |
 | P7 | `baseline onboard --project <slug>` ramp-up packet | P1,P2 | No | ☐ | — |
@@ -129,8 +131,11 @@ Reuse map:
 
 **Internal `[verified]`:** `docs/COMPOSE_STACK.md`, `docs/BASELINE_PLANNING.md`, `docs/CALIBRATION_EFFICACY.md`, `config/baseline.toml`, `agent_sessions/baseline.py`, `baseline/candidates/2026-07-05-extraction.md`.
 
+**Proposed `[design]`:** `docs/BASELINE_WATCHLIST_TOMBSTONES.md` — watchlist + rejection tombstones (P10/P11 PR plan).
+
 **Template source `[verified]`:** `badminton-highlight-indexer/docs/PROJECT_DOC_TEMPLATE.md`, `badminton-highlight-indexer/CLAUDE.md` (workflow conventions §).
 
 ### Changelog
 
+- 2026-07-06 — Added P10/P11 design reference (`BASELINE_WATCHLIST_TOMBSTONES.md`); marked P1–P4 ☑.
 - 2026-07-05 — Created tracked project; linked template provenance and archive hit counts.
