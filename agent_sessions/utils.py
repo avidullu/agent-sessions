@@ -5,12 +5,37 @@ from __future__ import annotations
 import datetime as dt
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any, Iterable
 
 
 def now_utc() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+
+
+def read_jsonl_dicts(path: Path, *, label: str | None = None) -> list[dict[str, Any]]:
+    """Read a JSONL file into dicts, warning on (and skipping) malformed lines.
+
+    The single tolerant reader shared by every JSONL consumer so one corrupt
+    line degrades to a warning instead of a raw ``JSONDecodeError`` traceback in
+    one place and a silent skip in another.
+    """
+    tag = label or str(path)
+    records: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8", errors="replace") as f:
+        for lineno, raw in enumerate(f, start=1):
+            line = raw.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError as exc:
+                print(f"warning: skipping malformed JSON at {tag}:{lineno}: {exc}", file=sys.stderr)
+                continue
+            if isinstance(obj, dict):
+                records.append(obj)
+    return records
 
 
 def jsonl_objects(path: Path) -> Iterable[dict[str, Any]]:

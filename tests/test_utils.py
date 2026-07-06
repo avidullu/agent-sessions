@@ -11,10 +11,25 @@ from agent_sessions.utils import (
     archive_markdown_path,
     jsonl_objects,
     now_utc,
+    read_jsonl_dicts,
     session_id_from_name,
     slugify,
     text_from_content,
 )
+
+
+class TestReadJsonlDicts:
+    def test_skips_malformed_line_with_warning(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        path = tmp_path / "data.jsonl"
+        path.write_text('{"a": 1}\nnot json\n{"b": 2}\n', encoding="utf-8")
+        records = read_jsonl_dicts(path, label="data.jsonl")
+        assert records == [{"a": 1}, {"b": 2}]
+        assert "skipping malformed JSON at data.jsonl:2" in capsys.readouterr().err
+
+    def test_ignores_non_dict_json(self, tmp_path: Path) -> None:
+        path = tmp_path / "data.jsonl"
+        path.write_text('{"a": 1}\n[1, 2, 3]\n', encoding="utf-8")
+        assert read_jsonl_dicts(path) == [{"a": 1}]
 
 
 class TestNowUtc:

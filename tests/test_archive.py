@@ -6,6 +6,8 @@ import gzip
 import json
 from pathlib import Path
 
+import pytest
+
 from agent_sessions.archive import (
     ExportResult,
     as_repo_relative,
@@ -153,6 +155,13 @@ class TestSelectSources:
         result = select_sources(multi_source_config, ["test-claude"])
         assert len(result) == 1
         assert result[0].name == "test-claude"
+
+    def test_unknown_selector_warns(
+        self, multi_source_config: ArchiveConfig, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        result = select_sources(multi_source_config, ["does-not-exist"])
+        assert result == []
+        assert "matched no configured source name or kind" in capsys.readouterr().err
 
     def test_filter_by_kind(self, multi_source_config: ArchiveConfig) -> None:
         result = select_sources(multi_source_config, ["codex"])
@@ -344,8 +353,6 @@ class TestLoadIndexRecords:
     def test_raises_when_no_index(
         self, repo_root: Path, archive_config: ArchiveConfig
     ) -> None:
-        import pytest
-
         with pytest.raises(SystemExit, match="index.jsonl"):
             load_index_records(archive_config)
 
@@ -374,6 +381,81 @@ class TestMergeIndexRecords:
         assert len(merged) == 1
         assert merged[0]["sha256"] == "new"
         assert merged[0]["markdown"] == "archive/test/new.md"
+
+    def test_same_session_across_machines_dedupes_by_session_id(self) -> None:
+        # Same logical session exported from two machines: different absolute
+        # source_file paths, same session_id -> a single merged record.
+        windows = {
+            "source": "claude-windows",
+            "source_file": r"C:\Users\a\.claude\projects\p\sess.jsonl",
+            "sha256": "aaa",
+            "markdown": "archive/claude-windows/sess.md",
+            "metadata": {"session_id": "1111-2222"},
+        }
+        wsl = {
+            "source": "claude-wsl-ubuntu",
+            "source_file": "/home/a/.claude/projects/p/sess.jsonl",
+            "sha256": "aaa",
+            "markdown": "archive/claude-wsl-ubuntu/sess.md",
+            "metadata": {"session_id": "1111-2222"},
+        }
+        merged = merge_index_records([windows], [wsl])
+        assert len(merged) == 1
+        assert merged[0]["metadata"]["session_id"] == "1111-2222"
+
+    def test_write_indexes_normalizes_paths_to_posix(self, archive_config: ArchiveConfig) -> None:
+        from agent_sessions.archive import read_existing_index_records, write_indexes
+
+        write_indexes(
+            archive_config,
+            [
+                {
+                    "source": "s",
+                    "kind": "claude",
+                    "source_file": r"C:\x\y.jsonl",
+                    "sha256": "d",
+                    "messages": 1,
+                    "markdown": r"archive\s\a.md",
+                    "pdf": None,
+                    "raw": None,
+                    "metadata": {},
+                }
+            ],
+        )
+        stored = read_existing_index_records(archive_config)
+        assert stored[0]["markdown"] == "archive/s/a.md"
+
+
+class TestPruneIndexRecords:
+    def test_prunes_records_with_missing_markdown(self, repo_root: Path, archive_config: ArchiveConfig) -> None:
+        from agent_sessions.archive import prune_index_records, read_existing_index_records, write_indexes
+
+        present = repo_root / "archive" / "s" / "present.md"
+        present.parent.mkdir(parents=True, exist_ok=True)
+        present.write_text("hi", encoding="utf-8")
+        write_indexes(
+            archive_config,
+            [
+                {"source": "s", "kind": "claude", "source_file": "a", "sha256": "1",
+                 "messages": 1, "markdown": "archive/s/present.md", "pdf": None, "raw": None, "metadata": {}},
+                {"source": "s", "kind": "claude", "source_file": "b", "sha256": "2",
+                 "messages": 1, "markdown": "archive/s/gone.md", "pdf": None, "raw": None, "metadata": {}},
+            ],
+        )
+        assert prune_index_records(archive_config) == 0
+        remaining = read_existing_index_records(archive_config)
+        assert [r["markdown"] for r in remaining] == ["archive/s/present.md"]
+
+    def test_dry_run_keeps_records(self, repo_root: Path, archive_config: ArchiveConfig) -> None:
+        from agent_sessions.archive import prune_index_records, read_existing_index_records, write_indexes
+
+        write_indexes(
+            archive_config,
+            [{"source": "s", "kind": "claude", "source_file": "b", "sha256": "2",
+              "messages": 1, "markdown": "archive/s/gone.md", "pdf": None, "raw": None, "metadata": {}}],
+        )
+        prune_index_records(archive_config, dry_run=True)
+        assert len(read_existing_index_records(archive_config)) == 1
 
     def test_export_preserves_records_from_other_machines(
         self, archive_config: ArchiveConfig
@@ -489,8 +571,6 @@ class TestPdfExisting:
     def test_no_index_raises(
         self, repo_root: Path, archive_config: ArchiveConfig
     ) -> None:
-        import pytest
-
         with pytest.raises(SystemExit, match="index.jsonl"):
             pdf_existing(archive_config)
 

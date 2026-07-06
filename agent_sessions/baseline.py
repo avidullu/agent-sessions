@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from .config import ArchiveConfig, read_toml, repo_path
-from .utils import archive_markdown_path
+from .utils import archive_markdown_path, read_jsonl_dicts
 
 
 BASELINE_CONFIG = Path("config/baseline.toml")
@@ -328,13 +328,7 @@ def load_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
     index_path = config.archive_dir / "index.jsonl"
     if not index_path.exists():
         raise SystemExit("archive/index.jsonl does not exist. Run export first.")
-    records: list[dict[str, Any]] = []
-    with index_path.open("r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                records.append(json.loads(line))
-    return records
+    return read_jsonl_dicts(index_path, label="archive/index.jsonl")
 
 
 def load_feedback(config: ArchiveConfig, feedback: Path | None) -> dict[str, dict[str, str]]:

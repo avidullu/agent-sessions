@@ -16,10 +16,18 @@ artifacts back to the private GitHub repo.
 
 The exporter now merges new local records into the existing `archive/index.jsonl`
 instead of replacing the index with only the current computer's visible files.
-Records are keyed by source name and source file path. When a source file is
-exported again with a changed digest, the current record replaces the older
-index entry for that same source file. Records from other computers stay in the
-index even when their local stores are not visible from the current machine.
+Records are merged on a machine-independent identity — the session's
+`metadata.session_id` when present, falling back to `(source name, source file
+path)` for older exports that predate a session id. Because the identity is the
+session rather than an absolute path, the same logical session exported from two
+machines (whose absolute source-file paths differ) collapses to a single record,
+and re-exporting a changed file still replaces the older entry for that session.
+Records from other computers stay in the index even when their local stores are
+not visible from the current machine.
+
+Existing rows written under the old path-only keying are left as-is; a one-time
+backfill and a `regenerate` (backup-and-rebuild) path are tracked separately, and
+`agent-archive prune` drops index rows whose archive Markdown no longer exists.
 
 ## Unified User View
 

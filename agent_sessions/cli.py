@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .archive import discover_sources, export_sources, pdf_existing
+from .archive import discover_sources, export_sources, pdf_existing, prune_index_records
 from .archive_status import archive_status
 from .baseline import baseline_scaffold, baseline_suggest
 from .config import load_config
@@ -42,6 +42,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_status = sub.add_parser("status", help="Show archive freshness and origin summary.")
     p_status.add_argument("--source", action="append", help="Source name or kind to check. Can be repeated.")
     p_status.add_argument("--json", action="store_true", help="Write machine-readable JSON.")
+
+    p_prune = sub.add_parser("prune", help="Drop index records whose archive Markdown is missing on disk.")
+    p_prune.add_argument("--dry-run", action="store_true", help="Report what would be pruned without writing.")
 
     p_baseline = sub.add_parser("baseline", help="Work with engineering baseline candidates.")
     baseline_sub = p_baseline.add_subparsers(dest="baseline_cmd", required=True)
@@ -158,6 +161,8 @@ def main(argv: list[str] | None = None) -> int:
         return pdf_existing(config, selected=args.source, limit=args.limit, force=args.force)
     if args.cmd == "status":
         return archive_status(config, selected=args.source, as_json=args.json)
+    if args.cmd == "prune":
+        return prune_index_records(config, dry_run=args.dry_run)
     if args.cmd == "baseline":
         if args.baseline_cmd == "scaffold":
             return baseline_scaffold(config, dry_run=args.dry_run)

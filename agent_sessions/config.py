@@ -46,6 +46,9 @@ def read_toml(path: Path) -> dict[str, Any]:
 
 
 def load_source(item: dict[str, Any], templates: PathTemplateContext) -> Source:
+    for required in ("name", "kind"):
+        if required not in item:
+            raise SystemExit(f"Invalid source entry in config: missing required key {required!r}. Entry: {item!r}")
     return Source(
         name=item["name"],
         kind=item["kind"],

@@ -43,6 +43,11 @@ class TestLoadSource:
         assert source.glob == "**/*"
         assert source.description == ""
 
+    def test_missing_required_key_raises_friendly_error(self) -> None:
+        templates = PathTemplateContext.from_environment(Path("/fake"))
+        with pytest.raises(SystemExit, match="missing required key 'kind'"):
+            load_source({"name": "test", "roots": []}, templates)
+
     def test_with_custom_glob_and_description(self) -> None:
         templates = PathTemplateContext.from_environment(Path("/fake"))
         item = {
