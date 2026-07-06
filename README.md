@@ -175,6 +175,18 @@ they are already stronger. See [docs/COMPOSE_STACK.md](docs/COMPOSE_STACK.md).
 Daily export automation is documented in [docs/AUTOMATION.md](docs/AUTOMATION.md).
 Multi-machine indexing is documented in [docs/MULTI_MACHINE.md](docs/MULTI_MACHINE.md).
 
+## Reusable Plugins
+
+This repo also hosts a Claude Code plugin marketplace (`agent-sessions-tools`).
+Install the `pr-review-loop` PR-reviewer plugin from any session:
+
+```shell
+/plugin marketplace add avidullu/agent-sessions
+/plugin install pr-review-loop@agent-sessions-tools
+```
+
+See [plugins/pr-review-loop/README.md](plugins/pr-review-loop/README.md).
+
 ## Other Machines
 
 Clone this private repo on another machine, run the same discovery/export
