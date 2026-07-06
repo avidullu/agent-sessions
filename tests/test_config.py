@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -88,13 +87,6 @@ class TestReadToml:
         result = read_toml(path)
         assert result == {"section": {"key": "value"}}
 
-    def test_system_exit_when_tomllib_missing(self, tmp_path: Path) -> None:
-        """If tomllib is not available (Python < 3.11), read_toml raises SystemExit."""
-        path = tmp_path / "test.toml"
-        path.write_text('[section]\nkey = "value"\n', encoding="utf-8")
-        with patch("agent_sessions.config.tomllib", None):
-            with pytest.raises(SystemExit, match="Python 3.11"):
-                read_toml(path)
 
 
 class TestLoadConfig:

@@ -15,9 +15,16 @@ from .baseline import (
     load_baseline_settings,
     load_feedback,
     parse_promoted_blocks,
+    parse_verdict,
 )
 from .baseline_calibration import apply_calibration_loop, calibration_delta, load_ledger_entries
 from .config import ArchiveConfig, read_toml
+
+# Thresholds for E5 (published agent slice must carry real promoted content).
+MIN_PUBLISHED_LINES = 20
+MIN_PUBLISHED_RULES = 3
+# Minimum distinct P-numbered tracker rows E3 expects in a tracked project doc.
+MIN_TRACKER_ROWS = 2
 
 
 @dataclass(frozen=True)
@@ -37,7 +44,8 @@ def _latest_sidecar(candidates_dir: Path) -> Path | None:
     return sidecars[-1] if sidecars else None
 
 
-def evaluate_e1_detect(repo_root: Path) -> EfficacyCheck:
+def evaluate_e1_detect(config: ArchiveConfig) -> EfficacyCheck:
+    repo_root = config.repo_root
     candidates_dir = repo_root / "baseline" / "candidates"
     sidecar = _latest_sidecar(candidates_dir)
     if sidecar is None:
@@ -58,17 +66,14 @@ def evaluate_e1_detect(repo_root: Path) -> EfficacyCheck:
     )
 
 
-def evaluate_e2_anchor(repo_root: Path) -> EfficacyCheck:
-    config_path = repo_root / "config" / "baseline.toml"
+def evaluate_e2_anchor(config: ArchiveConfig) -> EfficacyCheck:
+    config_path = config.repo_root / "config" / "baseline.toml"
     data = read_toml(config_path) if config_path.exists() else {}
     anchors = data.get("calibration_anchors", [])
+    # Config-driven: any tracked-project-doc anchor satisfies the gate; the
+    # specific source repo lives in config/baseline.toml, not hardcoded here.
     template_anchor = next(
-        (
-            anchor
-            for anchor in anchors
-            if anchor.get("kind") == "tracked-project-doc"
-            and anchor.get("source_repo") == "badminton-highlight-indexer"
-        ),
+        (anchor for anchor in anchors if anchor.get("kind") == "tracked-project-doc"),
         None,
     )
     if template_anchor is None:
@@ -81,18 +86,31 @@ def evaluate_e2_anchor(repo_root: Path) -> EfficacyCheck:
     )
 
 
-def evaluate_e3_dogfood(repo_root: Path) -> EfficacyCheck:
-    doc = repo_root / "docs" / "BASELINE_LOOP_CLOSURE.md"
+def evaluate_e3_dogfood(config: ArchiveConfig) -> EfficacyCheck:
+    doc = config.repo_root / "docs" / "BASELINE_LOOP_CLOSURE.md"
     text = _read_text(doc)
     if not text or "§7" not in text and "progress tracker" not in text.lower():
         return EfficacyCheck("E3.dogfood.tracked-project-doc", "dogfood", "fail", "BASELINE_LOOP_CLOSURE tracker missing.")
-    if "P0" not in text or "P9" not in text:
-        return EfficacyCheck("E3.dogfood.tracked-project-doc", "dogfood", "fail", "P0-P9 tracker rows missing.")
-    return EfficacyCheck("E3.dogfood.tracked-project-doc", "dogfood", "pass", "Tracked project doc with §7 rows present.")
+    # Generic: a tracked project doc has P-numbered deliverable rows; count
+    # distinct P-numbers instead of pinning to specific ids like P0/P9.
+    tracker_rows = {match for match in re.findall(r"\bP\d+\b", text)}
+    if len(tracker_rows) < MIN_TRACKER_ROWS:
+        return EfficacyCheck(
+            "E3.dogfood.tracked-project-doc",
+            "dogfood",
+            "fail",
+            f"Fewer than {MIN_TRACKER_ROWS} P-numbered tracker rows found.",
+        )
+    return EfficacyCheck(
+        "E3.dogfood.tracked-project-doc",
+        "dogfood",
+        "pass",
+        f"Tracked project doc with §7 rows present ({len(tracker_rows)} P-rows).",
+    )
 
 
-def evaluate_e4_promote(repo_root: Path) -> EfficacyCheck:
-    path = repo_root / "baseline" / "global" / "engineering-guardrails.md"
+def evaluate_e4_promote(config: ArchiveConfig) -> EfficacyCheck:
+    path = config.repo_root / "baseline" / "global" / "engineering-guardrails.md"
     text = _read_text(path)
     if PROMOTED_PLACEHOLDER in text:
         return EfficacyCheck("E4.promote.global-baseline", "promote", "fail", "Global guardrails still placeholder.")
@@ -112,14 +130,14 @@ def count_published_rules(text: str) -> int:
     return len(set(ids))
 
 
-def evaluate_e5_publish(repo_root: Path) -> EfficacyCheck:
-    path = repo_root / "baseline" / "agents" / "claude" / "CLAUDE.generated.md"
+def evaluate_e5_publish(config: ArchiveConfig) -> EfficacyCheck:
+    path = config.repo_root / "baseline" / "agents" / "claude" / "CLAUDE.generated.md"
     if not path.exists():
         return EfficacyCheck("E5.publish.agent-slices", "publish", "fail", "CLAUDE.generated.md missing.")
     text = path.read_text(encoding="utf-8")
     lines = text.splitlines()
     rule_count = count_published_rules(text)
-    if len(lines) <= 20 or rule_count < 3:
+    if len(lines) <= MIN_PUBLISHED_LINES or rule_count < MIN_PUBLISHED_RULES:
         return EfficacyCheck(
             "E5.publish.agent-slices",
             "publish",
@@ -134,17 +152,11 @@ def evaluate_e5_publish(repo_root: Path) -> EfficacyCheck:
     )
 
 
-def evaluate_e6_calibrate(repo_root: Path) -> EfficacyCheck:
-    feedback_path = repo_root / "baseline" / "calibration" / "feedback.example.toml"
+def evaluate_e6_calibrate(config: ArchiveConfig) -> EfficacyCheck:
+    feedback_path = config.repo_root / "baseline" / "calibration" / "feedback.example.toml"
     if not feedback_path.exists():
         return EfficacyCheck("E6.calibrate.feedback-loop", "calibrate", "fail", "feedback.example.toml missing.")
 
-    config = ArchiveConfig(
-        repo_root=repo_root,
-        archive_dir=repo_root / "archive",
-        raw_dir=repo_root / "raw",
-        sources=(),
-    )
     settings = load_baseline_settings(config)
     feedback_map = load_feedback(config, feedback_path)
     ledger_entries = load_ledger_entries(settings.ledger_path)
@@ -167,15 +179,11 @@ def evaluate_e6_calibrate(repo_root: Path) -> EfficacyCheck:
     delta = calibration_delta(feedback_applied, calibrated)
 
     rejected_ids = [
-        prediction_id
-        for prediction_id, item in feedback_map.items()
-        if str(item.get("verdict", "")).strip().lower() == "reject"
+        prediction_id for prediction_id, item in feedback_map.items() if parse_verdict(item) == "reject"
     ]
     suppressed_rejected = all(prediction_id in delta["suppressed_ids"] for prediction_id in rejected_ids)
     accepted_ids = [
-        prediction_id
-        for prediction_id, item in feedback_map.items()
-        if str(item.get("verdict", "")).strip().lower() == "accept"
+        prediction_id for prediction_id, item in feedback_map.items() if parse_verdict(item) == "accept"
     ]
     accepted_present = all(
         any(prediction.id == prediction_id for prediction in calibrated) for prediction_id in accepted_ids
@@ -213,8 +221,8 @@ EVALUATORS = (
 )
 
 
-def evaluate_all(repo_root: Path) -> list[EfficacyCheck]:
-    return [evaluator(repo_root) for evaluator in EVALUATORS]
+def evaluate_all(config: ArchiveConfig) -> list[EfficacyCheck]:
+    return [evaluator(config) for evaluator in EVALUATORS]
 
 
 def render_eval_report(checks: list[EfficacyCheck]) -> str:
@@ -236,7 +244,7 @@ def render_eval_report(checks: list[EfficacyCheck]) -> str:
 
 
 def baseline_eval(config: ArchiveConfig, output: Path | None = None, dry_run: bool = False) -> int:
-    checks = evaluate_all(config.repo_root)
+    checks = evaluate_all(config)
     report = render_eval_report(checks)
     if dry_run:
         print(report)

@@ -146,6 +146,26 @@ class TestApplyFeedback:
         result = apply_feedback(pred, fb)
         assert result.feedback != "none"
 
+    def test_does_not_mutate_input(self) -> None:
+        pred = Prediction(
+            id="test",
+            title="T",
+            scope="global",
+            risk="low",
+            category="meta",
+            confidence=0.5,
+            status="proposed",
+            evidence=[],
+            text="t",
+        )
+        result = apply_feedback(pred, {"test": {"verdict": "accept", "note": "Good."}})
+        # Prediction is frozen; apply_feedback returns a new copy and leaves the input intact.
+        assert result is not pred
+        assert pred.status == "proposed"
+        assert pred.confidence == 0.5
+        assert pred.feedback == "none"
+        assert result.status == "accepted-feedback"
+
 
 class TestPredictionToDict:
     def test_full_prediction(self) -> None:

@@ -23,6 +23,15 @@ from agent_sessions.baseline_eval import (
 from agent_sessions.config import ArchiveConfig
 
 
+def _config(repo_root: Path) -> ArchiveConfig:
+    return ArchiveConfig(
+        repo_root=repo_root,
+        archive_dir=repo_root / "archive",
+        raw_dir=repo_root / "raw",
+        sources=(),
+    )
+
+
 def _write_sidecar(repo_root: Path) -> None:
     sidecar = repo_root / "baseline" / "candidates" / "2026-07-05-extraction.predictions.json"
     sidecar.parent.mkdir(parents=True, exist_ok=True)
@@ -77,7 +86,7 @@ class TestBaselineEval:
             "# Baseline Loop Closure\n\n## 7. progress tracker\n\n| P0 | x | — | ☑ |\n| P9 | x | — | ☐ |\n",
             encoding="utf-8",
         )
-        checks = evaluate_all(repo_root)
+        checks = evaluate_all(_config(repo_root))
         assert len(checks) == 6
         by_id = {check.metric_id: check.status for check in checks}
         assert by_id["E1.detect.tracked-project-template"] == "pass"
@@ -112,7 +121,7 @@ class TestBaselineEval:
             encoding="utf-8",
         )
         assert count_published_rules(claude.read_text(encoding="utf-8")) == 2
-        check = evaluate_e5_publish(repo_root)
+        check = evaluate_e5_publish(_config(repo_root))
         assert check.status == "fail"
         assert "rules=2" in check.detail
 
@@ -133,7 +142,7 @@ class TestBaselineEval:
                 ]
             )
         claude.write_text("# Generated\n\n" + "\n".join(sections + ["line"] * 25), encoding="utf-8")
-        check = evaluate_e5_publish(repo_root)
+        check = evaluate_e5_publish(_config(repo_root))
         assert check.status == "pass"
         assert "3 rules" in check.detail
 
@@ -142,38 +151,39 @@ class TestBaselineEval:
         feedback.parent.mkdir(parents=True, exist_ok=True)
         real_feedback = Path(__file__).resolve().parents[1] / "baseline" / "calibration" / "feedback.example.toml"
         feedback.write_text(real_feedback.read_text(encoding="utf-8"), encoding="utf-8")
-        check = evaluate_e6_calibrate(repo_root)
+        check = evaluate_e6_calibrate(_config(repo_root))
         assert check.status == "pass"
 
     def test_e1_failures(self, repo_root: Path) -> None:
-        check = evaluate_e1_detect(repo_root)
+        check = evaluate_e1_detect(_config(repo_root))
         assert check.status == "fail"
         assert "No prediction sidecar" in check.detail
 
         sidecar = repo_root / "baseline" / "candidates" / "x.predictions.json"
         sidecar.parent.mkdir(parents=True, exist_ok=True)
         sidecar.write_text(json.dumps({"predictions": [{"id": "other", "confidence": 0.5, "evidence": ["e"]}]}), encoding="utf-8")
-        check = evaluate_e1_detect(repo_root)
+        check = evaluate_e1_detect(_config(repo_root))
         assert "Missing guardrail.tracked-project-docs" in check.detail
 
         sidecar.write_text(
             json.dumps({"predictions": [{"id": "guardrail.tracked-project-docs", "confidence": 0.9, "evidence": []}]}),
             encoding="utf-8",
         )
-        check = evaluate_e1_detect(repo_root)
+        check = evaluate_e1_detect(_config(repo_root))
         assert "no evidence" in check.detail.lower()
 
     def test_e3_and_e4_failures(self, repo_root: Path) -> None:
-        check = evaluate_e3_dogfood(repo_root)
+        check = evaluate_e3_dogfood(_config(repo_root))
         assert check.status == "fail"
 
         doc = repo_root / "docs" / "BASELINE_LOOP_CLOSURE.md"
         doc.parent.mkdir(parents=True, exist_ok=True)
         doc.write_text("# Tracker\n\nprogress tracker\n\n| P0 | x |\n", encoding="utf-8")
-        check = evaluate_e3_dogfood(repo_root)
-        assert "P0-P9" in check.detail
+        check = evaluate_e3_dogfood(_config(repo_root))
+        assert check.status == "fail"
+        assert "P-numbered tracker rows" in check.detail
 
-        check = evaluate_e4_promote(repo_root)
+        check = evaluate_e4_promote(_config(repo_root))
         assert check.status == "fail"
 
         global_dir = repo_root / "baseline" / "global"
@@ -184,7 +194,7 @@ class TestBaselineEval:
             global_baseline_header("engineering-guardrails.md") + f"\n{PROMOTED_PLACEHOLDER}\n",
             encoding="utf-8",
         )
-        check = evaluate_e4_promote(repo_root)
+        check = evaluate_e4_promote(_config(repo_root))
         assert "placeholder" in check.detail.lower()
 
     def test_e6_reports_ledger_confidence_adjustments(self, repo_root: Path) -> None:
@@ -213,13 +223,13 @@ class TestBaselineEval:
             + "\n",
             encoding="utf-8",
         )
-        check = evaluate_e6_calibrate(repo_root)
+        check = evaluate_e6_calibrate(_config(repo_root))
         assert check.status == "pass"
         assert "confidence adjustments" in check.detail
         assert not check.detail.endswith("0 confidence adjustments.")
 
     def test_e6_fails_without_feedback_file(self, repo_root: Path) -> None:
-        check = evaluate_e6_calibrate(repo_root)
+        check = evaluate_e6_calibrate(_config(repo_root))
         assert check.status == "fail"
         assert "feedback.example.toml missing" in check.detail
 
@@ -233,12 +243,12 @@ class TestBaselineEval:
             return list(predictions)
 
         monkeypatch.setattr("agent_sessions.baseline_eval.apply_calibration_loop", identity_loop)
-        check = evaluate_e6_calibrate(repo_root)
+        check = evaluate_e6_calibrate(_config(repo_root))
         assert check.status == "fail"
         assert "Rejected ids not suppressed" in check.detail
 
         monkeypatch.setattr("agent_sessions.baseline_eval.apply_calibration_loop", lambda *args: [])
-        check = evaluate_e6_calibrate(repo_root)
+        check = evaluate_e6_calibrate(_config(repo_root))
         assert check.status == "fail"
         assert "Accepted ids missing" in check.detail
 
@@ -256,7 +266,7 @@ class TestBaselineEval:
             return kept
 
         monkeypatch.setattr("agent_sessions.baseline_eval.apply_calibration_loop", static_loop)
-        check = evaluate_e6_calibrate(repo_root)
+        check = evaluate_e6_calibrate(_config(repo_root))
         assert check.status == "fail"
         assert "No confidence/feedback movement" in check.detail
 

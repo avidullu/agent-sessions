@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover
-    tomllib: Any = None  # type: ignore[no-redef]
 
 from .models import Source
 from .path_templates import PathTemplateContext
@@ -40,8 +36,6 @@ def load_config(repo_root: Path, config_path: Path | None = None) -> ArchiveConf
 
 
 def read_toml(path: Path) -> dict[str, Any]:
-    if tomllib is None:
-        raise SystemExit("Python 3.11+ is required to read TOML config.")
     return tomllib.loads(path.read_text(encoding="utf-8"))
 
 
