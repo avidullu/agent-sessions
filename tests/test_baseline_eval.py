@@ -5,11 +5,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from agent_sessions.baseline import PROMOTION_BEGIN, PROMOTION_END, global_baseline_header
 from agent_sessions.baseline_eval import (
+    EfficacyCheck,
     baseline_eval,
     count_published_rules,
     evaluate_all,
+    evaluate_e1_detect,
+    evaluate_e3_dogfood,
+    evaluate_e4_promote,
     evaluate_e5_publish,
     evaluate_e6_calibrate,
     render_eval_report,
@@ -139,14 +145,140 @@ class TestBaselineEval:
         check = evaluate_e6_calibrate(repo_root)
         assert check.status == "pass"
 
-    def test_render_eval_report(self) -> None:
-        from agent_sessions.baseline_eval import EfficacyCheck
+    def test_e1_failures(self, repo_root: Path) -> None:
+        check = evaluate_e1_detect(repo_root)
+        assert check.status == "fail"
+        assert "No prediction sidecar" in check.detail
 
+        sidecar = repo_root / "baseline" / "candidates" / "x.predictions.json"
+        sidecar.parent.mkdir(parents=True, exist_ok=True)
+        sidecar.write_text(json.dumps({"predictions": [{"id": "other", "confidence": 0.5, "evidence": ["e"]}]}), encoding="utf-8")
+        check = evaluate_e1_detect(repo_root)
+        assert "Missing guardrail.tracked-project-docs" in check.detail
+
+        sidecar.write_text(
+            json.dumps({"predictions": [{"id": "guardrail.tracked-project-docs", "confidence": 0.9, "evidence": []}]}),
+            encoding="utf-8",
+        )
+        check = evaluate_e1_detect(repo_root)
+        assert "no evidence" in check.detail.lower()
+
+    def test_e3_and_e4_failures(self, repo_root: Path) -> None:
+        check = evaluate_e3_dogfood(repo_root)
+        assert check.status == "fail"
+
+        doc = repo_root / "docs" / "BASELINE_LOOP_CLOSURE.md"
+        doc.parent.mkdir(parents=True, exist_ok=True)
+        doc.write_text("# Tracker\n\nprogress tracker\n\n| P0 | x |\n", encoding="utf-8")
+        check = evaluate_e3_dogfood(repo_root)
+        assert "P0-P9" in check.detail
+
+        check = evaluate_e4_promote(repo_root)
+        assert check.status == "fail"
+
+        global_dir = repo_root / "baseline" / "global"
+        global_dir.mkdir(parents=True, exist_ok=True)
+        from agent_sessions.baseline import PROMOTED_PLACEHOLDER, global_baseline_header
+
+        (global_dir / "engineering-guardrails.md").write_text(
+            global_baseline_header("engineering-guardrails.md") + f"\n{PROMOTED_PLACEHOLDER}\n",
+            encoding="utf-8",
+        )
+        check = evaluate_e4_promote(repo_root)
+        assert "placeholder" in check.detail.lower()
+
+    def test_e6_reports_ledger_confidence_adjustments(self, repo_root: Path) -> None:
+        feedback = repo_root / "baseline" / "calibration" / "feedback.example.toml"
+        feedback.parent.mkdir(parents=True, exist_ok=True)
+        real_feedback = Path(__file__).resolve().parents[1] / "baseline" / "calibration" / "feedback.example.toml"
+        feedback.write_text(real_feedback.read_text(encoding="utf-8"), encoding="utf-8")
+        ledger = repo_root / "baseline" / "metacognition" / "prediction-ledger.jsonl"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        ledger.write_text(
+            json.dumps(
+                {
+                    "id": "guardrail.pr-only-repo-writes",
+                    "status": "accepted-feedback",
+                    "confidence": 0.9,
+                }
+            )
+            + "\n"
+            + json.dumps(
+                {
+                    "id": "guardrail.pr-only-repo-writes",
+                    "status": "accepted-feedback",
+                    "confidence": 0.92,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        check = evaluate_e6_calibrate(repo_root)
+        assert check.status == "pass"
+        assert "confidence adjustments" in check.detail
+        assert not check.detail.endswith("0 confidence adjustments.")
+
+    def test_e6_fails_without_feedback_file(self, repo_root: Path) -> None:
+        check = evaluate_e6_calibrate(repo_root)
+        assert check.status == "fail"
+        assert "feedback.example.toml missing" in check.detail
+
+    def test_e6_failure_paths(self, repo_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        feedback = repo_root / "baseline" / "calibration" / "feedback.example.toml"
+        feedback.parent.mkdir(parents=True, exist_ok=True)
+        real_feedback = Path(__file__).resolve().parents[1] / "baseline" / "calibration" / "feedback.example.toml"
+        feedback.write_text(real_feedback.read_text(encoding="utf-8"), encoding="utf-8")
+
+        def identity_loop(predictions, feedback_map, ledger_entries):
+            return list(predictions)
+
+        monkeypatch.setattr("agent_sessions.baseline_eval.apply_calibration_loop", identity_loop)
+        check = evaluate_e6_calibrate(repo_root)
+        assert check.status == "fail"
+        assert "Rejected ids not suppressed" in check.detail
+
+        monkeypatch.setattr("agent_sessions.baseline_eval.apply_calibration_loop", lambda *args: [])
+        check = evaluate_e6_calibrate(repo_root)
+        assert check.status == "fail"
+        assert "Accepted ids missing" in check.detail
+
+        def static_loop(predictions, feedback_map, ledger_entries):
+            from dataclasses import replace
+
+            from agent_sessions.baseline_calibration import should_suppress_prediction, summarize_ledger
+
+            summaries = summarize_ledger(ledger_entries)
+            kept: list = []
+            for prediction in predictions:
+                if should_suppress_prediction(prediction, feedback_map, summaries.get(prediction.id)):
+                    continue
+                kept.append(replace(prediction, feedback="none"))
+            return kept
+
+        monkeypatch.setattr("agent_sessions.baseline_eval.apply_calibration_loop", static_loop)
+        check = evaluate_e6_calibrate(repo_root)
+        assert check.status == "fail"
+        assert "No confidence/feedback movement" in check.detail
+
+    def test_render_eval_report(self) -> None:
         report = render_eval_report(
             [EfficacyCheck("E1", "detect", "pass", "ok"), EfficacyCheck("E2", "anchor", "fail", "missing")]
         )
         assert "E1" in report
         assert "Failed: `1`" in report
+
+    def test_baseline_eval_dry_run_and_failure_exit(self, repo_root: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        _write_sidecar(repo_root)
+        config = ArchiveConfig(
+            repo_root=repo_root,
+            archive_dir=repo_root / "archive",
+            raw_dir=repo_root / "raw",
+            sources=(),
+        )
+        result = baseline_eval(config, dry_run=True)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Baseline Efficacy Evaluation" in captured.out
 
     def test_baseline_eval_writes_report(self, repo_root: Path) -> None:
         _write_sidecar(repo_root)
@@ -183,3 +315,16 @@ class TestBaselineEval:
         assert result in (0, 1)
         report = repo_root / "baseline" / "calibration" / "efficacy-report.md"
         assert report.exists()
+
+    def test_baseline_eval_reports_failures(self, repo_root: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        config = ArchiveConfig(
+            repo_root=repo_root,
+            archive_dir=repo_root / "archive",
+            raw_dir=repo_root / "raw",
+            sources=(),
+        )
+        result = baseline_eval(config, output=repo_root / "baseline" / "calibration" / "custom-report.md")
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Efficacy evaluation failed" in captured.out
+        assert (repo_root / "baseline" / "calibration" / "custom-report.md").exists()

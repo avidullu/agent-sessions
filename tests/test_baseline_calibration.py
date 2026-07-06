@@ -8,7 +8,10 @@ from pathlib import Path
 from agent_sessions.baseline import Prediction, apply_feedback
 from agent_sessions.baseline_calibration import (
     apply_calibration_loop,
+    apply_ledger_note,
     calibration_delta,
+    feedback_verdict,
+    ledger_confidence_adjustment,
     load_ledger_entries,
     should_suppress_prediction,
     summarize_ledger,
@@ -92,3 +95,60 @@ class TestCalibrationLoop:
         delta = calibration_delta(before, after)
         assert delta["suppressed_ids"] == ["b"]
         assert "a" in delta["confidence_changes"]
+
+    def test_apply_calibration_loop_does_not_mutate_input(self) -> None:
+        prediction = _prediction("guardrail.pr-only-repo-writes", confidence=0.7)
+        feedback = {"guardrail.pr-only-repo-writes": {"verdict": "accept", "note": "Good."}}
+        prediction = apply_feedback(prediction, feedback)
+        before_confidence = prediction.confidence
+        before_feedback = prediction.feedback
+        ledger = [
+            {"id": "guardrail.pr-only-repo-writes", "status": "accepted-feedback", "confidence": 0.9},
+            {"id": "guardrail.pr-only-repo-writes", "status": "accepted-feedback", "confidence": 0.92},
+        ]
+        calibrated = apply_calibration_loop([prediction], feedback, ledger)
+        delta = calibration_delta([prediction], calibrated)
+        assert prediction.confidence == before_confidence
+        assert prediction.feedback == before_feedback
+        assert delta["confidence_changes"]["guardrail.pr-only-repo-writes"] > 0
+
+    def test_load_ledger_skips_blank_lines(self, tmp_path: Path) -> None:
+        ledger = tmp_path / "ledger.jsonl"
+        ledger.write_text(
+            "\n"
+            + json.dumps({"id": "guardrail.one", "status": "accepted-feedback", "confidence": 0.8})
+            + "\n\n",
+            encoding="utf-8",
+        )
+        entries = load_ledger_entries(ledger)
+        assert len(entries) == 1
+
+    def test_feedback_verdict_and_suppress_helpers(self) -> None:
+        prediction = _prediction("guardrail.stale")
+        feedback = {"guardrail.stale": {"verdict": "reject", "note": "No."}}
+        summary = summarize_ledger(
+            [
+                {"id": "guardrail.stale", "status": "rejected-feedback", "confidence": 0.4},
+            ]
+        )["guardrail.stale"]
+        assert feedback_verdict(feedback, "guardrail.stale") == "reject"
+        assert should_suppress_prediction(prediction, feedback, summary) is True
+        assert ledger_confidence_adjustment(summary) < 0
+
+    def test_apply_ledger_note_appends_existing_feedback(self) -> None:
+        prediction = _prediction("guardrail.one")
+        prediction.feedback = "accept: yes"
+        summary = summarize_ledger(
+            [{"id": "guardrail.one", "status": "accepted-feedback", "confidence": 0.8}]
+        )["guardrail.one"]
+        note = apply_ledger_note(prediction, summary)
+        assert note.startswith("accept: yes; ledger:")
+
+    def test_apply_ledger_note_without_prior_feedback(self) -> None:
+        prediction = _prediction("guardrail.one")
+        summary = summarize_ledger(
+            [{"id": "guardrail.one", "status": "edit-requested", "confidence": 0.6}]
+        )["guardrail.one"]
+        note = apply_ledger_note(prediction, summary)
+        assert note.startswith("ledger:")
+        assert ledger_confidence_adjustment(summary) < 0

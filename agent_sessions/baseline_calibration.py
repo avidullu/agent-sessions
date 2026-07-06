@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -123,11 +123,12 @@ def apply_calibration_loop(
         summary = summaries.get(prediction.id)
         if should_suppress_prediction(prediction, feedback_map, summary):
             continue
+        updated = prediction
         adjustment = ledger_confidence_adjustment(summary)
         if adjustment:
-            prediction.confidence = confidence(prediction.confidence + adjustment)
-        prediction.feedback = apply_ledger_note(prediction, summary)
-        calibrated.append(prediction)
+            updated = replace(updated, confidence=confidence(updated.confidence + adjustment))
+        updated = replace(updated, feedback=apply_ledger_note(updated, summary))
+        calibrated.append(updated)
     return calibrated
 
 
