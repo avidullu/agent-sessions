@@ -4,9 +4,9 @@ Tracked project doc per docs/PROJECT_DOC_TEMPLATE.md.
 
 # Tech Debt Remediation Plan
 
-> **Status:** `IN PROGRESS` · **Owner:** `avidullu` · **Created:** `2026-07-06` · **Last updated:** `2026-07-06`
+> **Status:** `DONE` (archived) · **Owner:** `avidullu` · **Created:** `2026-07-06` · **Last updated:** `2026-07-06`
 > **Lifecycle:** `DRAFT → IN PROGRESS → DONE → archived` (move to `docs/archives/` when DONE)
-> **Progress:** 14 of 15 landed (TD1–TD9, TD11–TD15). Only TD10 (the `baseline.py` split) remains, spun out to issue #34.
+> **Progress:** 15 of 15 landed (TD1–TD15). Project complete; issue #34 (TD10) closed by PR #40.
 > **Tracking anchors:** §7 progress tracker is the source of truth; indexed in `docs/README.md`; pointer in `SESSION_HANDOFF.md`.
 > **Relation to existing docs:** peer-of `docs/BASELINE_LOOP_CLOSURE.md`; complements `docs/TEST_PLAN.md`.
 > **Honesty note:** each finding below is `[verified]` unless marked otherwise — all were reproduced against the working tree at commit `5d81234` (tests: 362 passed / 2 skipped, coverage 93.30%).
@@ -165,43 +165,54 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated. **One smal
 | TD7 | Index identity: session-id keys, POSIX paths at write time, `prune` command | TD6 | No | ☑ | #33 |
 | TD8 | Unified tolerant JSONL reader; de-dupe `load_index_records` | — | No | ☑ | #33 |
 | TD9 | Warnings/typed errors for unknown sources, missing WSL roots, bad config | — | No | ☑ | #33 |
-| TD10 | Split `baseline.py`; break `baseline`↔`baseline_calibration` cycle | TD4 | No | ☐ (spun out) | #34 |
+| TD10 | Split `baseline.py`; break `baseline`↔`baseline_calibration` cycle | TD4 | No | ☑ | #40 (issue #34) |
 | TD11 | CLI restructure: per-command registration, portable repo-root | TD1 | No | ☑ | #28 + #37 |
 | TD12 | Integration tests: six baseline subcommands via `main()`, PDF paths | TD11 | No | ☑ | #35 |
 | TD13 | Config-driven `baseline_eval` gates; uniform `ArchiveConfig` API | TD10 | No | ☑ | #37 |
 | TD14 | Consistency sweep: frozen Prediction, parse_verdict, dead code, docstrings | TD10 | No | ☑ | #37 |
 | TD15 | Incremental export/status via (size, mtime) short-circuit | TD7 | Optional | ☑ | #38 |
 
-**Landed:** TD1–TD9, TD11–TD15 are all merged. TD11's two halves shipped across
-#28 (`--repo-root` + `sys.path` removal) and #37 (per-command `set_defaults`
-registration).
+**All fifteen deliverables are merged.** TD11's two halves shipped across #28
+(`--repo-root` + `sys.path` removal) and #37 (per-command `set_defaults`
+registration); TD10 landed in #40, splitting `baseline.py` (1,044 → 332 lines)
+into `baseline_types` / `baseline_settings` / `baseline_predictions` /
+`baseline_report` / `baseline_promote` and breaking the
+`baseline`↔`baseline_calibration` cycle, with import-hygiene regression tests.
 
-**Remaining to close this project:** only **TD10** — the `baseline.py` split —
-tracked in #34 as its own focused refactor (module split + breaking the
-`baseline`↔`baseline_calibration` import cycle). Related follow-up: #32 (one-time
-index backfill + `regenerate`).
+**Project complete.** Remaining related work lives outside this tracker: #32
+(one-time index backfill + `regenerate` feature).
 
 ## 8. Open questions — owner / external
 
-- Owner: should TD7's migration also rewrite existing archive filenames (risk:
-  churn in git history) or only re-key `index.jsonl` (filenames stay as-is)?
+- ~~Owner: should TD7's migration also rewrite existing archive filenames?~~
+  Resolved 2026-07-06: re-key index only; one-time filename backfill + a
+  `regenerate` feature tracked in issue #32.
 - Owner: is the broader ruff rule set (`E501` line length etc.) worth adopting, or
-  keep defaults + isort/bugbear only?
+  keep defaults + isort/bugbear only? *(Carried forward as an open preference —
+  current config stays defaults-plus-line-length-120.)*
 
 ## 9. Definition of done
 
-- [ ] `pip install -e ".[dev]"` succeeds on a fresh clone; `agent-archive --help` works.
-- [ ] CI runs pytest (coverage ≥ 80), ruff, and mypy green on every PR.
-- [ ] `baseline promote` cannot delete hand-written content without `--force`.
-- [ ] Ledger writes are crash-safe.
-- [ ] Two machines exporting the same session produce one index record and one archive file.
-- [ ] `baseline.py` < 400 lines with no circular imports.
-- [ ] All six baseline subcommands covered by CLI-level tests.
+- [x] `pip install -e ".[dev]"` succeeds on a fresh clone; `agent-archive --help` works. *(#28)*
+- [x] CI runs pytest (coverage ≥ 80), ruff, and mypy green on every PR. *(#28)*
+- [x] `baseline promote` cannot delete hand-written content — the rewriter is
+  content-preserving outside marker blocks, stronger than the `--force` guard
+  originally sketched. *(#31)*
+- [x] Ledger writes are crash-safe. *(#31)*
+- [x] Two machines exporting the same session produce one index record (session-id
+  merge identity; existing-file backfill deferred to #32). *(#33)*
+- [x] `baseline.py` < 400 lines (332) with no circular imports, enforced by
+  import-hygiene tests. *(#40)*
+- [x] All six baseline subcommands covered by CLI-level tests. *(#35)*
 
 ## 10. References
 
-**Internal:** `pyproject.toml`, `tools/agent_archive.py`, `agent_sessions/{archive,baseline,baseline_eval,baseline_calibration,cli,render,config,path_templates,archive_status,utils}.py`, `docs/TEST_PLAN.md`, `docs/MULTI_MACHINE.md`.
+**Internal:** `pyproject.toml`, `tools/agent_archive.py`, `agent_sessions/{archive,baseline,baseline_types,baseline_settings,baseline_predictions,baseline_report,baseline_promote,baseline_eval,baseline_calibration,cli,render,config,path_templates,archive_status,utils}.py`, `docs/TEST_PLAN.md`, `docs/MULTI_MACHINE.md`.
 **External:** none required.
 
 ### Changelog
 - `2026-07-06` — Initial audit and plan drafted.
+- `2026-07-06` — TD1–TD3 landed (#28); tracker updated (#36).
+- `2026-07-06` — TD4–TD6 (#31), TD7–TD9 (#33), TD12 (#35) landed.
+- `2026-07-06` — TD11/TD13/TD14 (#37) and TD15 (#38) landed; tracker to 14/15 (#39).
+- `2026-07-06` — TD10 landed (#40, closes #34). 15/15 complete; status DONE; doc archived.

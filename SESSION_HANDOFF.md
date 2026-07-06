@@ -18,9 +18,9 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
 ## Next Steps / Open Threads
 
 - **Active tracked project:** `docs/BASELINE_LOOP_CLOSURE.md` (§7 closure tracker).
-- **Next tracked project:** `docs/TECH_DEBT_PLAN.md` (§7 TD1-TD15 tracker),
-  introduced by PR #24; after merge, complete the tracker and archive the doc
-  when DONE.
+- **Completed tracked project:** tech-debt remediation (TD1-TD15, PRs #28-#40)
+  is DONE and archived at `docs/archives/TECH_DEBT_PLAN.md`. Related follow-up:
+  issue #32 (index backfill + `regenerate`).
 - **Efficacy gates:** `docs/CALIBRATION_EFFICACY.md` and `baseline/calibration/efficacy.toml`.
 - **Merged:** PRs #13-#17 cover baseline promote, publish, calibration/eval,
   structured proposal ingest, and multi-machine archive status/merge behavior.
@@ -55,7 +55,7 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
 - `docs/BASELINE_PLANNING.md`
 - `docs/README.md`
 - `docs/BASELINE_LOOP_CLOSURE.md`
-- `docs/TECH_DEBT_PLAN.md`
+- `docs/archives/TECH_DEBT_PLAN.md`
 - `docs/CALIBRATION_EFFICACY.md`
 - `docs/PROJECT_DOC_TEMPLATE.md`
 - `docs/COMPOSE_STACK.md`
