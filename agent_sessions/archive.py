@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -16,7 +17,7 @@ from .config import ArchiveConfig
 from .models import Source
 from .render import markdown_for_session, write_pdf
 from .sources.registry import get_extractor
-from .utils import now_utc, slugify
+from .utils import now_utc, read_jsonl_dicts, slugify
 
 
 IMPORTED_AT_RE = re.compile(r"^- Imported at: `([^`]+)`$", re.MULTILINE)
@@ -65,6 +66,9 @@ def select_sources(config: ArchiveConfig, selected: list[str] | None) -> list[So
     if not selected:
         return list(config.sources)
     wanted = set(selected)
+    known = {source.name for source in config.sources} | {source.kind for source in config.sources}
+    for selector in sorted(wanted - known):
+        print(f"warning: --source {selector!r} matched no configured source name or kind.", file=sys.stderr)
     return [source for source in config.sources if source.name in wanted or source.kind in wanted]
 
 
@@ -88,6 +92,13 @@ def export_sources(
         if extractor is None:
             skipped_sources.append(f"{source.name} ({source.kind})")
             continue
+        for root in source.roots:
+            if "__missing_" in str(root):
+                print(
+                    f"warning: source {source.name!r} has an unresolved path template "
+                    f"({root}); skipping that root. Set it in sources.toml if this machine has it.",
+                    file=sys.stderr,
+                )
         for path in iter_source_files(source):
             if limit and exported >= limit:
                 break
@@ -136,27 +147,48 @@ def export_sources(
 
 
 def index_record_key(record: dict[str, Any]) -> tuple[str, str]:
+    # Path identity: used by `status` to match index records against the files
+    # visible on THIS machine (keyed by source name + local path).
     return (str(record.get("source", "")), str(record.get("source_file", "")))
+
+
+def index_identity_key(record: dict[str, Any]) -> tuple[str, ...]:
+    # Merge identity: machine-independent so the same logical session exported
+    # from Windows and WSL (different absolute source_file paths) collapses to a
+    # single record, while a re-export of a changed file still supersedes the old
+    # record instead of accumulating. session_id is stable across both machines
+    # and content changes; fall back to (source, source_file) when it is absent.
+    metadata = record.get("metadata")
+    if isinstance(metadata, dict):
+        session_id = str(metadata.get("session_id", "")).strip()
+        if session_id:
+            return ("session", session_id)
+    return ("path", str(record.get("source", "")), str(record.get("source_file", "")))
+
+
+def _posix_index_record(record: dict[str, Any]) -> dict[str, Any]:
+    # Repo-relative archive paths are written POSIX-normalized once, here, so
+    # downstream consumers never have to compensate for OS separators.
+    normalized = dict(record)
+    for key in ("markdown", "pdf", "raw"):
+        value = normalized.get(key)
+        if isinstance(value, str):
+            normalized[key] = value.replace("\\", "/")
+    return normalized
 
 
 def read_existing_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
     index_path = config.archive_dir / "index.jsonl"
     if not index_path.exists():
         return []
-    records: list[dict[str, Any]] = []
-    with index_path.open("r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                records.append(json.loads(line))
-    return records
+    return read_jsonl_dicts(index_path, label="archive/index.jsonl")
 
 
 def merge_index_records(existing: list[dict[str, Any]], current: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    merged: dict[tuple[str, str], dict[str, Any]] = {}
-    order: list[tuple[str, str]] = []
+    merged: dict[tuple[str, ...], dict[str, Any]] = {}
+    order: list[tuple[str, ...]] = []
     for record in [*existing, *current]:
-        key = index_record_key(record)
+        key = index_identity_key(record)
         if key not in merged:
             order.append(key)
         merged[key] = record
@@ -164,6 +196,7 @@ def merge_index_records(existing: list[dict[str, Any]], current: list[dict[str, 
 
 
 def write_indexes(config: ArchiveConfig, records: list[dict[str, Any]]) -> None:
+    records = [_posix_index_record(record) for record in records]
     jsonl_path = config.archive_dir / "index.jsonl"
     jsonl_text = "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in records)
     write_text_if_changed(jsonl_path, jsonl_text)
@@ -224,13 +257,36 @@ def load_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
     index_path = config.archive_dir / "index.jsonl"
     if not index_path.exists():
         raise SystemExit("archive/index.jsonl does not exist. Run export first.")
-    records: list[dict[str, Any]] = []
-    with index_path.open("r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                records.append(json.loads(line))
-    return records
+    return read_jsonl_dicts(index_path, label="archive/index.jsonl")
+
+
+def prune_index_records(config: ArchiveConfig, dry_run: bool = False) -> int:
+    """Drop index records whose archive Markdown file no longer exists on disk.
+
+    Safe GC for entries orphaned when a source file's digest changed (a fresh
+    stem/record supersedes the old one) or an archive file was deleted. Records
+    from other machines stay put as long as their committed Markdown is present.
+    """
+    records = read_existing_index_records(config)
+    kept: list[dict[str, Any]] = []
+    dropped: list[dict[str, Any]] = []
+    for record in records:
+        markdown = record.get("markdown")
+        target = config.repo_root / str(markdown).replace("\\", "/") if isinstance(markdown, str) else None
+        if target is not None and target.exists():
+            kept.append(record)
+        else:
+            dropped.append(record)
+    for record in dropped:
+        print(f"prune: dropping stale index record for {record.get('markdown')!r} (missing on disk)")
+    if not dropped:
+        print("prune: no stale index records found.")
+    elif not dry_run:
+        write_indexes(config, kept)
+        print(f"prune: removed {len(dropped)} record(s); {len(kept)} remain.")
+    else:
+        print(f"prune: would remove {len(dropped)} record(s); {len(kept)} would remain.")
+    return 0
 
 
 def pdf_existing(
