@@ -7,7 +7,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .baseline import BaselineSettings, Prediction, load_baseline_settings, prediction_to_dict
+from .baseline_settings import load_baseline_settings
+from .baseline_types import BaselineSettings, Prediction, prediction_to_dict
 from .config import ArchiveConfig
 
 

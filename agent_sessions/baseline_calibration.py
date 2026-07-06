@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from .baseline import Prediction, confidence, parse_verdict
+from .baseline_types import Prediction, confidence, parse_verdict
 
 
 LEDGER_ACCEPTED = "accepted-feedback"

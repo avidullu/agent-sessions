@@ -7,7 +7,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .baseline import load_baseline_settings, load_index_records
+from .baseline import load_index_records
+from .baseline_settings import load_baseline_settings
 from .config import ArchiveConfig
 from .utils import archive_markdown_path
 

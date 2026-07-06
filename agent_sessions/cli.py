@@ -82,7 +82,7 @@ def _handle_baseline_calibrate(config: ArchiveConfig, args: argparse.Namespace) 
 
 
 def _handle_baseline_promote(config: ArchiveConfig, args: argparse.Namespace) -> int:
-    from .baseline import baseline_promote
+    from .baseline_promote import baseline_promote
 
     promote_ids = tuple(args.promote_ids) if args.promote_ids else None
     return baseline_promote(
