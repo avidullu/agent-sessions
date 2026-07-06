@@ -1,8 +1,8 @@
 # Design: Prediction Watchlist + Rejection Tombstone System
 
 > **Status:** `PROPOSED FOR REVIEW (rev 2.1)` · **Repo:** `agent-sessions` · **Date:** 2026-07-06
-> **Tracking:** Proposed as P10 + P11 in `docs/BASELINE_LOOP_CLOSURE.md` §7  
-> **Honesty:** `[verified]` = exists in repo today; `[design]` = proposed in this doc  
+> **Tracking:** Proposed as P10 + P11 in `docs/BASELINE_LOOP_CLOSURE.md` §7
+> **Honesty:** `[verified]` = exists in repo today; `[design]` = proposed in this doc
 > **Rev 2:** Addresses design review (20 issues) · **Rev 2.1:** N1–N3 re-review amendments
 
 ---
@@ -689,6 +689,8 @@ Existing CLI flag (`cli.py:54–58`) sets `use_calibration=False`, which today s
 
 **Rationale:** `--no-calibration` means “skip ledger confidence nudges and tombstone file writes” — not “show rejected predictions.” When `--feedback` is loaded, feedback rejects and tombstone proximity matches (`prox >= 0.85`) still assign `tier=tombstone` and are filtered from the candidate report. This is a **safety improvement** over today where `--no-calibration` + feedback reject leaves rejected ids visible.
 
+**Cross-run persistence:** In-run suppression still applies when `--feedback` is loaded, but tombstones are not written to disk without the default calibration path or a subsequent `baseline calibrate` replay. A later `baseline suggest` run without `--feedback` can resurrect those patterns until tombstones are persisted.
+
 **Tests (PR 2b):** Extend `tests/test_baseline.py` — `baseline suggest --no-calibration --feedback` suppresses rejected ids but skips confidence adjustment vs calibrated run. Extend `tests/test_cli.py` if needed for flag wiring.
 
 ### 8.2 `baseline calibrate` — `baseline_calibrate()` in `agent_sessions/baseline.py`
@@ -995,7 +997,7 @@ P11 ingest/promote preflight ships in PR3; watchlist (P10) is orthogonal cache.
 16. **Feature flags:** `[tombstones] enabled` and `[tiers] enabled` default `false` until integration PR.
 17. **P11 depends on PR1+PR3**, not P10; P10 depends on PR2.
 18. **E6 regression gate** uses shared `visible_predictions()` / `enrich_predictions()` path — updated in PR 2b, not PR 3.
-19. **`--no-calibration`** skips ledger adjustment and tombstone side effects only; tier enrichment and suppression filter always run.
+19. **`--no-calibration`** skips ledger adjustment and tombstone side effects only; tier enrichment and suppression filter always run. Cross-run dedup requires the default calibration path or `baseline calibrate` replay.
 
 ---
 
