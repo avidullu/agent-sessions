@@ -10,11 +10,12 @@ stay separate.
 The scheduled job should:
 
 1. `git pull --ff-only`
-2. Run `python tools/agent_archive.py export --all`
-3. Optionally include `--pdf`
-4. Commit only when `archive/` changed
-5. Push only after a successful commit
-6. Exit cleanly when there is nothing new
+2. Optionally run `python tools/agent_archive.py status`
+3. Run `python tools/agent_archive.py export --all`
+4. Optionally include `--pdf`
+5. Commit only when `archive/` changed
+6. Push only after a successful commit
+7. Exit cleanly when there is nothing new
 
 It should not:
 
@@ -67,7 +68,25 @@ The exporter preserves existing session import timestamps and `archive/INDEX.md`
 generated timestamps when the underlying content is unchanged. That keeps daily
 runs quiet when there are no new or changed source sessions.
 
+`archive/index.jsonl` is merge-aware: records already indexed from another
+machine remain in the unified catalog even when the current machine cannot see
+that other machine's local agent stores.
+
 PDF generation skips existing PDFs unless the Markdown changed.
+
+## Hook Shape
+
+Git hooks are not useful for detecting new sessions because the source files are
+outside this repo. For near-real-time updates, use a filesystem watcher on the
+configured source roots and debounce it before running:
+
+```powershell
+python .\tools\agent_archive.py status
+.\scripts\daily-export.ps1 -Pdf
+```
+
+The debounce matters because agent tools can write JSONL/transcript files while
+a session is still active.
 
 ## Schedule Choices
 

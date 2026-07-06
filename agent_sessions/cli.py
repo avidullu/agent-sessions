@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 from .archive import discover_sources, export_sources, pdf_existing
+from .archive_status import archive_status
 from .baseline import baseline_scaffold, baseline_suggest
 from .config import load_config
 
@@ -35,6 +36,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_pdf.add_argument("--source", action="append", help="Source name or kind to PDF. Can be repeated.")
     p_pdf.add_argument("--limit", type=int, help="Maximum PDFs to write.")
     p_pdf.add_argument("--force", action="store_true", help="Overwrite existing PDFs.")
+
+    p_status = sub.add_parser("status", help="Show archive freshness and origin summary.")
+    p_status.add_argument("--source", action="append", help="Source name or kind to check. Can be repeated.")
+    p_status.add_argument("--json", action="store_true", help="Write machine-readable JSON.")
 
     p_baseline = sub.add_parser("baseline", help="Work with engineering baseline candidates.")
     baseline_sub = p_baseline.add_subparsers(dest="baseline_cmd", required=True)
@@ -149,6 +154,8 @@ def main(argv: list[str] | None = None) -> int:
         if not args.all and not args.source:
             parser.error("pdf requires --all or at least one --source")
         return pdf_existing(config, selected=args.source, limit=args.limit, force=args.force)
+    if args.cmd == "status":
+        return archive_status(config, selected=args.source, as_json=args.json)
     if args.cmd == "baseline":
         if args.baseline_cmd == "scaffold":
             return baseline_scaffold(config, dry_run=args.dry_run)

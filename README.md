@@ -26,6 +26,7 @@ Default sources live in `config/default_sources.toml`. Copy
 
 ```powershell
 python .\tools\agent_archive.py discover --write docs\DISCOVERY.md
+python .\tools\agent_archive.py status
 python .\tools\agent_archive.py export --all
 ```
 
@@ -97,11 +98,14 @@ browsing, live capture, and runtime memory are delegated to external tools where
 they are already stronger. See [docs/COMPOSE_STACK.md](docs/COMPOSE_STACK.md).
 
 Daily export automation is documented in [docs/AUTOMATION.md](docs/AUTOMATION.md).
+Multi-machine indexing is documented in [docs/MULTI_MACHINE.md](docs/MULTI_MACHINE.md).
 
 ## Other Machines
 
 Clone this private repo on another machine, run the same discovery/export
 commands there, commit the new `archive/` Markdown/PDF files, and push.
+The archive index is merge-aware, so records from other machines remain in the
+unified view when one machine exports only the local sources it can see.
 
 If a machine has different usernames, WSL distribution names, or custom storage
 paths, copy `sources.example.toml` to `sources.toml` and edit the roots. The
