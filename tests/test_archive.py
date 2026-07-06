@@ -518,6 +518,11 @@ class TestUtilityFunctions:
         assert len(result) == 8  # YYYYMMDD
         assert result.isdigit()
 
+    def test_dt_from_timestamp_is_utc(self) -> None:
+        # Stem must be timezone-independent (UTC), so it matches across machines
+        # regardless of the local timezone the export runs in.
+        assert dt_from_timestamp(1750000000.0) == "20250615"
+
     def test_source_modified_date(self, tmp_path: Path) -> None:
         path = tmp_path / "test.txt"
         path.write_text("hello", encoding="utf-8")

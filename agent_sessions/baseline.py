@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import math
+import os
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -422,13 +423,17 @@ def upsert_ledger(ledger_path: Path, run_id: str, predictions: list[dict[str, An
                 if record.get("run_id") != run_id:
                     existing.append(record)
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
-    with ledger_path.open("w", encoding="utf-8", newline="\n") as f:
-        for record in existing:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
-        recorded_at = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
-        for prediction in predictions:
-            record = {"run_id": run_id, "recorded_at": recorded_at, **prediction}
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    recorded_at = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+    lines = [json.dumps(record, ensure_ascii=False) for record in existing]
+    for prediction in predictions:
+        record = {"run_id": run_id, "recorded_at": recorded_at, **prediction}
+        lines.append(json.dumps(record, ensure_ascii=False))
+    # Write atomically: a crash mid-write must not truncate or corrupt the
+    # ledger the calibration loop depends on. Write a sibling temp file, then
+    # os.replace() (atomic on the same filesystem).
+    tmp_path = ledger_path.parent / f"{ledger_path.name}.{os.getpid()}.tmp"
+    tmp_path.write_text("".join(line + "\n" for line in lines), encoding="utf-8", newline="\n")
+    os.replace(tmp_path, ledger_path)
 
 
 def resolve_prediction_sidecar(settings: BaselineSettings, predictions: Path | None) -> Path:
@@ -919,13 +924,34 @@ def global_baseline_header(filename: str) -> str:
 
 
 def upsert_promoted_content(existing: str, blocks: dict[str, str], filename: str) -> str:
-    current_blocks = parse_promoted_blocks(existing)
-    current_blocks.update(blocks)
-    if not current_blocks:
+    if not blocks:
         return existing
-    header = global_baseline_header(filename)
-    body = "\n\n".join(current_blocks[prediction_id] for prediction_id in sorted(current_blocks))
-    return header + "\n" + body + "\n"
+    # Fresh/empty file: lay down the standard header plus the new blocks.
+    if not existing.strip():
+        body = "\n\n".join(blocks[prediction_id] for prediction_id in sorted(blocks))
+        return global_baseline_header(filename) + "\n" + body + "\n"
+    # Existing file: preserve all hand-written prose. Drop only the scaffold
+    # placeholder line, replace same-id blocks in place, and append new ones.
+    result = existing
+    if PROMOTED_PLACEHOLDER in result:
+        result = (
+            "\n".join(line for line in result.splitlines() if PROMOTED_PLACEHOLDER not in line).rstrip("\n") + "\n"
+        )
+    appended: list[str] = []
+    for prediction_id in sorted(blocks):
+        block = blocks[prediction_id]
+        marker = re.compile(
+            r'<!-- baseline:begin id="' + re.escape(prediction_id) + r'" -->\n?.*?'
+            r'<!-- baseline:end id="' + re.escape(prediction_id) + r'" -->',
+            re.DOTALL,
+        )
+        if marker.search(result):
+            result = marker.sub(lambda _match: block, result, count=1)
+        else:
+            appended.append(block)
+    if appended:
+        result = result.rstrip("\n") + "\n\n" + "\n\n".join(appended) + "\n"
+    return result
 
 
 def select_promotable_predictions(
@@ -974,8 +1000,6 @@ def promote_predictions(
     for target_name, blocks in grouped.items():
         path = settings.root / "global" / target_name
         existing = path.read_text(encoding="utf-8") if path.exists() else ""
-        if PROMOTED_PLACEHOLDER in existing or not parse_promoted_blocks(existing):
-            existing = global_baseline_header(target_name)
         updates[path] = upsert_promoted_content(existing, blocks, target_name)
     return updates
 
