@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -106,12 +107,18 @@ def evaluate_e4_promote(repo_root: Path) -> EfficacyCheck:
     )
 
 
+def count_published_rules(text: str) -> int:
+    ids = re.findall(r'\*\*ID:\*\* `((?:guardrail\.|profile\.)[^`]+)`', text)
+    return len(set(ids))
+
+
 def evaluate_e5_publish(repo_root: Path) -> EfficacyCheck:
     path = repo_root / "baseline" / "agents" / "claude" / "CLAUDE.generated.md"
     if not path.exists():
         return EfficacyCheck("E5.publish.agent-slices", "publish", "fail", "CLAUDE.generated.md missing.")
-    lines = path.read_text(encoding="utf-8").splitlines()
-    rule_count = sum(1 for line in lines if line.startswith("### "))
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    rule_count = count_published_rules(text)
     if len(lines) <= 20 or rule_count < 3:
         return EfficacyCheck(
             "E5.publish.agent-slices",

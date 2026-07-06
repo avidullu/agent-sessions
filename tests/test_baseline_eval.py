@@ -8,7 +8,9 @@ from pathlib import Path
 from agent_sessions.baseline import PROMOTION_BEGIN, PROMOTION_END, global_baseline_header
 from agent_sessions.baseline_eval import (
     baseline_eval,
+    count_published_rules,
     evaluate_all,
+    evaluate_e5_publish,
     evaluate_e6_calibrate,
     render_eval_report,
 )
@@ -76,6 +78,59 @@ class TestBaselineEval:
         assert by_id["E2.anchor.template-source"] == "pass"
         assert by_id["E3.dogfood.tracked-project-doc"] == "pass"
 
+    def test_e5_ignores_evidence_headings(self, repo_root: Path) -> None:
+        claude = repo_root / "baseline" / "agents" / "claude" / "CLAUDE.generated.md"
+        claude.parent.mkdir(parents=True, exist_ok=True)
+        claude.write_text(
+            "\n".join(
+                [
+                    "# Generated",
+                    "",
+                    "### Rule One",
+                    "**Source:** `baseline/global/engineering-guardrails.md` · **ID:** `guardrail.one`",
+                    "",
+                    "Rule text.",
+                    "### Evidence",
+                    "- hit",
+                    "",
+                    "### Rule Two",
+                    "**Source:** `baseline/global/engineering-guardrails.md` · **ID:** `guardrail.two`",
+                    "",
+                    "Rule text.",
+                    "### Evidence",
+                    "- hit",
+                    "",
+                    *["padding"] * 25,
+                ]
+            ),
+            encoding="utf-8",
+        )
+        assert count_published_rules(claude.read_text(encoding="utf-8")) == 2
+        check = evaluate_e5_publish(repo_root)
+        assert check.status == "fail"
+        assert "rules=2" in check.detail
+
+    def test_e5_passes_with_three_rule_ids(self, repo_root: Path) -> None:
+        claude = repo_root / "baseline" / "agents" / "claude" / "CLAUDE.generated.md"
+        claude.parent.mkdir(parents=True, exist_ok=True)
+        sections = []
+        for index in range(3):
+            sections.extend(
+                [
+                    f"### Rule {index}",
+                    f"**Source:** `baseline/global/x.md` · **ID:** `guardrail.rule-{index}`",
+                    "",
+                    "Text.",
+                    "### Evidence",
+                    "- e",
+                    "",
+                ]
+            )
+        claude.write_text("# Generated\n\n" + "\n".join(sections + ["line"] * 25), encoding="utf-8")
+        check = evaluate_e5_publish(repo_root)
+        assert check.status == "pass"
+        assert "3 rules" in check.detail
+
     def test_e6_passes_with_feedback_example(self, repo_root: Path) -> None:
         feedback = repo_root / "baseline" / "calibration" / "feedback.example.toml"
         feedback.parent.mkdir(parents=True, exist_ok=True)
@@ -106,8 +161,11 @@ class TestBaselineEval:
                     "<!-- baseline:generated:begin -->",
                     "",
                     "### Rule A",
+                    "**ID:** `guardrail.a`",
                     "### Rule B",
+                    "**ID:** `guardrail.b`",
                     "### Rule C",
+                    "**ID:** `guardrail.c`",
                     "",
                     *["line"] * 25,
                     "<!-- baseline:generated:end -->",
