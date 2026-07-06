@@ -146,6 +146,60 @@ class TestCopyRaw:
         assert result.parent.exists()
 
 
+class TestCanReuseRecord:
+    def _config(self, tmp_path: Path) -> ArchiveConfig:
+        return ArchiveConfig(
+            repo_root=tmp_path,
+            archive_dir=tmp_path / "archive",
+            raw_dir=tmp_path / "raw",
+            sources=(),
+        )
+
+    def _record_with_markdown(self, tmp_path: Path, **extra: object) -> dict:
+        md = tmp_path / "archive" / "s" / "a.md"
+        md.parent.mkdir(parents=True, exist_ok=True)
+        md.write_text("x", encoding="utf-8")
+        record = {"markdown": "archive/s/a.md", "size": 10, "mtime": 100.0}
+        record.update(extra)
+        return record
+
+    def test_none_prior_not_reusable(self, tmp_path: Path) -> None:
+        from agent_sessions.archive import _can_reuse_record
+
+        assert _can_reuse_record(self._config(tmp_path), None, 10, 100.0, False, False) is False
+
+    def test_missing_size_mtime_not_reusable(self, tmp_path: Path) -> None:
+        from agent_sessions.archive import _can_reuse_record
+
+        prior = self._record_with_markdown(tmp_path)
+        del prior["size"]
+        assert _can_reuse_record(self._config(tmp_path), prior, 10, 100.0, False, False) is False
+
+    def test_matching_size_mtime_reusable(self, tmp_path: Path) -> None:
+        from agent_sessions.archive import _can_reuse_record
+
+        prior = self._record_with_markdown(tmp_path)
+        assert _can_reuse_record(self._config(tmp_path), prior, 10, 100.0, False, False) is True
+
+    def test_changed_mtime_not_reusable(self, tmp_path: Path) -> None:
+        from agent_sessions.archive import _can_reuse_record
+
+        prior = self._record_with_markdown(tmp_path)
+        assert _can_reuse_record(self._config(tmp_path), prior, 10, 999.0, False, False) is False
+
+    def test_missing_markdown_not_reusable(self, tmp_path: Path) -> None:
+        from agent_sessions.archive import _can_reuse_record
+
+        prior = {"markdown": "archive/s/gone.md", "size": 10, "mtime": 100.0}
+        assert _can_reuse_record(self._config(tmp_path), prior, 10, 100.0, False, False) is False
+
+    def test_pdf_requested_but_missing_not_reusable(self, tmp_path: Path) -> None:
+        from agent_sessions.archive import _can_reuse_record
+
+        prior = self._record_with_markdown(tmp_path, pdf=None)
+        assert _can_reuse_record(self._config(tmp_path), prior, 10, 100.0, True, False) is False
+
+
 class TestSelectSources:
     def test_all_when_none_selected(self, multi_source_config: ArchiveConfig) -> None:
         result = select_sources(multi_source_config, None)

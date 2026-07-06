@@ -6,6 +6,7 @@ import json
 import re
 from collections import Counter
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .archive import index_record_key, iter_source_files, read_existing_index_records, sha256_file
@@ -65,7 +66,7 @@ def classify_source_origin(path: str) -> SourceOrigin:
 def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> StatusSummary:
     indexed = read_existing_index_records(config)
     indexed_by_key = {index_record_key(record): record for record in indexed}
-    visible_by_key: dict[tuple[str, str], str] = {}
+    visible_by_key: dict[tuple[str, str], tuple[int, float, Path]] = {}
     skipped_sources: list[str] = []
 
     selected_names = set(selected or [])
@@ -79,16 +80,21 @@ def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> 
             skipped_sources.append(f"{source.name} ({source.kind})")
             continue
         for path in iter_source_files(source):
-            visible_by_key[(source.name, str(path))] = sha256_file(path)
+            stat_result = path.stat()
+            visible_by_key[(source.name, str(path))] = (stat_result.st_size, stat_result.st_mtime, path)
 
     new_files = 0
     changed_files = 0
-    for key, digest in visible_by_key.items():
+    for key, (size, mtime, path) in visible_by_key.items():
         record = indexed_by_key.get(key)
         if record is None:
             new_files += 1
             continue
-        if str(record.get("sha256", "")) != digest:
+        # Skip the sha256 read when size+mtime match the indexed record; only
+        # hash when they differ or are absent (records predating TD15).
+        if record.get("size") == size and record.get("mtime") == mtime:
+            continue
+        if str(record.get("sha256", "")) != sha256_file(path):
             changed_files += 1
 
     not_visible_records = sum(1 for key in indexed_by_key if key not in visible_by_key)

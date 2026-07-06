@@ -73,6 +73,38 @@ def select_sources(config: ArchiveConfig, selected: list[str] | None) -> list[So
     return [source for source in config.sources if source.name in wanted or source.kind in wanted]
 
 
+def _index_path_exists(config: ArchiveConfig, rel: Any) -> bool:
+    return isinstance(rel, str) and bool(rel) and (config.repo_root / rel.replace("\\", "/")).exists()
+
+
+def _can_reuse_record(
+    config: ArchiveConfig,
+    prior: dict[str, Any] | None,
+    size: int,
+    mtime: float,
+    write_pdfs: bool,
+    copy_raw_files: bool,
+) -> bool:
+    """Skip re-hashing/re-extracting a source file that is unchanged since the
+    last export (matching size + mtime) as long as the outputs it would produce
+    already exist on disk. Records written before TD15 lack size/mtime and never
+    match, so they fall through to a full re-export.
+
+    Tradeoff: identity is (size, mtime), not a content hash — a same-size,
+    same-mtime in-place edit (unusual for append-only agent logs) would be
+    missed. Run `export` after touching a file, or `prune`/re-export, to force a
+    fresh hash if that ever matters."""
+    if prior is None or prior.get("size") != size or prior.get("mtime") != mtime:
+        return False
+    if not _index_path_exists(config, prior.get("markdown")):
+        return False
+    if write_pdfs and not _index_path_exists(config, prior.get("pdf")):
+        return False
+    if copy_raw_files and not _index_path_exists(config, prior.get("raw")):
+        return False
+    return True
+
+
 def export_sources(
     config: ArchiveConfig,
     selected: list[str] | None = None,
@@ -83,6 +115,8 @@ def export_sources(
 ) -> ExportResult:
     sources = select_sources(config, selected)
     config.archive_dir.mkdir(parents=True, exist_ok=True)
+    existing_records = read_existing_index_records(config)
+    prior_by_key = {} if dry_run else {index_record_key(record): record for record in existing_records}
     records: list[dict[str, Any]] = []
     pdf_missing = False
     skipped_sources: list[str] = []
@@ -103,6 +137,14 @@ def export_sources(
         for path in iter_source_files(source):
             if limit and exported >= limit:
                 break
+            stat_result = path.stat()
+            size, mtime = stat_result.st_size, stat_result.st_mtime
+            prior = prior_by_key.get((source.name, str(path)))
+            if _can_reuse_record(config, prior, size, mtime, write_pdfs, copy_raw_files):
+                assert prior is not None  # _can_reuse_record returns False for None
+                records.append(prior)  # unchanged since last export: skip hashing/extraction/render
+                exported += 1
+                continue
             digest = sha256_file(path)
             session = extractor(path)
             session_id = str(session.metadata.get("session_id") or path.stem)
@@ -131,6 +173,8 @@ def export_sources(
                     "kind": source.kind,
                     "source_file": str(path),
                     "sha256": digest,
+                    "size": size,
+                    "mtime": mtime,
                     "messages": len(session.messages),
                     "markdown": as_repo_relative(config, md_path),
                     "pdf": as_repo_relative(config, pdf_path) if pdf_path else None,
@@ -143,7 +187,7 @@ def export_sources(
             break
 
     if not dry_run:
-        write_indexes(config, merge_index_records(read_existing_index_records(config), records))
+        write_indexes(config, merge_index_records(existing_records, records))
     return ExportResult(exported=exported, pdf_missing=pdf_missing, skipped_sources=tuple(skipped_sources))
 
 
