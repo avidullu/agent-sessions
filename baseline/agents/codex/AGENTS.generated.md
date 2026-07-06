@@ -37,7 +37,7 @@ Projects should maintain a short session handoff or start-here file so future ag
 **Confidence:** 0.93
 **Review note:** Promote first — high confidence, strong archive evidence.
 
-Agents must not push directly to durable/shared repos. They should branch from the remote base, stage explicit paths, open a PR, and merge only after explicit approval or a scoped umbrella approval.
+Agents must not push directly to durable/shared repos. They should branch from the remote base, stage explicit paths, open a PR, and merge only after explicit approval or a scoped umbrella approval. Scoped approval is limited to the named project, PR set, task, and time/context in which it was granted; it must not be reused for adjacent work, self-authored PRs, or later PRs without renewed confirmation.
 
 ### Evidence
 - 333 scanned sessions contain `repo-governance` signals.

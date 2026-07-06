@@ -525,6 +525,21 @@ class TestBuildPredictions:
         assert tracked.confidence > 0.55
         assert any("tracked-project-docs" in item for item in tracked.evidence)
 
+    def test_pr_only_repo_writes_scopes_umbrella_authorization(self, repo_root: Path) -> None:
+        predictions = build_predictions(
+            settings=_baseline_settings(repo_root),
+            source_counts=Counter({"claude": 1}),
+            kind_counts=Counter({"claude": 1}),
+            project_hits=Counter(),
+            text_signals={
+                "repo-governance": [TextSignal(source="s", markdown="archive/s.md", count=10)]
+            },
+        )
+        pr_rule = next(p for p in predictions if p.id == "guardrail.pr-only-repo-writes")
+        assert "scoped umbrella approval" in pr_rule.text
+        assert "self-authored PRs" in pr_rule.text
+        assert "renewed confirmation" in pr_rule.text
+
 
 class TestRenderPrediction:
     def test_renders(self) -> None:
