@@ -16,9 +16,14 @@ from agent_sessions.baseline import (
     apply_feedback,
     baseline_calibrate,
     baseline_files,
+    baseline_promote,
     baseline_readme,
     baseline_scaffold,
     baseline_suggest,
+    category_promotion_target,
+    parse_promoted_blocks,
+    promote_predictions,
+    select_promotable_predictions,
     build_predictions,
     candidates_readme,
     confidence,
@@ -958,3 +963,177 @@ class TestLoadIndexRecordsBaseline:
         )
         with pytest.raises(SystemExit):
             load_index_records(config)
+
+
+class TestPromotionHelpers:
+    def test_category_promotion_target(self) -> None:
+        assert category_promotion_target("repo-governance") == "engineering-guardrails.md"
+        assert category_promotion_target("regression-frameworks") == "regression-frameworks.md"
+
+    def test_parse_promoted_blocks(self) -> None:
+        content = (
+            "# Engineering Guardrails\n\n"
+            '<!-- baseline:begin id="guardrail.one" -->\n'
+            "## One\n\nRule one.\n"
+            '<!-- baseline:end id="guardrail.one" -->\n'
+        )
+        blocks = parse_promoted_blocks(content)
+        assert "guardrail.one" in blocks
+        assert "Rule one." in blocks["guardrail.one"]
+        assert '<!-- baseline:begin id="guardrail.one" -->' in blocks["guardrail.one"]
+        assert '<!-- baseline:end id="guardrail.one" -->' in blocks["guardrail.one"]
+
+    def test_upsert_preserves_markers_on_incremental_promote(self) -> None:
+        from agent_sessions.baseline import render_promoted_block, upsert_promoted_content
+
+        existing = (
+            "# Engineering Guardrails\n\n"
+            "Promoted guidance derived from reviewed baseline candidates.\n\n"
+            '<!-- baseline:begin id="guardrail.old" -->\n'
+            "## Old\n\nRule old.\n"
+            '<!-- baseline:end id="guardrail.old" -->\n'
+        )
+        new_block = render_promoted_block(
+            {
+                "id": "guardrail.new",
+                "title": "New",
+                "confidence": 0.8,
+                "text": "Rule new.",
+                "evidence": [],
+            },
+            run_id="run",
+            feedback_note="",
+            promoted_at="2026-07-06",
+        )
+        output = upsert_promoted_content(
+            existing,
+            {"guardrail.new": new_block},
+            "engineering-guardrails.md",
+        )
+        assert '<!-- baseline:begin id="guardrail.old" -->' in output
+        assert '<!-- baseline:begin id="guardrail.new" -->' in output
+        assert sorted(parse_promoted_blocks(output)) == ["guardrail.new", "guardrail.old"]
+
+    def test_select_promotable_predictions_filters_guardrails(self) -> None:
+        predictions = [
+            {"id": "guardrail.pr-only-repo-writes", "category": "repo-governance"},
+            {"id": "profile.multi-agent-builder", "category": "metacognition"},
+            {"id": "guardrail.handoff-and-resume", "category": "checkpointing"},
+        ]
+        feedback = {
+            "guardrail.pr-only-repo-writes": {"verdict": "accept"},
+            "profile.multi-agent-builder": {"verdict": "accept"},
+            "guardrail.handoff-and-resume": {"verdict": "reject"},
+        }
+        selected = select_promotable_predictions(predictions, feedback)
+        assert len(selected) == 1
+        assert selected[0]["id"] == "guardrail.pr-only-repo-writes"
+
+
+class TestBaselinePromote:
+    def _write_sidecar(self, repo_root: Path) -> Path:
+        sidecar = repo_root / "baseline" / "candidates" / "2026-07-05-extraction.predictions.json"
+        sidecar.parent.mkdir(parents=True, exist_ok=True)
+        sidecar.write_text(
+            json.dumps(
+                {
+                    "run_id": "2026-07-05-extraction",
+                    "predictions": [
+                        {
+                            "id": "guardrail.pr-only-repo-writes",
+                            "title": "PR-Only Repo Writes",
+                            "category": "repo-governance",
+                            "confidence": 0.99,
+                            "text": "Use PRs for durable repo writes.",
+                            "evidence": ["333 sessions mention repo-governance."],
+                        },
+                        {
+                            "id": "guardrail.verified-regression-gates",
+                            "title": "Verified Regression Gates",
+                            "category": "regression-frameworks",
+                            "confidence": 0.95,
+                            "text": "Run pytest, ruff, and mypy before claiming done.",
+                            "evidence": ["210 sessions mention regression-frameworks."],
+                        },
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return sidecar
+
+    def test_promote_writes_global_files(self, repo_root: Path) -> None:
+        config = ArchiveConfig(
+            repo_root=repo_root,
+            archive_dir=repo_root / "archive",
+            raw_dir=repo_root / "raw",
+            sources=(),
+        )
+        feedback_path = repo_root / "baseline" / "calibration" / "feedback.toml"
+        feedback_path.parent.mkdir(parents=True, exist_ok=True)
+        feedback_path.write_text(
+            '[feedback."guardrail.pr-only-repo-writes"]\nverdict = "accept"\nnote = "Promote."\n'
+            '[feedback."guardrail.verified-regression-gates"]\nverdict = "accept"\nnote = "Promote."\n',
+            encoding="utf-8",
+        )
+        sidecar = self._write_sidecar(repo_root)
+
+        result = baseline_promote(config, feedback=feedback_path, predictions=sidecar)
+        assert result == 0
+
+        guardrails = repo_root / "baseline" / "global" / "engineering-guardrails.md"
+        regression = repo_root / "baseline" / "global" / "regression-frameworks.md"
+        assert guardrails.exists()
+        assert regression.exists()
+        guardrail_text = guardrails.read_text(encoding="utf-8")
+        regression_text = regression.read_text(encoding="utf-8")
+        assert "guardrail.pr-only-repo-writes" in guardrail_text
+        assert "Promoted guidance will land here." not in guardrail_text
+        assert "guardrail.verified-regression-gates" in regression_text
+
+    def test_promote_dry_run(self, repo_root: Path) -> None:
+        config = ArchiveConfig(
+            repo_root=repo_root,
+            archive_dir=repo_root / "archive",
+            raw_dir=repo_root / "raw",
+            sources=(),
+        )
+        feedback_path = repo_root / "baseline" / "calibration" / "feedback.toml"
+        feedback_path.write_text(
+            '[feedback."guardrail.pr-only-repo-writes"]\nverdict = "accept"\n',
+            encoding="utf-8",
+        )
+        sidecar = self._write_sidecar(repo_root)
+        result = baseline_promote(
+            config,
+            feedback=feedback_path,
+            predictions=sidecar,
+            dry_run=True,
+        )
+        assert result == 0
+        assert not (repo_root / "baseline" / "global" / "engineering-guardrails.md").exists()
+
+    def test_promote_predictions_upserts_by_id(self, repo_root: Path) -> None:
+        settings = _baseline_settings(repo_root)
+        feedback = {"guardrail.pr-only-repo-writes": {"verdict": "accept", "note": "ok"}}
+        predictions = [
+            {
+                "id": "guardrail.pr-only-repo-writes",
+                "title": "PR-Only Repo Writes",
+                "category": "repo-governance",
+                "confidence": 0.99,
+                "text": "Use PRs.",
+                "evidence": ["evidence"],
+            }
+        ]
+        updates = promote_predictions(
+            settings,
+            predictions,
+            feedback,
+            run_id="run-1",
+            promoted_at="2026-07-06",
+        )
+        assert len(updates) == 1
+        path = settings.root / "global" / "engineering-guardrails.md"
+        assert path in updates
+        assert "guardrail.pr-only-repo-writes" in updates[path]

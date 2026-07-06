@@ -59,6 +59,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_baseline_calibrate.add_argument("--output", type=Path, help="Calibration summary Markdown output path.")
     p_baseline_calibrate.add_argument("--dry-run", action="store_true")
 
+    p_baseline_promote = baseline_sub.add_parser(
+        "promote",
+        help="Promote accepted guardrail predictions into baseline/global files.",
+    )
+    p_baseline_promote.add_argument("--feedback", type=Path, required=True, help="Calibration feedback TOML file.")
+    p_baseline_promote.add_argument("--predictions", type=Path, help="Prediction JSON sidecar to promote from.")
+    p_baseline_promote.add_argument("--id", action="append", dest="promote_ids", help="Promote only this prediction id.")
+    p_baseline_promote.add_argument("--dry-run", action="store_true")
+
     p_baseline_bundle = baseline_sub.add_parser("bundle", help="Create a bounded evidence bundle for an AI agent.")
     p_baseline_bundle.add_argument("--output-dir", type=Path, help="Bundle output directory.")
     p_baseline_bundle.add_argument("--max-sessions", type=int, default=12)
@@ -130,6 +139,17 @@ def main(argv: list[str] | None = None) -> int:
                 predictions=args.predictions,
                 output=args.output,
                 dry_run=args.dry_run,
+            )
+        if args.baseline_cmd == "promote":
+            from .baseline import baseline_promote
+
+            promote_ids = tuple(args.promote_ids) if args.promote_ids else None
+            return baseline_promote(
+                config,
+                feedback=args.feedback,
+                predictions=args.predictions,
+                dry_run=args.dry_run,
+                ids=promote_ids,
             )
         if args.baseline_cmd == "bundle":
             from .baseline_agent import baseline_bundle

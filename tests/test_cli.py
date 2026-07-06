@@ -108,6 +108,24 @@ class TestBuildParser:
         assert args.baseline_cmd == "calibrate"
         assert args.feedback == Path("fb.toml")
 
+    def test_baseline_promote(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "baseline",
+                "promote",
+                "--feedback",
+                "baseline/calibration/feedback.example.toml",
+                "--id",
+                "guardrail.pr-only-repo-writes",
+                "--dry-run",
+            ]
+        )
+        assert args.baseline_cmd == "promote"
+        assert args.feedback == Path("baseline/calibration/feedback.example.toml")
+        assert args.promote_ids == ["guardrail.pr-only-repo-writes"]
+        assert args.dry_run is True
+
     def test_baseline_bundle(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
