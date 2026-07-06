@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import gzip
 import hashlib
 import json
@@ -316,9 +317,11 @@ def source_modified_date(path: Path) -> str:
 
 
 def dt_from_timestamp(timestamp: float) -> str:
-    import datetime as dt
-
-    return dt.datetime.fromtimestamp(timestamp).strftime("%Y%m%d")
+    # Use UTC so the archive stem is stable regardless of the exporting
+    # machine's timezone; render.py records the modified timestamp in UTC too,
+    # so a session near midnight (or exported from two timezones) resolves to a
+    # single stem and a single archive file.
+    return dt.datetime.fromtimestamp(timestamp, dt.timezone.utc).strftime("%Y%m%d")
 
 
 def as_repo_relative(config: ArchiveConfig, path: Path | None) -> str | None:

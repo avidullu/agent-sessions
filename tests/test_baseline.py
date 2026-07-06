@@ -675,6 +675,18 @@ class TestUpsertLedger:
         content = ledger_path.read_text(encoding="utf-8")
         assert "p2" in content
 
+    def test_atomic_write_leaves_no_temp_file(self, tmp_path: Path) -> None:
+        ledger_path = tmp_path / "ledger.jsonl"
+        upsert_ledger(ledger_path, "run-1", [{"id": "p1"}])
+        upsert_ledger(ledger_path, "run-2", [{"id": "p2"}])
+        # Prior-run records are retained and the temp file is cleaned up by os.replace.
+        content = ledger_path.read_text(encoding="utf-8")
+        assert "p1" in content and "p2" in content
+        assert list(tmp_path.glob("*.tmp")) == []
+        # Every retained line is valid JSON (no partial/corrupt writes).
+        for line in content.splitlines():
+            json.loads(line)
+
 
 class TestWritePredictionArtifacts:
     def test_writes_sidecar_and_ledger(self, repo_root: Path) -> None:
@@ -1052,6 +1064,49 @@ class TestPromotionHelpers:
         assert '<!-- baseline:begin id="guardrail.old" -->' in output
         assert '<!-- baseline:begin id="guardrail.new" -->' in output
         assert sorted(parse_promoted_blocks(output)) == ["guardrail.new", "guardrail.old"]
+
+    def test_upsert_preserves_handwritten_prose_outside_markers(self) -> None:
+        from agent_sessions.baseline import render_promoted_block, upsert_promoted_content
+
+        # A file a human has edited: prose that lives OUTSIDE any marker block.
+        existing = (
+            "# Engineering Guardrails\n\n"
+            "## Team note (hand-written)\n\n"
+            "Always tag the on-call before promoting anything risky.\n\n"
+            '<!-- baseline:begin id="guardrail.old" -->\n'
+            "## Old\n\nRule old.\n"
+            '<!-- baseline:end id="guardrail.old" -->\n'
+        )
+        new_block = render_promoted_block(
+            {"id": "guardrail.new", "title": "New", "confidence": 0.8, "text": "Rule new.", "evidence": []},
+            run_id="run",
+            feedback_note="",
+            promoted_at="2026-07-06",
+        )
+        output = upsert_promoted_content(existing, {"guardrail.new": new_block}, "engineering-guardrails.md")
+        # The hand-written section must survive the promote.
+        assert "## Team note (hand-written)" in output
+        assert "Always tag the on-call before promoting anything risky." in output
+        # And both marker blocks are present.
+        assert sorted(parse_promoted_blocks(output)) == ["guardrail.new", "guardrail.old"]
+
+    def test_upsert_replaces_same_id_block_in_place(self) -> None:
+        from agent_sessions.baseline import render_promoted_block, upsert_promoted_content
+
+        def block(text: str) -> str:
+            return render_promoted_block(
+                {"id": "guardrail.one", "title": "One", "confidence": 0.9, "text": text, "evidence": []},
+                run_id="run",
+                feedback_note="",
+                promoted_at="2026-07-06",
+            )
+
+        existing = "# Engineering Guardrails\n\nKeep this line.\n\n" + block("Old text.") + "\n"
+        output = upsert_promoted_content(existing, {"guardrail.one": block("New text.")}, "engineering-guardrails.md")
+        assert "Keep this line." in output
+        assert "New text." in output
+        assert "Old text." not in output
+        assert list(parse_promoted_blocks(output)) == ["guardrail.one"]
 
     def test_select_promotable_predictions_filters_guardrails(self) -> None:
         predictions = [
