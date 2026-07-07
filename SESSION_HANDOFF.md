@@ -22,7 +22,7 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   mining as the first producer, replay selection/bundling/ingest after
   provenance and redaction contracts. PR #45 merged the tracker. PR #46 merged
   K1: `baseline/SCHEMA.md`, scaffold coverage, bundle packet schema references,
-  and tests/docs updates. K2 is active on branch `codex/handoffs-audit` in
+  and tests/docs updates. PR #47 is open for K2 on branch `codex/handoffs-audit` in
   `C:\Users\avidu\Projects\Agent Sessions - handoffs-audit`: report-only
   `baseline handoffs audit`, writing only `baseline/handoffs/audit.md`; K6 owns
   persistent `baseline/handoffs/index.jsonl` and project-page/proposal feeds.
