@@ -229,6 +229,14 @@ class TestBuildParser:
         assert args.limit == 5
         assert args.dry_run is True
 
+    def test_baseline_replay_redact(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["baseline", "replay", "redact", "--limit", "3", "--dry-run"])
+        assert args.baseline_cmd == "replay"
+        assert args.replay_cmd == "redact"
+        assert args.limit == 3
+        assert args.dry_run is True
+
     def test_baseline_handoffs_index(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -531,6 +539,12 @@ class TestMainBaselineSubcommands:
             encoding="utf-8",
         )
         assert main(["baseline", "replay", "select", "--dry-run"]) == 0
+
+    def test_replay_redact(self) -> None:
+        manifest = self.repo_root / "baseline" / "replay" / "manifest.jsonl"
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text("", encoding="utf-8")
+        assert main(["baseline", "replay", "redact", "--dry-run"]) == 0
 
     def test_bundle(self) -> None:
         archive_dir = self.repo_root / "archive"
