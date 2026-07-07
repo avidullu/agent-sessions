@@ -70,7 +70,8 @@ baseline/
 - Project pages: generated sections in `baseline/projects/<slug>/README.md`
   should use `render_project_page_block()` and
   `upsert_project_page_content()` so the shipped `baseline:begin/end` marker
-  parser preserves hand-written prose.
+  parser preserves hand-written prose. Only the exact scaffold placeholder line
+  is removed; edited placeholder-like prose is preserved as human-owned content.
 - Baseline lint: `baseline lint` is read-only by default and reports schema,
   marker, generated-link, stale-block, orphan-page, and explicit contradiction
   findings. Errors fail the command; warnings surface review signals while K6

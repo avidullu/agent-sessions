@@ -71,6 +71,9 @@ Rules:
 - Project-page producers should render sections with `render_project_page_block()`
   and write them through `upsert_project_page_content()`, which reuses the same
   marker parser/upsert path as promoted guardrails.
+- Project-page upserts may remove the scaffold placeholder only when the line
+  exactly matches the known placeholder text; edited placeholder-like prose is
+  human-owned content.
 - Metadata such as `generated_by`, `generated_at`, and `proposal_id` belongs in
   the block body or in structured sidecars unless the shared parser changes.
 

@@ -13,7 +13,7 @@ PROJECT DOC TEMPLATE — copy this file to docs/<YOUR_PLAN>.md and fill it in.
 
 ## 0. TL;DR
 
-The `agent_sessions` package now has broad pytest coverage across archive, extractor, CLI, and baseline workflows. The current full-suite gate is **451 passed** with **96.48%** line coverage. Tests focus on unit-testing pure functions, mocking I/O boundaries (filesystem, subprocess, TOML parsing), and exercising the CLI surface through argparse.
+The `agent_sessions` package now has broad pytest coverage across archive, extractor, CLI, and baseline workflows. The current full-suite gate is **452 passed** with **96.48%** line coverage. Tests focus on unit-testing pure functions, mocking I/O boundaries (filesystem, subprocess, TOML parsing), and exercising the CLI surface through argparse.
 
 ## 1. Problem & goal
 
@@ -89,13 +89,13 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated.
 | T10 | `test_gemini_extractor.py` | T0 | No | ☑ | 7 tests, 100% coverage |
 | T11 | `test_grok_extractor.py` | T0 | No | ☑ | 5 tests, 100% coverage |
 | T12 | `test_archive.py` | T0 | No | ☑ | 35 tests, archive core logic covered |
-| T13 | `test_baseline.py` | T0 | No | ☑ | 78 tests, baseline scaffold/suggest/calibrate/promote/schema/project-page upserts |
+| T13 | `test_baseline.py` | T0 | No | ☑ | 79 tests, baseline scaffold/suggest/calibrate/promote/schema/project-page upserts |
 | T14 | `test_baseline_agent.py` | T0 | No | ☑ | 19 tests, evidence bundles and schema references |
 | T15 | `test_cli.py` | T0 | No | ☑ | 47 tests, CLI parsing + dispatch |
 | T16 | `test_baseline_handoffs.py` | T0 | No | ☑ | 7 tests, report-only handoff audit |
 | T17 | `test_baseline_lint.py` | T0 | No | ☑ | 17 tests, marker parsing, generated-link, stale, orphan, contradiction, and report behavior |
 | T18 | `test_tool_wrapper.py` | T0 | No | ☑ | 1 test, wrapper import path |
-| T19 | Run `pytest --cov` and verify >80% overall | T1–T18 | No | ☑ | **96.48%** (451 passed) |
+| T19 | Run `pytest --cov` and verify >80% overall | T1–T18 | No | ☑ | **96.48%** (452 passed) |
 
 ## 8. Open questions
 

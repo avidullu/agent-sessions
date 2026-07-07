@@ -26,7 +26,7 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   `baseline handoffs audit`, writing only `baseline/handoffs/audit.md`; the K2
   audit report scanned 3,114 archive records and found 946 archive handoff
   candidates. PR #48 merged K3: shared `baseline:begin/end` marker-block
-  helpers for project-page generated sections. K4 is active on branch
+  helpers for project-page generated sections. PR #49 is open for K4 on branch
   `codex/baseline-lint` in
   `C:\Users\avidu\Projects\Agent Sessions - baseline-lint`: read-only
   `baseline lint` skeleton for schema, marker, generated-link, stale-block,
@@ -119,10 +119,10 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   the shipped `baseline:begin/end` marker grammar via
   `render_project_page_block()` and `upsert_project_page_content()`; no second
   marker family or free-form page rewrite path.
-- K3 review follow-ups to consider in K4/K6 (2026-07-07): dedupe project-page
-  placeholder text between `baseline_settings` and `baseline_promote`; document
-  exact-line placeholder matching as intentionally safer; add a golden
-  byte-output test for empty-file `upsert_promoted_content()`.
+- K3 review follow-ups carried into PR #49 (2026-07-07): deduped project-page
+  placeholder text between `baseline_settings` and `baseline_promote`;
+  documented/tested exact-line placeholder matching as intentionally safer; and
+  added a golden byte-output test for empty-file `upsert_promoted_content()`.
 - K4 lint severity decision (2026-07-07): malformed markers and broken generated
   links are errors; orphan pages, stale blocks, and explicit contradiction
   markers start as warnings until downstream producers provide richer source

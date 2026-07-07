@@ -1240,6 +1240,22 @@ class TestPromotionHelpers:
         assert "Sessions: 3" in output
         assert "Sessions: 2" not in output
 
+    def test_upsert_project_page_content_preserves_edited_placeholder_like_text(self) -> None:
+        existing = project_readme("badminton-highlight-indexer").replace(
+            "will land here.",
+            "will land here after review.",
+        )
+        block = render_project_page_block(
+            "knowledge.activity",
+            "Activity",
+            "Sessions: 2",
+            generated_by="baseline project-pages",
+            generated_at="2026-07-07",
+        )
+        output = upsert_project_page_content(existing, {"knowledge.activity": block}, "badminton-highlight-indexer")
+        assert "will land here after review." in output
+        assert list(parse_promoted_blocks(output)) == ["knowledge.activity"]
+
     def test_upsert_project_page_content_no_blocks_returns_existing(self) -> None:
         existing = "# Project\n\nHuman text.\n"
         assert upsert_project_page_content(existing, {}, "project") == existing
