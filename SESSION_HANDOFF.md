@@ -26,55 +26,33 @@ Today landed a long run of small PRs:
 - #50 K5: proposal trace propagation and archive-reference validation.
 - #51 K6: persistent `baseline/handoffs/index.jsonl` plus `handoffs.index`
   project-page feeds for configured or existing project pages only.
+- #52 K7: `baseline handoffs proposals` deterministic proposal JSON generation
+  with a hand-written-proposal overwrite guard and the #51 stable generated-date
+  follow-up.
 
-PR #52 is open for K7:
+PR #53 is open for K8:
 
-- URL: https://github.com/avidullu/agent-sessions/pull/52
-- Branch: `codex/handoff-proposal-generation`
-- Worktree: `C:\Users\avidu\Projects\Agent Sessions - handoff-proposals`
-- Head: `e6dd3a0 Record K7 PR number`
-- State at 2026-07-07 20:43 IST: open, CI green, no review comments/reviews yet.
-
-K7 adds `baseline handoffs proposals`, generates deterministic proposal JSON for
-configured/existing projects, refuses to overwrite hand-written proposal files,
-and validates generated handoff proposals through `baseline ingest --dry-run`.
-It also folds in the #51 review follow-up that `handoffs.index` blocks should
-preserve their existing `generated_at` date when the generated feed content is
-unchanged, avoiding date-only churn on periodic runs.
-
-Verification already run for PR #52:
-
-- `git diff --check`
-- `python -m ruff check .`
-- `python -m mypy agent_sessions tools`
-- `python -c "from agent_sessions.cli import main; raise SystemExit(main(['baseline','lint','--dry-run']))"`
-  - 0 errors, 2 known `W2-orphan` warnings for `agent-sessions` and `avidullu`
-- `python -c "from agent_sessions.cli import main; raise SystemExit(main(['baseline','ingest','--dry-run']))"`
-  - 5 accepted, 0 rejected
-- `python -m pytest --cov=agent_sessions --cov-report=term-missing`
-  - 495 passed, 97.05% coverage
-
-The temporary 10-minute PR polling heartbeat from this session was deleted when
-this handoff was refreshed, because remaining work will resume in a new session.
+- Branch: `claude/replay-select`
+- `baseline replay select` scores archived sessions for replayability and writes
+  a deterministic `baseline/replay/manifest.jsonl` of selected + near-miss
+  candidates with exclusion reasons and **no transcript excerpts** (so the
+  manifest stays trackable). Coding sessions are excluded in v1 (D5). Re-running
+  reproduces the manifest byte-for-byte (gate R2-dedup).
+- Dogfood run: scanned 3,114 candidates -> 20 selected, 20 near-miss,
+  3,013 hard-excluded (mostly coding).
 
 ## Next Steps / Open Threads
 
-1. Start the new session by following the repo freshness rule: `git pull
-   --ff-only` before reading the relevant checkout. If the primary checkout has
-   local `SESSION_HANDOFF.md` edits that block fast-forward, do not clobber
-   them; use the K7 worktree or a fresh worktree.
-2. Check PR #52 first:
-   - `gh pr view 52 --repo avidullu/agent-sessions --json state,reviewDecision,statusCheckRollup,latestReviews,comments`
-   - use the `github:gh-address-comments` workflow if review comments exist.
-3. If #52 gets LGTM/merge-ready and CI is green, run the merge gate locally
-   before merging: `git diff --check`, `ruff`, `mypy`, full pytest with
-   coverage, plus baseline lint/ingest dry-runs when relevant. Then merge #52.
-4. After #52 merges, update `docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md` K7 to
-   `Done`, refresh this handoff, and start the next tracker item in order.
-5. Next implementation item is K8: `baseline replay select` deterministic
-   manifests excluding coding sessions. Start it from `origin/main` in a fresh
-   `codex/...` branch. K8 should not create replay bundles or egress excerpts;
-   K9 owns redaction and K10 owns bundle writing.
+1. K9 (`replay redaction v0`) is next and is **safety-critical**: a deterministic
+   fail-closed secret scanner + `redaction-report.json`, gating replay egress.
+   `baseline/replay/bundles/` is already gitignored. Get an explicit human OK
+   before merging K9 since it is the only path that moves transcript excerpts
+   off the machine.
+2. Then K10 (`baseline replay bundle`, blocked on K8+K9), K11 (`baseline replay
+   ingest`, reuses K5 trace validation, writes `baseline/replay/ledger.jsonl`),
+   and K12 (efficacy gates W/H/R wired into `baseline eval`).
+3. Merge gate for every slice: `git diff --check`, `ruff`, `mypy`, full pytest
+   with coverage, plus `baseline lint --dry-run` when generated artifacts change.
 
 Known open boundaries:
 

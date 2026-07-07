@@ -204,6 +204,19 @@ def _handle_baseline_handoffs_proposals(config: ArchiveConfig, args: argparse.Na
     )
 
 
+def _handle_baseline_replay_select(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .baseline_replay import baseline_replay_select
+
+    return baseline_replay_select(
+        config,
+        kind=args.kind,
+        limit=args.limit,
+        output=args.output,
+        max_archive_records=args.max_archive_records,
+        dry_run=args.dry_run,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Export local coding-agent sessions.")
     parser.add_argument("--repo-root", type=Path, default=default_repo_root(), help="Archive repository root.")
@@ -379,6 +392,24 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_handoffs_proposals.add_argument("--dry-run", action="store_true")
     p_handoffs_proposals.set_defaults(func=_handle_baseline_handoffs_proposals)
+
+    p_baseline_replay = baseline_sub.add_parser("replay", help="Select, bundle, and ingest cross-agent replay work.")
+    replay_sub = p_baseline_replay.add_subparsers(dest="replay_cmd", required=True)
+    p_replay_select = replay_sub.add_parser(
+        "select",
+        help="Write a deterministic replay-candidate manifest (no excerpts), excluding coding sessions.",
+    )
+    p_replay_select.add_argument("--kind", help="Only select sessions whose inferred kind matches (e.g. planning).")
+    p_replay_select.add_argument("--limit", type=int, default=20, help="Maximum sessions to select.")
+    p_replay_select.add_argument("--output", type=Path, help="Manifest JSONL output path.")
+    p_replay_select.add_argument(
+        "--max-archive-records",
+        type=int,
+        default=0,
+        help="Maximum archive records to scan; 0 scans all indexed records.",
+    )
+    p_replay_select.add_argument("--dry-run", action="store_true")
+    p_replay_select.set_defaults(func=_handle_baseline_replay_select)
 
     return parser
 

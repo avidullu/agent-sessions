@@ -97,7 +97,8 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated.
 | T17 | `test_baseline_lint.py` | T0 | No | ☑ | 19 tests, marker parsing, generated-link, generated-date, stale, orphan, contradiction, and report behavior |
 | T18 | `test_baseline_ingest.py` | T0 | No | ☑ | 30 tests, proposal ingest and trace-reference validation |
 | T19 | `test_tool_wrapper.py` | T0 | No | ☑ | 1 test, wrapper import path |
-| T20 | Run `pytest --cov` and verify >80% overall | T1–T19 | No | ☑ | **97.05%** (495 passed) |
+| T20 | `test_baseline_replay.py` | T0 | No | ☑ | 26 tests, replay selection scoring, coding exclusion, kind filter, deterministic manifest |
+| T21 | Run `pytest --cov` and verify >80% overall | T1–T20 | No | ☑ | **97.17%** (521 passed) |
 
 ## 8. Open questions
 

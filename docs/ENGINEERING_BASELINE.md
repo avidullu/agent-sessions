@@ -81,6 +81,11 @@ baseline/
   marker, generated-link, stale-block, malformed generated-date, orphan-page,
   and explicit contradiction findings. Errors fail the command; warnings surface
   review signals while later producers are still gated.
+- Replay selection: `baseline replay select` scores archived sessions for
+  replayability and writes a deterministic `baseline/replay/manifest.jsonl` of
+  selected and near-miss candidates with exclusion reasons and no transcript
+  excerpts. Coding sessions are excluded in v1; redaction and bundle egress are
+  later gated work.
 
 ## Guardrails
 

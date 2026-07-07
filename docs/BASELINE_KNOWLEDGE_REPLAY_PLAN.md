@@ -318,8 +318,8 @@ Legend: `Todo`, `In progress`, `Done`, `Blocked/gated`. One small PR per row.
 | K4 | `baseline lint` skeleton for schema, links, stale blocks, orphan pages, and P6 contradiction checks | #26 | K1,K3 | Yes | Done | #49 |
 | K5 | Proposal + `Prediction` trace-field extension and ingest reference validation against `archive/index.jsonl` | #19/#23/#25 | K1 | Yes | Done | #50 |
 | K6 | `baseline handoffs index` discovery records in `baseline/handoffs/index.jsonl` and project-page feed | #23/#26 | K2,K3,K5 | No | Done | #51 |
-| K7 | Handoff-derived proposal generation with trace records | #23 | K5,K6 | Yes | In progress | #52 |
-| K8 | `baseline replay select` deterministic manifests, excluding coding sessions | #25 | K1 | No | Todo | - |
+| K7 | Handoff-derived proposal generation with trace records | #23 | K5,K6 | Yes | Done | #52 |
+| K8 | `baseline replay select` deterministic manifests, excluding coding sessions | #25 | K1 | No | In progress | #53 |
 | K9 | Replay redaction v0: deterministic scanner, redaction report, fixture tests, and bundle gitignore coverage | #25 | K0, P10/P11 design | Yes | Todo | - |
 | K10 | `baseline replay bundle` gitignored packets with rubric files after redaction preflight | #25 | K8,K9 | Yes | Todo | - |
 | K11 | `baseline replay ingest` validates external replay results into proposals/candidates | #25 | K5,K10 | Yes | Todo | - |
@@ -406,6 +406,7 @@ Additional gate names:
 
 ### Changelog
 
+- 2026-07-07 - Merged PR #52 for K7 and opened PR #53 for K8 `baseline replay select`: deterministic, excerpt-free replay manifest excluding coding sessions (D5), idempotent for gate R2-dedup.
 - 2026-07-07 - Wrapped the session with PR #52 open, CI green, and awaiting review; next resume should review/merge #52 before starting K8.
 - 2026-07-07 - Opened PR #52 for K7 handoff-derived proposal generation and the #51 stable generated-date follow-up.
 - 2026-07-07 - Merged PR #51 for K6, recorded its non-blocking review follow-ups, and started K7 handoff-derived proposal generation; K7 also keeps `handoffs.index` dates stable when feed content is unchanged.
