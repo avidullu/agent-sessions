@@ -69,6 +69,9 @@ baseline/
   freshness audit at `baseline/handoffs/audit.md`; `baseline handoffs index`
   writes persistent records to `baseline/handoffs/index.jsonl` and marker-owned
   `handoffs.index` feeds only on configured or already-scaffolded project pages.
+  `baseline handoffs proposals` turns that index into deterministic proposal
+  JSON files under `baseline/proposals/`, refuses to overwrite hand-written
+  proposals, and relies on `baseline ingest --dry-run` for reference validation.
 - Project pages: generated sections in `baseline/projects/<slug>/README.md`
   should use `render_project_page_block()` and
   `upsert_project_page_content()` so the shipped `baseline:begin/end` marker

@@ -192,6 +192,18 @@ def _handle_baseline_handoffs_index(config: ArchiveConfig, args: argparse.Namesp
     )
 
 
+def _handle_baseline_handoffs_proposals(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .baseline_handoffs import baseline_handoffs_proposals
+
+    return baseline_handoffs_proposals(
+        config,
+        index=args.index,
+        output_dir=args.output_dir,
+        max_records_per_project=args.max_records_per_project,
+        dry_run=args.dry_run,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Export local coding-agent sessions.")
     parser.add_argument("--repo-root", type=Path, default=default_repo_root(), help="Archive repository root.")
@@ -352,6 +364,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_handoffs_index.add_argument("--dry-run", action="store_true")
     p_handoffs_index.set_defaults(func=_handle_baseline_handoffs_index)
+
+    p_handoffs_proposals = handoffs_sub.add_parser(
+        "proposals",
+        help="Write handoff-derived proposal JSON with structured trace records.",
+    )
+    p_handoffs_proposals.add_argument("--index", type=Path, help="Handoff JSONL index path.")
+    p_handoffs_proposals.add_argument("--output-dir", type=Path, help="Proposal JSON output directory.")
+    p_handoffs_proposals.add_argument(
+        "--max-records-per-project",
+        type=int,
+        default=5,
+        help="Maximum handoff records to cite per generated project proposal.",
+    )
+    p_handoffs_proposals.add_argument("--dry-run", action="store_true")
+    p_handoffs_proposals.set_defaults(func=_handle_baseline_handoffs_proposals)
 
     return parser
 

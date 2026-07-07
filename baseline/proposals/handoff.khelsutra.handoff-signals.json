@@ -1,0 +1,66 @@
+{
+  "approval_mode": "strict",
+  "category": "docs",
+  "confidence": 0.85,
+  "evidence": [
+    "baseline/handoffs/index.jsonl contains 11 handoff candidate(s) for project `khelsutra`.",
+    "archive/claude-windows/20260622-54d4074a-5a8d-4058-b42d-a757c338132c-54d4074a-5a8d-4058-b42d-a757c338132c-a2aab69.md",
+    "archive/claude-windows/20260622-dca1ff63-3aec-42ab-897f-41970003f4e1-dca1ff63-3aec-42ab-897f-41970003f4e1-5bb1d71.md",
+    "archive/claude-windows/20260629-c6fbcfbb-d724-4901-b146-68f198409ed5-c6fbcfbb-d724-4901-b146-68f198409ed5-6148c97.md",
+    "archive/claude-windows/20260702-831509e0-5773-4469-a2ff-205848372a6b-831509e0-5773-4469-a2ff-205848372a6b-1eafb5f.md",
+    "archive/claude-windows/20260704-b8be946b-bd13-4912-b478-1b1923b9478c-b8be946b-bd13-4912-b478-1b1923b9478c-6b904a9.md"
+  ],
+  "generated_by": "baseline handoffs proposals",
+  "id": "handoff.khelsutra.handoff-signals",
+  "open_questions": [
+    "Which linked handoffs contain durable project guidance rather than transient next steps?",
+    "10 indexed handoff candidate(s) lack standard headings; should they be normalized or ignored?"
+  ],
+  "risk": "low",
+  "scope": "project:khelsutra",
+  "source_kind": "repo-handoff",
+  "suggested_baseline_text": "Review the 11 indexed handoff candidate(s) for `khelsutra` before promoting durable project guidance. Prioritize repeated, still-current lessons from Ramp-Up Kit, You Are Here; use the linked evidence for next steps / open threads, ramp-up kit, session handoff, session-handoff, start here and leave transient next steps out of the baseline.",
+  "title": "Review handoff signals for khelsutra",
+  "trace": [
+    {
+      "markdown_path": "archive/claude-windows/20260622-54d4074a-5a8d-4058-b42d-a757c338132c-54d4074a-5a8d-4058-b42d-a757c338132c-a2aab69.md",
+      "project_slug": "khelsutra",
+      "session_id": "54d4074a-5a8d-4058-b42d-a757c338132c",
+      "source": "claude-windows",
+      "source_file": "C:\\Users\\avidu\\.claude\\projects\\C--Users-avidu-Projects-khelsutra\\54d4074a-5a8d-4058-b42d-a757c338132c.jsonl",
+      "transform": "baseline handoffs proposals"
+    },
+    {
+      "markdown_path": "archive/claude-windows/20260622-dca1ff63-3aec-42ab-897f-41970003f4e1-dca1ff63-3aec-42ab-897f-41970003f4e1-5bb1d71.md",
+      "project_slug": "khelsutra",
+      "session_id": "dca1ff63-3aec-42ab-897f-41970003f4e1",
+      "source": "claude-windows",
+      "source_file": "C:\\Users\\avidu\\.claude\\projects\\C--Users-avidu-Projects-khelsutra\\dca1ff63-3aec-42ab-897f-41970003f4e1.jsonl",
+      "transform": "baseline handoffs proposals"
+    },
+    {
+      "markdown_path": "archive/claude-windows/20260629-c6fbcfbb-d724-4901-b146-68f198409ed5-c6fbcfbb-d724-4901-b146-68f198409ed5-6148c97.md",
+      "project_slug": "khelsutra",
+      "session_id": "c6fbcfbb-d724-4901-b146-68f198409ed5",
+      "source": "claude-windows",
+      "source_file": "C:\\Users\\avidu\\.claude\\projects\\C--Users-avidu-Projects-khelsutra\\c6fbcfbb-d724-4901-b146-68f198409ed5.jsonl",
+      "transform": "baseline handoffs proposals"
+    },
+    {
+      "markdown_path": "archive/claude-windows/20260702-831509e0-5773-4469-a2ff-205848372a6b-831509e0-5773-4469-a2ff-205848372a6b-1eafb5f.md",
+      "project_slug": "khelsutra",
+      "session_id": "831509e0-5773-4469-a2ff-205848372a6b",
+      "source": "claude-windows",
+      "source_file": "C:\\Users\\avidu\\.claude\\projects\\C--Users-avidu-Projects-khelsutra\\831509e0-5773-4469-a2ff-205848372a6b.jsonl",
+      "transform": "baseline handoffs proposals"
+    },
+    {
+      "markdown_path": "archive/claude-windows/20260704-b8be946b-bd13-4912-b478-1b1923b9478c-b8be946b-bd13-4912-b478-1b1923b9478c-6b904a9.md",
+      "project_slug": "khelsutra",
+      "session_id": "b8be946b-bd13-4912-b478-1b1923b9478c",
+      "source": "claude-windows",
+      "source_file": "C:\\Users\\avidu\\.claude\\projects\\C--Users-avidu-Projects-khelsutra-guru-khelsutra--claude-worktrees-zealous-pike-7d0a85\\b8be946b-bd13-4912-b478-1b1923b9478c.jsonl",
+      "transform": "baseline handoffs proposals"
+    }
+  ]
+}

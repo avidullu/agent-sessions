@@ -13,7 +13,7 @@ PROJECT DOC TEMPLATE — copy this file to docs/<YOUR_PLAN>.md and fill it in.
 
 ## 0. TL;DR
 
-The `agent_sessions` package now has broad pytest coverage across archive, extractor, CLI, and baseline workflows. The current full-suite gate is **480 passed** with **96.90%** line coverage. Tests focus on unit-testing pure functions, mocking I/O boundaries (filesystem, subprocess, TOML parsing), and exercising the CLI surface through argparse.
+The `agent_sessions` package now has broad pytest coverage across archive, extractor, CLI, and baseline workflows. The current full-suite gate is **495 passed** with **97.05%** line coverage. Tests focus on unit-testing pure functions, mocking I/O boundaries (filesystem, subprocess, TOML parsing), and exercising the CLI surface through argparse.
 
 ## 1. Problem & goal
 
@@ -92,12 +92,12 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated.
 | T12 | `test_archive.py` | T0 | No | ☑ | 35 tests, archive core logic covered |
 | T13 | `test_baseline.py` | T0 | No | ☑ | 79 tests, baseline scaffold/suggest/calibrate/promote/schema/project-page upserts |
 | T14 | `test_baseline_agent.py` | T0 | No | ☑ | 19 tests, evidence bundles and schema references |
-| T15 | `test_cli.py` | T0 | No | ☑ | 49 tests, CLI parsing + dispatch |
-| T16 | `test_baseline_handoffs.py` | T0 | No | ☑ | 23 tests, report-only audit plus persistent handoff index/feed behavior |
+| T15 | `test_cli.py` | T0 | No | ☑ | 51 tests, CLI parsing + dispatch |
+| T16 | `test_baseline_handoffs.py` | T0 | No | ☑ | 36 tests, report-only audit, persistent handoff index/feed behavior, stable feed dates, and generated handoff proposals |
 | T17 | `test_baseline_lint.py` | T0 | No | ☑ | 19 tests, marker parsing, generated-link, generated-date, stale, orphan, contradiction, and report behavior |
 | T18 | `test_baseline_ingest.py` | T0 | No | ☑ | 30 tests, proposal ingest and trace-reference validation |
 | T19 | `test_tool_wrapper.py` | T0 | No | ☑ | 1 test, wrapper import path |
-| T20 | Run `pytest --cov` and verify >80% overall | T1–T19 | No | ☑ | **96.90%** (480 passed) |
+| T20 | Run `pytest --cov` and verify >80% overall | T1–T19 | No | ☑ | **97.05%** (495 passed) |
 
 ## 8. Open questions
 

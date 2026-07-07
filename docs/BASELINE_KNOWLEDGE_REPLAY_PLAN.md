@@ -149,7 +149,13 @@ Handoff mining should be deterministic and auditable:
   coverage/freshness report; it does not write pages, proposals, or indexes.
 - K6 `baseline handoffs index` normalizes records into
   `baseline/handoffs/index.jsonl`.
-- Feed stable patterns into project pages and optional proposal JSON.
+- Feed stable patterns into project pages and K7 proposal JSON. Project-page
+  feed dates should change only when the generated feed content changes, so
+  periodic runs do not create date-only diffs.
+- K7 `baseline handoffs proposals` converts indexed records for configured or
+  already-scaffolded projects into deterministic proposal JSON under
+  `baseline/proposals/`; it refuses to overwrite hand-written proposals and
+  leaves promotion to the existing review/ingest flow.
 - Extract structured fields with heading/marker scraping only. This is
   deterministic for repo handoffs that follow the local convention (`## Next
   Steps / Open Threads`, ramp-up kit, decisions), but arbitrary formats are
@@ -289,7 +295,7 @@ tracker ships the minimal deterministic scanner as the replay egress gate.
 | `baseline/replay/bundles/*` | `baseline replay bundle` | external replayer/panel | Gitignored; bundles may contain session excerpts. |
 | `baseline/replay/bundles/*/redaction-report.json` | redaction preflight | human reviewer, R5-safety | Gitignored by default; records scanner version, replacements, and blocked reasons. |
 | `baseline/replay/ledger.jsonl` | `baseline replay ingest` | calibration/eval | Append-only replay result history. |
-| `baseline/proposals/*.json` | humans, handoff miner, replay ingest | `baseline ingest` | Replay/handoff producers include structured trace fields that ingest validates against `archive/index.jsonl`. |
+| `baseline/proposals/*.json` | humans, `baseline handoffs proposals`, replay ingest | `baseline ingest` | Replay/handoff producers include structured trace fields that ingest validates against `archive/index.jsonl`. |
 
 ## 6. Honest limits - what this does NOT do
 
@@ -311,8 +317,8 @@ Legend: `Todo`, `In progress`, `Done`, `Blocked/gated`. One small PR per row.
 | K3 | Reuse/extend `upsert_promoted_content()` for project-page generated sections | #26 | K1, TD4 #31 | Yes | Done | #48 |
 | K4 | `baseline lint` skeleton for schema, links, stale blocks, orphan pages, and P6 contradiction checks | #26 | K1,K3 | Yes | Done | #49 |
 | K5 | Proposal + `Prediction` trace-field extension and ingest reference validation against `archive/index.jsonl` | #19/#23/#25 | K1 | Yes | Done | #50 |
-| K6 | `baseline handoffs index` discovery records in `baseline/handoffs/index.jsonl` and project-page feed | #23/#26 | K2,K3,K5 | No | In progress | #51 |
-| K7 | Handoff-derived proposal generation with trace records | #23 | K5,K6 | Yes | Todo | - |
+| K6 | `baseline handoffs index` discovery records in `baseline/handoffs/index.jsonl` and project-page feed | #23/#26 | K2,K3,K5 | No | Done | #51 |
+| K7 | Handoff-derived proposal generation with trace records | #23 | K5,K6 | Yes | In progress | #52 |
 | K8 | `baseline replay select` deterministic manifests, excluding coding sessions | #25 | K1 | No | Todo | - |
 | K9 | Replay redaction v0: deterministic scanner, redaction report, fixture tests, and bundle gitignore coverage | #25 | K0, P10/P11 design | Yes | Todo | - |
 | K10 | `baseline replay bundle` gitignored packets with rubric files after redaction preflight | #25 | K8,K9 | Yes | Todo | - |
@@ -338,7 +344,7 @@ Additional gate names:
 | #23 - mine handoffs | Yes, primary | First producer for the knowledge layer. |
 | #25 - replay loop | Yes, primary | Second producer after schema, handoff mining, and redaction contracts. |
 | #26 - wiki-style knowledge layer | Yes, primary | Foundation for both handoff mining and replay output. |
-| #32 - backfill/regenerate | No, boundary | Useful for archive identity quality, but too broad for this project; keep it separate unless replay selection needs exact regenerated ids. |
+| #32 - backfill/regenerate | No, boundary | Useful for archive identity quality and any future `baseline/handoffs/index.jsonl --prune` semantics, but too broad for this project; keep it separate unless replay selection needs exact regenerated ids. |
 
 ## 9. Open questions - owner / external
 
@@ -357,9 +363,14 @@ Additional gate names:
    **No. K6 persists all discovered handoff candidates in
    `baseline/handoffs/index.jsonl`, but writes `handoffs.index` marker blocks
    only to configured or already-scaffolded project pages.**
-6. Which session classes are allowed for replay v1 besides planning, writing,
+6. Should K7 generated proposal files be auto-promoted?
+   **No. K7 writes deterministic proposal JSON for configured or existing
+   project pages only, with structured trace and human review via
+   `baseline ingest`; generated proposal overwrites are limited to files already
+   marked with `generated_by = "baseline handoffs proposals"`.**
+7. Which session classes are allowed for replay v1 besides planning, writing,
    documentation, and research?
-7. Should R5-safety allow a manual override for blocked bundles, or should v1
+8. Should R5-safety allow a manual override for blocked bundles, or should v1
    remain strictly fail-closed with no override?
 
 ## 10. Definition of done
@@ -395,6 +406,9 @@ Additional gate names:
 
 ### Changelog
 
+- 2026-07-07 - Wrapped the session with PR #52 open, CI green, and awaiting review; next resume should review/merge #52 before starting K8.
+- 2026-07-07 - Opened PR #52 for K7 handoff-derived proposal generation and the #51 stable generated-date follow-up.
+- 2026-07-07 - Merged PR #51 for K6, recorded its non-blocking review follow-ups, and started K7 handoff-derived proposal generation; K7 also keeps `handoffs.index` dates stable when feed content is unchanged.
 - 2026-07-07 - Merged PR #50 for K5 and started K6 persistent handoff index/project-page feed work; K6 also folds in the small optional #49 invalid-date lint warning and #50 path-prefix normalization follow-ups.
 - 2026-07-07 - Opened PR #51 for K6 persistent handoff index records and configured project-page feeds.
 - 2026-07-07 - Merged PR #49 for K4 and started K5 trace reference validation.

@@ -142,7 +142,7 @@ illustrative proposal example until proposal validation is formalized in code.
 | Project pages | `baseline/projects/<slug>/README.md` | human prose + marker blocks | Durable project knowledge and generated sections. |
 | Candidate reports | `baseline/candidates/*.md` | generated, reviewed by humans | Human-readable reports with sidecars. |
 | Candidate sidecars | `baseline/candidates/*.predictions.json` | generated | Structured prediction payloads and trace data. |
-| Proposal inputs | `baseline/proposals/*.json` | human or bounded producer | Reviewable proposal drafts ingested into candidates. |
+| Proposal inputs | `baseline/proposals/*.json` | human or bounded producer | Reviewable proposal drafts ingested into candidates; K7 handoff proposals are deterministic review inputs with structured trace. |
 | Handoff audit | `baseline/handoffs/audit.md` | generated report | K2 audit output only; no pages, proposals, or index writes. |
 | Handoff index | `baseline/handoffs/index.jsonl` | generated records | K6 persistent normalized handoff records; project-page feeds are marker blocks on configured or existing project pages only. |
 | Replay manifest | `baseline/replay/manifest.jsonl` | generated records | Deterministic selected session refs and exclusion reasons, no excerpts. |
@@ -165,6 +165,9 @@ illustrative proposal example until proposal validation is formalized in code.
 - Handoff audit is report-only. Persistent handoff indexing writes
   `baseline/handoffs/index.jsonl` for all discovered records, while project-page
   feeds update only configured or already-scaffolded project pages.
+- Generated handoff proposals may overwrite only proposal files already marked
+  with `generated_by = "baseline handoffs proposals"`; hand-written proposals
+  are never replaced by that producer.
 - Replay bundle egress is blocked unless deterministic redaction passes and
   bundle paths are gitignored.
 
@@ -190,6 +193,9 @@ Rules:
 - Project-page upserts may remove the scaffold placeholder only when the line
   exactly matches the known placeholder text; edited placeholder-like prose is
   human-owned content.
+- Producers should preserve an existing `generated_at` value when a marker
+  block's substantive generated content is unchanged, so periodic runs converge
+  to quiet diffs.
 - Metadata such as `generated_by`, `generated_at`, and `proposal_id` belongs in
   the block body or in structured sidecars unless the shared parser changes.
 
@@ -201,7 +207,7 @@ field is available:
 
 | Field | Meaning |
 |---|---|
-| `source` | Archive source or producer name, for example `codex` or `baseline handoffs audit`. |
+| `source` | Archive source or producer name, for example `codex`, `baseline handoffs audit`, or `baseline handoffs proposals`. |
 | `source_file` | Original raw source file or repo handoff path when known. |
 | `markdown_path` | Repo-relative markdown artifact, usually under `archive/`. |
 | `session_id` | Session identifier from record metadata when available. |
@@ -218,6 +224,9 @@ Structured proposal fields:
 
 - `source_kind` is optional for human-authored proposals; replay and handoff
   producers should use `replay`, `handoff`, or `repo-handoff`.
+- K7 handoff-derived proposal files use
+  `generated_by = "baseline handoffs proposals"` and `source_kind =
+  "repo-handoff"`; they are review inputs, not promotion decisions.
 - `replay_of`, when present, is the original archive session id and must resolve
   against `archive/index.jsonl`.
 
@@ -270,6 +279,8 @@ Required validator behavior:
   analysis can harden this rule.
 - Reject replay or handoff proposal ingest when required trace references do
   not resolve.
+- Refuse generated handoff proposal overwrites unless the target is already
+  owned by the same handoff proposal producer.
 - Fail replay bundle writes when redaction detects high-confidence secrets.
 
 ## 8. Non-Goals
@@ -282,6 +293,7 @@ Required validator behavior:
 
 ## 9. Changelog
 
+- 2026-07-07: Added K7 generated handoff proposal ownership rules and stable project-page generated dates for unchanged feeds.
 - 2026-07-07: Added K6 persistent handoff index records and configured project-page `handoffs.index` feeds.
 - 2026-07-07: Added K5 proposal trace propagation and ingest reference validation.
 - 2026-07-07: Added K4 `baseline lint` severity model and first validator scope.

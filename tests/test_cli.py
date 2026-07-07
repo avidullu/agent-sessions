@@ -235,6 +235,29 @@ class TestBuildParser:
         assert args.max_archive_records == 10
         assert args.dry_run is True
 
+    def test_baseline_handoffs_proposals(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "baseline",
+                "handoffs",
+                "proposals",
+                "--index",
+                "custom-index.jsonl",
+                "--output-dir",
+                "custom-proposals",
+                "--max-records-per-project",
+                "3",
+                "--dry-run",
+            ]
+        )
+        assert args.baseline_cmd == "handoffs"
+        assert args.handoffs_cmd == "proposals"
+        assert args.index == Path("custom-index.jsonl")
+        assert args.output_dir == Path("custom-proposals")
+        assert args.max_records_per_project == 3
+        assert args.dry_run is True
+
     def test_config_option(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["--config", "custom.toml", "discover"])
@@ -529,6 +552,31 @@ class TestMainBaselineSubcommands:
             encoding="utf-8",
         )
         assert main(["baseline", "handoffs", "index", "--dry-run"]) == 0
+
+    def test_handoffs_proposals(self) -> None:
+        index = self.repo_root / "baseline" / "handoffs" / "index.jsonl"
+        index.parent.mkdir(parents=True, exist_ok=True)
+        index.write_text(
+            json.dumps(
+                {
+                    "id": "handoff.test",
+                    "source_kind": "repo-handoff",
+                    "source": "codex",
+                    "source_file": "/fake/session.jsonl",
+                    "markdown_path": "archive/codex/session.md",
+                    "session_id": "s1",
+                    "project_raw": "test-pilot",
+                    "project_slug": "test-pilot",
+                    "sections": ["You Are Here"],
+                    "signals": ["session handoff"],
+                    "warnings": [],
+                    "trace": [{"markdown_path": "archive/codex/session.md", "session_id": "s1"}],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        assert main(["baseline", "handoffs", "proposals", "--dry-run"]) == 0
 
     def test_ingest(self) -> None:
         proposal = self.repo_root / "baseline" / "proposals" / "guardrail.test.json"
