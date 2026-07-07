@@ -25,12 +25,15 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   and tests/docs updates. PR #47 merged K2: report-only
   `baseline handoffs audit`, writing only `baseline/handoffs/audit.md`; the K2
   audit report scanned 3,114 archive records and found 946 archive handoff
-  candidates. PR #48 is open for K3 on branch `codex/project-page-upserts` in
-  `C:\Users\avidu\Projects\Agent Sessions - project-page-upserts`: shared
-  `baseline:begin/end` marker-block helpers for project-page generated sections.
-  K6 still owns persistent `baseline/handoffs/index.jsonl` and
-  project-page/proposal feeds. Related issue #19 is folded in as lightweight
-  provenance substrate; #32 remains separate backfill/regenerate work.
+  candidates. PR #48 merged K3: shared `baseline:begin/end` marker-block
+  helpers for project-page generated sections. K4 is active on branch
+  `codex/baseline-lint` in
+  `C:\Users\avidu\Projects\Agent Sessions - baseline-lint`: read-only
+  `baseline lint` skeleton for schema, marker, generated-link, stale-block,
+  orphan-page, and explicit contradiction checks. K6 still owns persistent
+  `baseline/handoffs/index.jsonl` and project-page/proposal feeds. Related
+  issue #19 is folded in as lightweight provenance substrate; #32 remains
+  separate backfill/regenerate work.
 - **Completed tracked project:** `docs/FIRST_USER_SETUP_TRACKER.md` (#42 + #18
   setup UX). MVP completed by PRs #43 and #44; optional future work is the P7
   `doctor`/`setup` command. Issue #32 remains separate backfill/regenerate work
@@ -116,3 +119,11 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   the shipped `baseline:begin/end` marker grammar via
   `render_project_page_block()` and `upsert_project_page_content()`; no second
   marker family or free-form page rewrite path.
+- K3 review follow-ups to consider in K4/K6 (2026-07-07): dedupe project-page
+  placeholder text between `baseline_settings` and `baseline_promote`; document
+  exact-line placeholder matching as intentionally safer; add a golden
+  byte-output test for empty-file `upsert_promoted_content()`.
+- K4 lint severity decision (2026-07-07): malformed markers and broken generated
+  links are errors; orphan pages, stale blocks, and explicit contradiction
+  markers start as warnings until downstream producers provide richer source
+  records.

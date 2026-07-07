@@ -9,7 +9,12 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, cast
 
-from .baseline_settings import load_baseline_settings, load_feedback, resolve_prediction_sidecar
+from .baseline_settings import (
+    PROJECT_README_PLACEHOLDER,
+    load_baseline_settings,
+    load_feedback,
+    resolve_prediction_sidecar,
+)
 from .baseline_types import BaselineSettings, parse_verdict
 from .config import ArchiveConfig
 
@@ -99,7 +104,7 @@ def project_page_header(slug: str) -> str:
 
 
 def project_page_placeholder(slug: str) -> str:
-    return f"Project-specific promoted baseline notes for `{slug}` will land here."
+    return PROJECT_README_PLACEHOLDER.format(slug=slug)
 
 
 def _drop_placeholder_lines(content: str, placeholders: Sequence[str]) -> str:

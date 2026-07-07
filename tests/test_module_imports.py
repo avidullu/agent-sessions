@@ -22,6 +22,7 @@ BASELINE_MODULES = (
     "agent_sessions.baseline_calibration",
     "agent_sessions.baseline",
     "agent_sessions.baseline_eval",
+    "agent_sessions.baseline_lint",
     "agent_sessions.baseline_publish",
     "agent_sessions.baseline_ingest",
     "agent_sessions.baseline_agent",

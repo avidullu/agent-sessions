@@ -308,8 +308,8 @@ Legend: `Todo`, `In progress`, `Done`, `Blocked/gated`. One small PR per row.
 | K0 | Tracked design plan, docs index, and handoff pointer | #23/#25/#26 | - | No | Done | #45 |
 | K1 | `baseline/SCHEMA.md` with page types, existing marker grammar, #19-aligned trace fields, and lint/validator contract | #26/#19 | K0 | Yes | Done | #46 |
 | K2 | Report-only `baseline handoffs audit` coverage/freshness report; writes `baseline/handoffs/audit.md` only and no page/proposal/index writes | #23 | K0 | No | Done | #47 |
-| K3 | Reuse/extend `upsert_promoted_content()` for project-page generated sections | #26 | K1, TD4 #31 | Yes | In progress | #48 |
-| K4 | `baseline lint` skeleton for schema, links, stale blocks, orphan pages, and P6 contradiction checks | #26 | K1,K3 | Yes | Todo | - |
+| K3 | Reuse/extend `upsert_promoted_content()` for project-page generated sections | #26 | K1, TD4 #31 | Yes | Done | #48 |
+| K4 | `baseline lint` skeleton for schema, links, stale blocks, orphan pages, and P6 contradiction checks | #26 | K1,K3 | Yes | In progress | - |
 | K5 | Proposal + `Prediction` trace-field extension and ingest reference validation against `archive/index.jsonl` | #19/#23/#25 | K1 | Yes | Todo | - |
 | K6 | `baseline handoffs index` discovery records in `baseline/handoffs/index.jsonl` and project-page feed | #23/#26 | K2,K3,K5 | No | Todo | - |
 | K7 | Handoff-derived proposal generation with trace records | #23 | K5,K6 | Yes | Todo | - |
@@ -390,6 +390,7 @@ Additional gate names:
 
 ### Changelog
 
+- 2026-07-07 - Merged PR #48 for K3 and started K4 `baseline lint` skeleton.
 - 2026-07-07 - Opened PR #48 for K3 shared project-page marker-block upsert helpers.
 - 2026-07-07 - Merged PR #47 for K2 and started K3 project-page marker-block upsert helpers.
 - 2026-07-07 - Opened PR #47 for K2 `baseline handoffs audit` report-only coverage/freshness work.

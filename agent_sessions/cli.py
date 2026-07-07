@@ -143,6 +143,12 @@ def _handle_baseline_eval(config: ArchiveConfig, args: argparse.Namespace) -> in
     return baseline_eval(config, output=args.output, dry_run=args.dry_run)
 
 
+def _handle_baseline_lint(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .baseline_lint import baseline_lint
+
+    return baseline_lint(config, output=args.output, stale_days=args.stale_days, dry_run=args.dry_run)
+
+
 def _handle_baseline_ingest(config: ArchiveConfig, args: argparse.Namespace) -> int:
     from .baseline_ingest import baseline_ingest
 
@@ -270,6 +276,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_baseline_eval.add_argument("--output", type=Path, help="Evaluation report Markdown output path.")
     p_baseline_eval.add_argument("--dry-run", action="store_true")
     p_baseline_eval.set_defaults(func=_handle_baseline_eval)
+
+    p_baseline_lint = baseline_sub.add_parser("lint", help="Lint baseline schema, marker blocks, links, and pages.")
+    p_baseline_lint.add_argument("--output", type=Path, help="Optional lint report Markdown output path.")
+    p_baseline_lint.add_argument("--stale-days", type=int, default=90, help="Generated block age warning threshold.")
+    p_baseline_lint.add_argument("--dry-run", action="store_true")
+    p_baseline_lint.set_defaults(func=_handle_baseline_lint)
 
     p_baseline_ingest = baseline_sub.add_parser(
         "ingest",
