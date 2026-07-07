@@ -8,14 +8,17 @@ from pathlib import Path
 import pytest
 
 from agent_sessions.baseline_replay import (
+    baseline_replay_bundle,
     baseline_replay_redact,
     baseline_replay_select,
     evaluate_record,
+    extract_task_and_deliverable,
     infer_kind,
     load_manifest,
     render_manifest_jsonl,
     select_replay_candidates,
     selected_manifest_entries,
+    split_turns,
 )
 from agent_sessions.config import ArchiveConfig
 
@@ -354,3 +357,84 @@ class TestBaselineReplayRedact:
         assert rc == 0
         assert "Redaction preflight" in capsys.readouterr().out
         assert not (repo_root / "baseline" / "replay" / "bundles" / "redaction-preflight.json").exists()
+
+
+class TestTurnExtraction:
+    def test_extracts_first_user_and_last_assistant(self) -> None:
+        text = (
+            "### 1. user\n\nFirst task.\n\n### 2. assistant\n\nEarly reply.\n\n"
+            "### 3. user\n\nFollow up.\n\n### 4. assistant\n\nFinal deliverable here.\n"
+        )
+        assert split_turns(text)[0] == ("user", "First task.")
+        task, deliverable = extract_task_and_deliverable(text)
+        assert task == "First task."
+        assert deliverable == "Final deliverable here."
+
+    def test_no_turns_returns_empty(self) -> None:
+        assert extract_task_and_deliverable("plain text with no role headers") == ("", "")
+
+
+class TestBaselineReplayBundle:
+    def _select(self, repo_root: Path, body: str) -> None:
+        _write_archive(
+            repo_root,
+            [_record("archive/demo/plan.md", sha="1" * 64, session="s1", messages=10, body=body)],
+        )
+        assert baseline_replay_select(_config(repo_root), limit=20) == 0
+
+    def test_writes_packet_rubric_and_report_for_clean_session(self, repo_root: Path) -> None:
+        self._select(repo_root, _planning_markdown())
+        rc = baseline_replay_bundle(_config(repo_root))
+        assert rc == 0
+        bundles = list((repo_root / "baseline" / "replay" / "bundles").glob("*/packet.json"))
+        assert len(bundles) == 1
+        bundle_dir = bundles[0].parent
+        assert (bundle_dir / "rubric.md").exists()
+        assert (bundle_dir / "redaction-report.json").exists()
+        packet = json.loads(bundles[0].read_text(encoding="utf-8"))
+        assert packet["rubric_version"] == "replay-rubric-v1"
+        assert PLANNING_PROMPT in packet["task_prompt"]
+        assert packet["access_tier"] == "session-only"
+        assert packet["constraints"]
+
+    def test_secret_session_skipped_no_packet_written(self, repo_root: Path) -> None:
+        body = (
+            "# Session\n\n### 1. user\n\n"
+            f"{PLANNING_PROMPT}\n\n### 2. assistant\n\n"
+            "Here is the plan.\n\n## Rollout\n\n| P | D |\n|---|---|\n| 1 | x |\n\n"
+            "leak ghp_" + "a" * 36 + "\n"
+        )
+        self._select(repo_root, body)
+        rc = baseline_replay_bundle(_config(repo_root))
+        assert rc == 0
+        # No packet written for the blocked session, but a redaction report records the skip.
+        assert not list((repo_root / "baseline" / "replay" / "bundles").glob("*/packet.json"))
+        reports = list((repo_root / "baseline" / "replay" / "bundles").glob("*/redaction-report.json"))
+        assert len(reports) == 1
+        report = json.loads(reports[0].read_text(encoding="utf-8"))
+        assert report["blocked"] is True
+        assert "ghp_" not in reports[0].read_text(encoding="utf-8")
+
+    def test_packet_redacts_email_in_deliverable(self, repo_root: Path) -> None:
+        body = (
+            "# Session\n\n### 1. user\n\n"
+            f"{PLANNING_PROMPT}\n\n### 2. assistant\n\n"
+            "Plan ready. Contact me at dev@example.com.\n\n## Rollout\n\n| P | D |\n|---|---|\n| 1 | x |\n"
+        )
+        self._select(repo_root, body)
+        assert baseline_replay_bundle(_config(repo_root)) == 0
+        packet = json.loads(
+            next((repo_root / "baseline" / "replay" / "bundles").glob("*/packet.json")).read_text(encoding="utf-8")
+        )
+        assert "dev@example.com" not in packet["original_deliverable"]
+        assert "<email-1>" in packet["original_deliverable"]
+
+    def test_dry_run_writes_nothing(self, repo_root: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        self._select(repo_root, _planning_markdown())
+        assert baseline_replay_bundle(_config(repo_root), dry_run=True) == 0
+        assert "Replay bundle:" in capsys.readouterr().out
+        assert not (repo_root / "baseline" / "replay" / "bundles").exists()
+
+    def test_missing_manifest_raises(self, repo_root: Path) -> None:
+        with pytest.raises(SystemExit):
+            baseline_replay_bundle(_config(repo_root))

@@ -229,6 +229,19 @@ def _handle_baseline_replay_redact(config: ArchiveConfig, args: argparse.Namespa
     )
 
 
+def _handle_baseline_replay_bundle(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .baseline_replay import baseline_replay_bundle
+
+    return baseline_replay_bundle(
+        config,
+        manifest=args.manifest,
+        output_dir=args.output_dir,
+        limit=args.limit,
+        access_tier=args.access_tier,
+        dry_run=args.dry_run,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Export local coding-agent sessions.")
     parser.add_argument("--repo-root", type=Path, default=default_repo_root(), help="Archive repository root.")
@@ -432,6 +445,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_replay_redact.add_argument("--limit", type=int, default=0, help="Maximum selected sessions to scan; 0 scans all.")
     p_replay_redact.add_argument("--dry-run", action="store_true")
     p_replay_redact.set_defaults(func=_handle_baseline_replay_redact)
+
+    p_replay_bundle = replay_sub.add_parser(
+        "bundle",
+        help="Write gitignored replay packets (redacted task + deliverable + rubric) for selected sessions.",
+    )
+    p_replay_bundle.add_argument("--manifest", type=Path, help="Replay manifest JSONL path.")
+    p_replay_bundle.add_argument("--output-dir", type=Path, help="Bundle output directory (gitignored by default).")
+    p_replay_bundle.add_argument("--limit", type=int, default=0, help="Maximum selected sessions to bundle; 0 = all.")
+    p_replay_bundle.add_argument(
+        "--access-tier",
+        default="session-only",
+        help="Access tier recorded in each packet's constraint block.",
+    )
+    p_replay_bundle.add_argument("--dry-run", action="store_true")
+    p_replay_bundle.set_defaults(func=_handle_baseline_replay_bundle)
 
     return parser
 
