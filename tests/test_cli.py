@@ -248,6 +248,14 @@ class TestBuildParser:
         assert args.limit == 2
         assert args.dry_run is True
 
+    def test_baseline_replay_ingest(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["baseline", "replay", "ingest", "--result", "r.json", "--dry-run"])
+        assert args.baseline_cmd == "replay"
+        assert args.replay_cmd == "ingest"
+        assert args.result == Path("r.json")
+        assert args.dry_run is True
+
     def test_baseline_handoffs_index(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -562,6 +570,29 @@ class TestMainBaselineSubcommands:
         manifest.parent.mkdir(parents=True, exist_ok=True)
         manifest.write_text("", encoding="utf-8")
         assert main(["baseline", "replay", "bundle", "--dry-run"]) == 0
+
+    def test_replay_ingest(self) -> None:
+        archive_dir = self.repo_root / "archive"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / "index.jsonl").write_text(
+            '{"source":"s","sha256":"a","messages":5,"markdown":"a/s.md","metadata":{"session_id":"sid"}}\n',
+            encoding="utf-8",
+        )
+        result = self.repo_root / "result.json"
+        result.write_text(
+            json.dumps(
+                {
+                    "replay_of": "sid",
+                    "replayer": "x",
+                    "rubric_version": "replay-rubric-v1",
+                    "claim": "Name explicit rollback steps.",
+                    "confidence": 0.7,
+                    "recommended_action": "watchlist",
+                }
+            ),
+            encoding="utf-8",
+        )
+        assert main(["baseline", "replay", "ingest", "--result", str(result), "--dry-run"]) == 0
 
     def test_bundle(self) -> None:
         archive_dir = self.repo_root / "archive"

@@ -29,6 +29,7 @@ BASELINE_MODULES = (
     "agent_sessions.baseline_handoffs",
     "agent_sessions.baseline_replay",
     "agent_sessions.baseline_redaction",
+    "agent_sessions.baseline_replay_ingest",
     "agent_sessions.cli",
 )
 

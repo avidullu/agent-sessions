@@ -97,6 +97,12 @@ baseline/
   fail-closed scanner are skipped with a report and never written. Bundles stay
   under the gitignored `baseline/replay/bundles/` and are handed to an external
   replayer/judge out of band.
+- Replay ingest: `baseline replay ingest` validates an external replay result
+  (its `replay_of`/trace references must resolve against `archive/index.jsonl`),
+  appends it to the append-only `baseline/replay/ledger.jsonl`, and — when the
+  judge recommends it — emits a `replay.*` proposal that flows through the same
+  human-gated `baseline ingest` -> candidate -> promote pipeline. Nothing is
+  auto-promoted.
 
 ## Guardrails
 

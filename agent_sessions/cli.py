@@ -242,6 +242,18 @@ def _handle_baseline_replay_bundle(config: ArchiveConfig, args: argparse.Namespa
     )
 
 
+def _handle_baseline_replay_ingest(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .baseline_replay_ingest import baseline_replay_ingest
+
+    return baseline_replay_ingest(
+        config,
+        result=args.result,
+        output_dir=args.output_dir,
+        ledger=args.ledger,
+        dry_run=args.dry_run,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Export local coding-agent sessions.")
     parser.add_argument("--repo-root", type=Path, default=default_repo_root(), help="Archive repository root.")
@@ -460,6 +472,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_replay_bundle.add_argument("--dry-run", action="store_true")
     p_replay_bundle.set_defaults(func=_handle_baseline_replay_bundle)
+
+    p_replay_ingest = replay_sub.add_parser(
+        "ingest",
+        help="Validate an external replay result into replay.* proposals and the append-only replay ledger.",
+    )
+    p_replay_ingest.add_argument("--result", type=Path, help="Replay result JSON path (one object or a list).")
+    p_replay_ingest.add_argument("--output-dir", type=Path, help="Proposal JSON output directory.")
+    p_replay_ingest.add_argument("--ledger", type=Path, help="Replay ledger JSONL path.")
+    p_replay_ingest.add_argument("--dry-run", action="store_true")
+    p_replay_ingest.set_defaults(func=_handle_baseline_replay_ingest)
 
     return parser
 
