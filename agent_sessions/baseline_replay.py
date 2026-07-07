@@ -39,7 +39,27 @@ MAX_TRANSCRIPT_CHARS = 60_000
 MIN_FIRST_PROMPT_CHARS = 200
 CODING_FENCE_THRESHOLD = 6
 
+RUBRIC_VERSION = "replay-rubric-v1"
+REPLAY_CONSTRAINTS = (
+    "Re-execute the task prompt fresh. Do not read the original deliverable before producing your own.",
+    "Use a different model lineage than the original run where possible (cross-lineage second opinion).",
+    "Emit proposals conforming to baseline/proposals/proposal.schema.json extended with replay provenance"
+    " (replay_of, replayer, rubric_version).",
+    "Never auto-promote. Output is a human-reviewed proposal only.",
+)
+REPLAY_RUBRIC = (
+    "# Replay comparison rubric\n\n"
+    f"Rubric version: `{RUBRIC_VERSION}`\n\n"
+    "Compare the replayed deliverable against the original along these axes, and report only"
+    " generalizable lessons (not one-off nitpicks):\n\n"
+    "1. Correctness deltas — did the replay get something right/wrong that the original did not?\n"
+    "2. Missed requirements — requirements in the task prompt that either run failed to address.\n"
+    "3. Structure/method improvements — clearer decomposition, better evidence, safer approach.\n"
+    "4. Generalizable lessons — reusable guidance worth proposing into the baseline.\n"
+)
+
 USER_TURN_RE = re.compile(r"^#{1,6}\s*(?:\d+\.\s*)?user\b", re.IGNORECASE | re.MULTILINE)
+ROLE_RE = re.compile(r"^#{1,6}\s*(?:\d+\.\s*)?(user|assistant|system|tool)\b", re.IGNORECASE)
 TURN_HEADER_RE = re.compile(r"^#{1,6}\s*(?:\d+\.\s*)?(?:user|assistant|system|tool)\b", re.IGNORECASE | re.MULTILINE)
 DIFF_HUNK_RE = re.compile(r"^(?:@@ .* @@|diff --git |\+\+\+ |--- )", re.MULTILINE)
 FENCE_RE = re.compile(r"^```", re.MULTILINE)
@@ -404,6 +424,139 @@ def load_manifest(path: Path) -> list[dict[str, Any]]:
 
 def selected_manifest_entries(path: Path) -> list[dict[str, Any]]:
     return [record for record in load_manifest(path) if record.get("selected") is True]
+
+
+def split_turns(text: str) -> list[tuple[str, str]]:
+    """Split an exported transcript into ``(role, body)`` turns by its role
+    headers (``### 2. assistant`` etc.). Best-effort for this repo's export
+    format; sources formatted differently yield no turns."""
+    turns: list[tuple[str, str]] = []
+    matches = list(TURN_HEADER_RE.finditer(text))
+    for index, match in enumerate(matches):
+        role_match = ROLE_RE.match(text[match.start() :])
+        role = role_match.group(1).lower() if role_match else "unknown"
+        line_end = text.find("\n", match.start())
+        body_start = line_end + 1 if line_end != -1 else len(text)
+        body_end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        turns.append((role, text[body_start:body_end].strip()))
+    return turns
+
+
+def extract_task_and_deliverable(text: str) -> tuple[str, str]:
+    turns = split_turns(text)
+    task = next((body for role, body in turns if role == "user"), "")
+    deliverable = next((body for role, body in reversed(turns) if role == "assistant"), "")
+    return task, deliverable
+
+
+def build_replay_packet(
+    entry: dict[str, Any],
+    *,
+    task_prompt: str,
+    original_deliverable: str,
+    access_tier: str,
+) -> dict[str, Any]:
+    return {
+        "replay_of": str(entry.get("session_id") or entry.get("sha256") or entry.get("id") or ""),
+        "id": str(entry.get("id", "")),
+        "source": str(entry.get("source", "")),
+        "project_slug": str(entry.get("project_slug", "")),
+        "markdown_path": str(entry.get("markdown_path", "")),
+        "kind": str(entry.get("kind", "")),
+        "access_tier": access_tier,
+        "rubric_version": RUBRIC_VERSION,
+        "constraints": list(REPLAY_CONSTRAINTS),
+        "task_prompt": task_prompt,
+        "original_deliverable": original_deliverable,
+    }
+
+
+def baseline_replay_bundle(
+    config: ArchiveConfig,
+    *,
+    manifest: Path | None = None,
+    output_dir: Path | None = None,
+    limit: int = 0,
+    access_tier: str = "session-only",
+    dry_run: bool = False,
+) -> int:
+    """Write gitignored replay packets (K10). Each selected session's task prompt
+    and original deliverable are redacted (K9); a session is skipped, never
+    written, if its egress content trips the fail-closed secret scanner. Every
+    bundle carries its own ``redaction-report.json`` (valueless)."""
+    from .baseline_redaction import redact_text, result_to_report
+
+    settings = load_baseline_settings(config)
+    manifest_path = manifest or settings.root / "replay" / "manifest.jsonl"
+    if not manifest_path.is_absolute():
+        manifest_path = config.repo_root / manifest_path
+    if not manifest_path.exists():
+        raise SystemExit(f"Replay manifest does not exist: {manifest_path}. Run `baseline replay select` first.")
+
+    bundles_dir = output_dir or settings.root / "replay" / "bundles"
+    if not bundles_dir.is_absolute():
+        bundles_dir = config.repo_root / bundles_dir
+
+    entries = selected_manifest_entries(manifest_path)
+    if limit > 0:
+        entries = entries[:limit]
+
+    written: list[str] = []
+    skipped: list[str] = []
+    for entry in sorted(entries, key=lambda e: str(e.get("id", ""))):
+        candidate_id = str(entry.get("id", "")) or "replay.unknown"
+        markdown_path = str(entry.get("markdown_path", ""))
+        md = archive_markdown_path(config.repo_root, markdown_path)
+        text = md.read_text(encoding="utf-8", errors="replace") if md.exists() else ""
+        task_raw, deliverable_raw = extract_task_and_deliverable(text)
+        task_res = redact_text(task_raw)
+        deliverable_res = redact_text(deliverable_raw)
+        blocked = task_res.blocked or deliverable_res.blocked
+        report = {
+            "id": candidate_id,
+            "blocked": blocked,
+            "task": result_to_report(f"{candidate_id}:task", task_res),
+            "deliverable": result_to_report(f"{candidate_id}:deliverable", deliverable_res),
+        }
+        if blocked:
+            skipped.append(candidate_id)
+            if not dry_run:
+                _write_skip_report(bundles_dir / candidate_id, report)
+            continue
+        packet = build_replay_packet(
+            entry,
+            task_prompt=task_res.redacted_text,
+            original_deliverable=deliverable_res.redacted_text,
+            access_tier=access_tier,
+        )
+        written.append(candidate_id)
+        if not dry_run:
+            _write_bundle(bundles_dir / candidate_id, packet, report)
+
+    summary = (
+        f"Replay bundle: {len(written)} written, {len(skipped)} skipped (redaction-blocked). "
+        f"Output dir (gitignored): {bundles_dir}"
+    )
+    print(summary)
+    return 0
+
+
+def _write_bundle(bundle_dir: Path, packet: dict[str, Any], report: dict[str, Any]) -> None:
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+    (bundle_dir / "packet.json").write_text(
+        json.dumps(packet, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
+    )
+    (bundle_dir / "rubric.md").write_text(REPLAY_RUBRIC, encoding="utf-8", newline="\n")
+    (bundle_dir / "redaction-report.json").write_text(
+        json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
+    )
+
+
+def _write_skip_report(bundle_dir: Path, report: dict[str, Any]) -> None:
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+    (bundle_dir / "redaction-report.json").write_text(
+        json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
+    )
 
 
 def baseline_replay_redact(

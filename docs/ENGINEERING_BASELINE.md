@@ -91,6 +91,12 @@ baseline/
   `redaction-report.json` under the gitignored `baseline/replay/bundles/`.
   High-confidence secrets block the egress gate (non-zero exit); low-risk emails
   and private paths are placeholdered. Secret values are never recorded.
+- Replay bundles: `baseline replay bundle` writes one gitignored packet per
+  selected session (redacted task prompt + original deliverable + comparison
+  rubric + per-bundle redaction report). Sessions whose egress content trips the
+  fail-closed scanner are skipped with a report and never written. Bundles stay
+  under the gitignored `baseline/replay/bundles/` and are handed to an external
+  replayer/judge out of band.
 
 ## Guardrails
 

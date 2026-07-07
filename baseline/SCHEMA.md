@@ -178,6 +178,7 @@ Required validator behavior:
 
 ## 9. Changelog
 
+- 2026-07-07: Added K10 `baseline replay bundle`: gitignored replay packets (redacted task + deliverable + rubric + per-bundle redaction report) written only for sessions that pass the fail-closed redaction gate.
 - 2026-07-07: Added K9 replay redaction v0: deterministic fail-closed secret scanner and `redaction-report.json` (values never recorded); gitignored replay egress.
 - 2026-07-07: Added K8 `baseline replay select` deterministic, excerpt-free replay manifest (`baseline/replay/manifest.jsonl`) excluding coding sessions.
 - 2026-07-07: Added K7 generated handoff proposal ownership rules and stable project-page generated dates for unchanged feeds.
