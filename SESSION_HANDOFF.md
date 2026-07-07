@@ -28,8 +28,8 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   candidates. PR #48 merged K3: shared `baseline:begin/end` marker-block
   helpers for project-page generated sections. PR #49 merged K4: read-only
   `baseline lint` skeleton for schema, marker, generated-link, stale-block,
-  orphan-page, and explicit contradiction checks. K5 is active on branch
-  `codex/trace-reference-validation` in
+  orphan-page, and explicit contradiction checks. PR #50 is open for K5 on
+  branch `codex/trace-reference-validation` in
   `C:\Users\avidu\Projects\Agent Sessions - trace-reference-validation`:
   proposal trace-field threading plus `archive/index.jsonl` reference
   validation for replay/handoff proposal ingest. K6 still owns persistent
