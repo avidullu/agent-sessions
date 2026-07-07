@@ -34,6 +34,7 @@ baseline/
     repo-workflows.md
   handoffs/
     audit.md
+    index.jsonl
   agents/
     codex/AGENTS.generated.md
     claude/CLAUDE.generated.md
@@ -65,17 +66,18 @@ baseline/
   packet plus a proposal prompt for any explicitly authorized agent. Generated
   evidence packets are ignored by Git by default.
 - Handoff mining: `baseline handoffs audit` writes a report-only coverage and
-  freshness audit at `baseline/handoffs/audit.md`; persistent handoff indexes
-  and project/proposal feeds are later gated work.
+  freshness audit at `baseline/handoffs/audit.md`; `baseline handoffs index`
+  writes persistent records to `baseline/handoffs/index.jsonl` and marker-owned
+  `handoffs.index` feeds only on configured or already-scaffolded project pages.
 - Project pages: generated sections in `baseline/projects/<slug>/README.md`
   should use `render_project_page_block()` and
   `upsert_project_page_content()` so the shipped `baseline:begin/end` marker
   parser preserves hand-written prose. Only the exact scaffold placeholder line
   is removed; edited placeholder-like prose is preserved as human-owned content.
 - Baseline lint: `baseline lint` is read-only by default and reports schema,
-  marker, generated-link, stale-block, orphan-page, and explicit contradiction
-  findings. Errors fail the command; warnings surface review signals while K6
-  and later producers are still gated.
+  marker, generated-link, stale-block, malformed generated-date, orphan-page,
+  and explicit contradiction findings. Errors fail the command; warnings surface
+  review signals while later producers are still gated.
 
 ## Guardrails
 

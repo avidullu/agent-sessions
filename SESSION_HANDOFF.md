@@ -28,12 +28,14 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   candidates. PR #48 merged K3: shared `baseline:begin/end` marker-block
   helpers for project-page generated sections. PR #49 merged K4: read-only
   `baseline lint` skeleton for schema, marker, generated-link, stale-block,
-  orphan-page, and explicit contradiction checks. PR #50 is open for K5 on
-  branch `codex/trace-reference-validation` in
-  `C:\Users\avidu\Projects\Agent Sessions - trace-reference-validation`:
+  orphan-page, and explicit contradiction checks. PR #50 merged K5:
   proposal trace-field threading plus `archive/index.jsonl` reference
-  validation for replay/handoff proposal ingest. K6 still owns persistent
-  `baseline/handoffs/index.jsonl` and project-page/proposal feeds. Related
+  validation for replay/handoff proposal ingest. PR #51 is open for K6 on branch
+  `codex/handoffs-index-feed` in
+  `C:\Users\avidu\Projects\Agent Sessions - handoffs-index-feed`: persistent
+  `baseline/handoffs/index.jsonl`, marker-owned `handoffs.index` project-page
+  feeds for configured/existing pages, and small #49/#50 review follow-ups.
+  K7 still owns handoff-derived proposal generation. Related
   issue #19 is folded in as lightweight provenance substrate; #32 remains
   separate backfill/regenerate work.
 - **Completed tracked project:** `docs/FIRST_USER_SETUP_TRACKER.md` (#42 + #18
@@ -83,6 +85,7 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
 - `docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md`
 - `baseline/SCHEMA.md`
 - `baseline/handoffs/audit.md`
+- `baseline/handoffs/index.jsonl`
 - `docs/archives/TECH_DEBT_PLAN.md`
 - `docs/CALIBRATION_EFFICACY.md`
 - `docs/PROJECT_DOC_TEMPLATE.md`
@@ -129,11 +132,19 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   links are errors; orphan pages, stale blocks, and explicit contradiction
   markers start as warnings until downstream producers provide richer source
   records.
-- K4 review follow-ups left for later rows (2026-07-07): invalid generated dates
-  should become lint findings instead of exceptions; K12 should map rule ids to
-  gate ids explicitly; duplicate baseline markdown reads are acceptable for now
-  but can be optimized if the tree grows.
+- K4 review follow-ups (2026-07-07): K6 folds in invalid generated-date lint
+  warnings instead of exceptions; K12 should still map rule ids to gate ids
+  explicitly; duplicate baseline markdown reads are acceptable for now but can
+  be optimized if the tree grows.
 - K5 trace validation decision (2026-07-07): human proposals keep optional
   free-text evidence; `source_kind` of `replay`, `handoff`, or `repo-handoff`
   requires structured trace and resolvable `markdown_path`/`session_id`
   references before candidate sidecars are written.
+- K6 handoff index decision (2026-07-07): persist every discovered handoff
+  candidate in `baseline/handoffs/index.jsonl`, but only write project-page
+  feed blocks to configured or existing pages. Configured pilot aliases collapse
+  multiple raw paths into the canonical slug; digest disambiguators are reserved
+  for unknown slug collisions.
+- K5 review follow-up folded into K6 (2026-07-07): `normalized_markdown_path()`
+  now removes only explicit `./` or leading `/` path prefixes rather than using
+  `lstrip("./")`.

@@ -218,6 +218,23 @@ class TestBuildParser:
         assert args.max_archive_records == 10
         assert args.dry_run is True
 
+    def test_baseline_handoffs_index(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "baseline",
+                "handoffs",
+                "index",
+                "--max-archive-records",
+                "10",
+                "--dry-run",
+            ]
+        )
+        assert args.baseline_cmd == "handoffs"
+        assert args.handoffs_cmd == "index"
+        assert args.max_archive_records == 10
+        assert args.dry_run is True
+
     def test_config_option(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["--config", "custom.toml", "discover"])
@@ -487,6 +504,31 @@ class TestMainBaselineSubcommands:
             encoding="utf-8",
         )
         assert main(["baseline", "handoffs", "audit", "--dry-run"]) == 0
+
+    def test_handoffs_index(self) -> None:
+        archive_dir = self.repo_root / "archive"
+        markdown_dir = archive_dir / "codex"
+        markdown_dir.mkdir(parents=True, exist_ok=True)
+        (markdown_dir / "session.md").write_text(
+            "# Session Handoff\n\n## You Are Here\n\nHere.\n\n## Next Steps / Open Threads\n\nNext.\n",
+            encoding="utf-8",
+        )
+        (archive_dir / "index.jsonl").write_text(
+            json.dumps(
+                {
+                    "source": "codex",
+                    "kind": "codex",
+                    "source_file": "/fake/session.jsonl",
+                    "sha256": "abc",
+                    "messages": 3,
+                    "markdown": "archive/codex/session.md",
+                    "metadata": {"session_id": "s1", "project": "Project"},
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        assert main(["baseline", "handoffs", "index", "--dry-run"]) == 0
 
     def test_ingest(self) -> None:
         proposal = self.repo_root / "baseline" / "proposals" / "guardrail.test.json"

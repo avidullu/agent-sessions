@@ -183,7 +183,20 @@ def lint_stale_blocks(
         match = GENERATED_AT_RE.search(block.content)
         if not match:
             continue
-        generated_on = dt.date.fromisoformat(match.group(1))
+        date_text = match.group(1)
+        try:
+            generated_on = dt.date.fromisoformat(date_text)
+        except ValueError:
+            findings.append(
+                LintFinding(
+                    "W3-generated-date",
+                    "warning",
+                    rel_path,
+                    f"Generated block `{block.block_id}` has an invalid generated date `{date_text}`.",
+                    block.start_line,
+                )
+            )
+            continue
         age_days = (today - generated_on).days
         if age_days > stale_days:
             findings.append(
@@ -237,11 +250,8 @@ def lint_orphan_project_pages(root: Path, repo_root: Path) -> list[LintFinding]:
     for page in project_pages:
         text = page.read_text(encoding="utf-8", errors="replace")
         has_generated_blocks = bool(generated_blocks(text))
-        if page not in inbound:
-            detail = "Project page has no inbound baseline links"
-            if not has_generated_blocks:
-                detail += " and no generated blocks yet"
-            detail += "."
+        if page not in inbound and not has_generated_blocks:
+            detail = "Project page has no inbound baseline links and no generated blocks yet."
             findings.append(LintFinding("W2-orphan", "warning", repo_relative(page, repo_root), detail))
     return findings
 
