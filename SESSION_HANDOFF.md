@@ -35,27 +35,31 @@ Today landed a long run of small PRs:
   valueless redaction report; egress remains gitignored.
 - #55 K10: `baseline replay bundle` writes gitignored redacted packets
   (task + deliverable + rubric + report) only for sessions that pass the K9 gate.
+- #56 K11: `baseline replay ingest` validates external replay results into
+  `replay.*` proposals (K5-gated) + an append-only `baseline/replay/ledger.jsonl`.
+- #57 K12: efficacy gates (W1/W2, H1/H2, R1-R5, `G-no-autopromote`) wired into
+  `baseline eval` with a `gated` status; real-repo run 14 pass / 0 fail / 2 gated.
 
-PR #56 is open for K11:
+## Status: knowledge + replay tracker COMPLETE (K0-K12)
 
-- Branch: `claude/replay-ingest`
-- `baseline replay ingest --result <path>` validates an external replay result
-  (its `replay_of`/trace references must resolve against `archive/index.jsonl`),
-  appends every result to the append-only `baseline/replay/ledger.jsonl`, and —
-  for `recommended_action == "proposal"` — emits a `replay.*` proposal that
-  passes the K5 `validate_proposal` gate and flows through `baseline ingest`.
-  Unresolvable results are rejected (non-zero) and recorded in the ledger.
-- No dogfood artifacts committed: a fabricated replay result would inject a
-  synthetic candidate into the real baseline, so only tests exercise it.
+`docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md` is `DONE` — every K row landed via PRs
+#45-#57. The knowledge layer (SCHEMA, marker upserts, lint), handoff mining
+(audit -> index -> project feeds -> proposals), and the replay loop
+(select -> redact -> bundle -> ingest) are all implemented, deterministic, and
+human-gated. `baseline eval` now reports the E + W/H/R gate battery.
+
+The only pending signal is empirical, not code: `R3-signal`/`R4-value` stay
+`gated` until a real out-of-band replay result is ingested — replay execution is
+out-of-band by design (D4). The first real replay run will flip those.
 
 ## Next Steps / Open Threads
 
-1. K12 is the last slice: wire the W/H/R efficacy gates into `baseline eval`
-   (schema-lint clean, handoff precision/freshness, replay R1-R5, no
-   auto-promotion) and flip the remaining tracker rows to `Done`, then mark the
-   project `DONE`/archived.
-2. Merge gate for every slice: `git diff --check`, `ruff`, `mypy`, full pytest
-   with coverage, plus `baseline lint --dry-run` when generated artifacts change.
+- Optional: archive the tracker doc per its lifecycle once satisfied; run a real
+  replay (hand a `baseline replay bundle` packet to a cross-lineage agent, then
+  `baseline replay ingest` the result) to exercise R3/R4 with live data.
+- Optional follow-ups noted in PR self-audits: replay-select slug reuse of K6's
+  richer derivation; `baseline replay bundle` clearing a stale `<id>/` on rerun;
+  entropy-based redaction beyond the v0 denylist.
 
 Known open boundaries:
 

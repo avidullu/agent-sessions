@@ -103,6 +103,11 @@ baseline/
   judge recommends it — emits a `replay.*` proposal that flows through the same
   human-gated `baseline ingest` -> candidate -> promote pipeline. Nothing is
   auto-promoted.
+- Efficacy gates: `baseline eval` reports E1-E6 plus the K12 W/H/R gates
+  (schema/marker/link, handoff precision/freshness, replay R1-R5) and a
+  `G-no-autopromote` governance gate. Gates whose prerequisites do not exist yet
+  (e.g. no external replay result ingested) report `gated` rather than passing or
+  failing.
 
 ## Guardrails
 

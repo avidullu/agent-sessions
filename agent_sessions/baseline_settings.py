@@ -293,6 +293,7 @@ Required validator behavior:
 
 ## 9. Changelog
 
+- 2026-07-07: Added K12 efficacy gates (W1/W2 schema+link, H1/H2 handoff, R1-R5 replay, `G-no-autopromote`) to `baseline eval`, with a `gated` status for prerequisite-pending gates. Completes the knowledge/replay tracker (K0-K12).
 - 2026-07-07: Added K11 `baseline replay ingest`: validates external replay results, emits `replay.*` proposals that clear the K5 gate, and appends the append-only `baseline/replay/ledger.jsonl`.
 - 2026-07-07: Added K10 `baseline replay bundle`: gitignored replay packets (redacted task + deliverable + rubric + per-bundle redaction report) written only for sessions that pass the fail-closed redaction gate.
 - 2026-07-07: Added K9 replay redaction v0: deterministic fail-closed secret scanner and `redaction-report.json` (values never recorded); gitignored replay egress.

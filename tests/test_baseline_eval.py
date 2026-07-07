@@ -18,6 +18,7 @@ from agent_sessions.baseline_eval import (
     evaluate_e4_promote,
     evaluate_e5_publish,
     evaluate_e6_calibrate,
+    evaluate_extended_gates,
     render_eval_report,
 )
 from agent_sessions.config import ArchiveConfig
@@ -87,11 +88,15 @@ class TestBaselineEval:
             encoding="utf-8",
         )
         checks = evaluate_all(_config(repo_root))
-        assert len(checks) == 6
+        assert len(checks) == 16  # 6 E-gates + 10 W/H/R/governance gates (K12)
         by_id = {check.metric_id: check.status for check in checks}
         assert by_id["E1.detect.tracked-project-template"] == "pass"
         assert by_id["E2.anchor.template-source"] == "pass"
         assert by_id["E3.dogfood.tracked-project-doc"] == "pass"
+        # K12 gates present; replay gates are `gated` with no replay data in a minimal repo.
+        assert by_id["R1-select"] == "gated"
+        assert by_id["R3-signal"] == "gated"
+        assert by_id["G-no-autopromote"] == "pass"
 
     def test_e5_ignores_evidence_headings(self, repo_root: Path) -> None:
         claude = repo_root / "baseline" / "agents" / "claude" / "CLAUDE.generated.md"
@@ -272,10 +277,60 @@ class TestBaselineEval:
 
     def test_render_eval_report(self) -> None:
         report = render_eval_report(
-            [EfficacyCheck("E1", "detect", "pass", "ok"), EfficacyCheck("E2", "anchor", "fail", "missing")]
+            [
+                EfficacyCheck("E1", "detect", "pass", "ok"),
+                EfficacyCheck("E2", "anchor", "fail", "missing"),
+                EfficacyCheck("R3", "replay", "gated", "pending"),
+            ]
         )
         assert "E1" in report
         assert "Failed: `1`" in report
+        assert "Gated (prerequisite pending): `1`" in report
+
+
+class TestExtendedGates:
+    def _config(self, repo_root: Path) -> ArchiveConfig:
+        return _config(repo_root)
+
+    def test_r5_safety_passes_with_gitignore_and_scanner(self, repo_root: Path) -> None:
+        (repo_root / ".gitignore").write_text("baseline/replay/bundles/\n", encoding="utf-8")
+        by_id = {c.metric_id: c for c in evaluate_extended_gates(self._config(repo_root))}
+        assert by_id["R5-safety"].status == "pass"
+
+    def test_r5_safety_fails_without_gitignore(self, repo_root: Path) -> None:
+        by_id = {c.metric_id: c for c in evaluate_extended_gates(self._config(repo_root))}
+        assert by_id["R5-safety"].status == "fail"
+
+    def test_replay_gates_pass_with_data(self, repo_root: Path) -> None:
+        replay = repo_root / "baseline" / "replay"
+        replay.mkdir(parents=True, exist_ok=True)
+        (replay / "manifest.jsonl").write_text(
+            json.dumps({"id": "replay.aaa", "selected": True}) + "\n", encoding="utf-8"
+        )
+        (replay / "ledger.jsonl").write_text(
+            json.dumps({"id": "r1", "proposal_id": "replay.aaa", "resolved": True}) + "\n", encoding="utf-8"
+        )
+        by_id = {c.metric_id: c for c in evaluate_extended_gates(self._config(repo_root))}
+        assert by_id["R1-select"].status == "pass"
+        assert by_id["R2-dedup"].status == "pass"
+        assert by_id["R3-signal"].status == "pass"
+
+    def test_r2_dedup_fails_on_duplicate_ids(self, repo_root: Path) -> None:
+        replay = repo_root / "baseline" / "replay"
+        replay.mkdir(parents=True, exist_ok=True)
+        (replay / "manifest.jsonl").write_text(
+            json.dumps({"id": "dup", "selected": True}) + "\n" + json.dumps({"id": "dup", "selected": False}) + "\n",
+            encoding="utf-8",
+        )
+        by_id = {c.metric_id: c for c in evaluate_extended_gates(self._config(repo_root))}
+        assert by_id["R2-dedup"].status == "fail"
+
+    def test_no_autopromote_gate_fails_on_offending_proposal(self, repo_root: Path) -> None:
+        proposals = repo_root / "baseline" / "proposals"
+        proposals.mkdir(parents=True, exist_ok=True)
+        (proposals / "bad.json").write_text(json.dumps({"approval_mode": "auto-promote"}), encoding="utf-8")
+        by_id = {c.metric_id: c for c in evaluate_extended_gates(self._config(repo_root))}
+        assert by_id["G-no-autopromote"].status == "fail"
 
     def test_baseline_eval_dry_run_and_failure_exit(self, repo_root: Path, capsys: pytest.CaptureFixture[str]) -> None:
         _write_sidecar(repo_root)

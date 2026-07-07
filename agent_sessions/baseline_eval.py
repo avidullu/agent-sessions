@@ -15,6 +15,7 @@ from .baseline_promote import PROMOTED_PLACEHOLDER, parse_promoted_blocks
 from .baseline_settings import load_baseline_settings, load_feedback
 from .baseline_types import parse_verdict
 from .config import ArchiveConfig, read_toml
+from .utils import read_jsonl_dicts
 
 # Thresholds for E5 (published agent slice must carry real promoted content).
 MIN_PUBLISHED_LINES = 20
@@ -217,18 +218,157 @@ EVALUATORS = (
 )
 
 
+def evaluate_extended_gates(config: ArchiveConfig) -> list[EfficacyCheck]:
+    """K12: wiki-lint (W), handoff (H), replay (R) and governance gates.
+
+    Uses a third status, ``gated``, for gates whose prerequisites don't exist yet
+    (e.g. no external replay result has been ingested), so they are reported
+    honestly rather than counted as failures or falsely passed."""
+    from .baseline_lint import lint_baseline
+    from .baseline_redaction import SCANNER_VERSION
+
+    repo = config.repo_root
+    checks: list[EfficacyCheck] = []
+
+    findings = lint_baseline(config)
+    schema_errors = [f for f in findings if f.severity == "error" and f.rule_id in ("W1-schema", "W1-marker")]
+    link_errors = [f for f in findings if f.severity == "error" and f.rule_id == "W2-links"]
+    checks.append(
+        EfficacyCheck(
+            "W1-schema",
+            "wiki-lint",
+            "pass" if not schema_errors else "fail",
+            "No schema/marker errors." if not schema_errors else f"{len(schema_errors)} schema/marker error(s).",
+        )
+    )
+    checks.append(
+        EfficacyCheck(
+            "W2-links",
+            "wiki-lint",
+            "pass" if not link_errors else "fail",
+            "No broken generated links." if not link_errors else f"{len(link_errors)} broken generated link(s).",
+        )
+    )
+
+    handoff_index = read_jsonl_dicts(repo / "baseline" / "handoffs" / "index.jsonl", label="handoff-index") if (
+        repo / "baseline" / "handoffs" / "index.jsonl"
+    ).exists() else []
+    checks.append(
+        EfficacyCheck(
+            "H1-handoff-precision",
+            "handoff",
+            "pass" if handoff_index else "gated",
+            f"{len(handoff_index)} handoff record(s) indexed." if handoff_index else "No handoff index yet.",
+        )
+    )
+    audit = repo / "baseline" / "handoffs" / "audit.md"
+    audit_ok = audit.exists() and "Stale threshold" in _read_text(audit)
+    checks.append(
+        EfficacyCheck(
+            "H2-handoff-freshness",
+            "handoff",
+            "pass" if audit_ok else "gated",
+            "Handoff audit reports freshness." if audit_ok else "No handoff audit yet.",
+        )
+    )
+
+    manifest = repo / "baseline" / "replay" / "manifest.jsonl"
+    manifest_records = read_jsonl_dicts(manifest, label="replay-manifest") if manifest.exists() else []
+    selected = [r for r in manifest_records if r.get("selected") is True]
+    checks.append(
+        EfficacyCheck(
+            "R1-select",
+            "replay",
+            "pass" if selected else "gated",
+            f"{len(selected)} selected replay candidate(s)." if selected else "No replay manifest yet.",
+        )
+    )
+    ids = [r.get("id") for r in manifest_records]
+    if not manifest_records:
+        checks.append(EfficacyCheck("R2-dedup", "replay", "gated", "No manifest to check for dedup."))
+    elif len(ids) == len(set(ids)):
+        checks.append(EfficacyCheck("R2-dedup", "replay", "pass", "Manifest ids unique (deterministic dedup holds)."))
+    else:
+        checks.append(EfficacyCheck("R2-dedup", "replay", "fail", "Duplicate ids in replay manifest."))
+
+    ledger = repo / "baseline" / "replay" / "ledger.jsonl"
+    ledger_records = read_jsonl_dicts(ledger, label="replay-ledger") if ledger.exists() else []
+    has_proposal = any(r.get("proposal_id") for r in ledger_records)
+    checks.append(
+        EfficacyCheck(
+            "R3-signal",
+            "replay",
+            "pass" if has_proposal else "gated",
+            "At least one replay-derived proposal recorded."
+            if has_proposal
+            else "No replay-derived proposal yet (needs an external replay result).",
+        )
+    )
+    checks.append(
+        EfficacyCheck(
+            "R4-value",
+            "replay",
+            "gated",
+            "Replay acceptance not yet measurable against non-replay candidates.",
+        )
+    )
+    gitignore = _read_text(repo / ".gitignore")
+    r5_ok = "baseline/replay/bundles/" in gitignore and bool(SCANNER_VERSION)
+    checks.append(
+        EfficacyCheck(
+            "R5-safety",
+            "replay",
+            "pass" if r5_ok else "fail",
+            f"Bundles gitignored; redaction scanner `{SCANNER_VERSION}`."
+            if r5_ok
+            else "Bundle gitignore or redaction scanner missing.",
+        )
+    )
+
+    auto_promote = _proposals_requesting_auto_promote(repo / "baseline" / "proposals")
+    checks.append(
+        EfficacyCheck(
+            "G-no-autopromote",
+            "governance",
+            "pass" if not auto_promote else "fail",
+            "No proposal requests auto-promote." if not auto_promote else f"Auto-promote requested by: {auto_promote}.",
+        )
+    )
+    return checks
+
+
+def _proposals_requesting_auto_promote(proposals_dir: Path) -> list[str]:
+    offenders: list[str] = []
+    if not proposals_dir.exists():
+        return offenders
+    for path in sorted(proposals_dir.glob("*.json")):
+        if path.name == "proposal.schema.json":
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and str(data.get("approval_mode", "")).lower() == "auto-promote":
+            offenders.append(path.name)
+    return offenders
+
+
 def evaluate_all(config: ArchiveConfig) -> list[EfficacyCheck]:
-    return [evaluator(config) for evaluator in EVALUATORS]
+    checks = [evaluator(config) for evaluator in EVALUATORS]
+    checks.extend(evaluate_extended_gates(config))
+    return checks
 
 
 def render_eval_report(checks: list[EfficacyCheck]) -> str:
     passed = sum(1 for check in checks if check.status == "pass")
     failed = sum(1 for check in checks if check.status == "fail")
+    gated = sum(1 for check in checks if check.status == "gated")
     lines = [
         "# Baseline Efficacy Evaluation",
         "",
         f"- Passed: `{passed}`",
         f"- Failed: `{failed}`",
+        f"- Gated (prerequisite pending): `{gated}`",
         f"- Total: `{len(checks)}`",
         "",
         "| Metric | Phase | Status | Detail |",
@@ -244,7 +384,7 @@ def baseline_eval(config: ArchiveConfig, output: Path | None = None, dry_run: bo
     report = render_eval_report(checks)
     if dry_run:
         print(report)
-        return 0 if all(check.status == "pass" for check in checks) else 1
+        return 0 if not any(check.status == "fail" for check in checks) else 1
     target = output or config.repo_root / "baseline" / "calibration" / "efficacy-report.md"
     if not target.is_absolute():
         target = config.repo_root / target
