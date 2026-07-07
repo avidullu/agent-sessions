@@ -21,10 +21,13 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   #25, and #26 as one sequence: schema/compiled wiki first, handoff mining as the
   first producer, replay selection/bundling/ingest after provenance and redaction
   contracts. Draft PR #45 is open with review feedback addressed on-branch:
-  K3 maps to loop-closure P6, K8 depends on P10/P11 redaction/dedup, and K2
-  reuses the shipped marker/upsert machinery from TD4 #31. Related issue #19 is
-  folded in as lightweight provenance substrate; #32 remains separate
-  backfill/regenerate work.
+  redaction is now a first-class replay egress gate, replay/handoff ingest must
+  validate trace refs against `archive/index.jsonl`, K2 read-only handoff audit
+  can land before schema-gated writes, K8/K11 map to loop-closure P5, K4 maps to
+  P6, K9/K10 cover replay redaction and bundle egress, and K3 reuses the shipped
+  marker/upsert machinery from TD4 #31. Related issue #19 is folded in as
+  lightweight provenance substrate; #32 remains separate backfill/regenerate
+  work.
 - **Completed tracked project:** `docs/FIRST_USER_SETUP_TRACKER.md` (#42 + #18
   setup UX). MVP completed by PRs #43 and #44; optional future work is the P7
   `doctor`/`setup` command. Issue #32 remains separate backfill/regenerate work

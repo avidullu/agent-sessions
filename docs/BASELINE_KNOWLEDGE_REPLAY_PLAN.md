@@ -10,12 +10,12 @@
 
 ## 0. TL;DR
 
-Build the compounding knowledge layer first, then handoff mining, then replay.
-The shared substrate is a deterministic, human-gated `baseline/SCHEMA.md` plus
-compiled project pages with marker-owned blocks and lint gates. Handoff mining is
-the lowest-risk first producer because handoffs are already distilled session
-memory; replay comes after schema, provenance, redaction, and bundle contracts are
-in place.
+Build the compounding knowledge layer, read-only handoff audit, and replay
+pipeline as one safety-first program. The shared substrate is a deterministic,
+human-gated `baseline/SCHEMA.md`, #19-aligned trace fields, marker-owned project
+pages, and lint gates. Read-only handoff coverage can ship early; any generated
+knowledge writes or replay egress wait for schema, provenance, ingest-integrity,
+and redaction contracts.
 
 ## 1. Problem & goal
 
@@ -40,15 +40,17 @@ without giving an LLM silent write access to policy.
 
 | # | Decision | Source / date | Implication |
 |---|---|---|---|
-| D1 | Do `baseline/SCHEMA.md` before mining or replay. | #26 + research, 2026-07-07 | Every derived artifact gets ownership, provenance, and lint rules before new producers write into it. |
+| D1 | Do `baseline/SCHEMA.md` before generated knowledge writes or replay egress. | #26 + research, 2026-07-07 | Derived pages, proposals, replay bundles, and ingested replay results get ownership, provenance, and lint rules before they write. A read-only handoff coverage audit may ship earlier. |
 | D2 | Keep raw sources immutable and derived pages deterministic. | LLM-wiki prior art `[researched]` | Use marker-block upserts and generated sections; do not let an LLM freely rewrite project pages. |
 | D3 | Ship handoff mining before replay. | #23/#25 scope comparison `[design]` | Handoffs are already summary artifacts, so they validate schema/provenance with less execution risk. |
 | D4 | Replay execution is out-of-band in v1. | #25 + eval tooling research `[researched]` | This repo selects and bundles sessions; another agent/panel runs the replay and submits structured output. |
 | D5 | Exclude coding sessions from replay v1. | #25 non-goal `[verified]` | No workspace snapshots means code replay would be misleading until commit/worktree provenance exists. |
-| D6 | Add lightweight provenance now; integrate deeper #19 traces later. | #19 dependency `[design]` | Record source entity, activity, agent, derivation, and bundle ids without blocking on a full trace system. |
+| D6 | Align lightweight provenance to #19 trace fields now. | #19 dependency `[design]` | Use `source`, `source_file`, `markdown_path`, `session_id`, `timestamp`, `project_slug`, `repo`, and evidence anchors so v1 is a subset of the eventual trace model. |
 | D7 | Do not build search or embeddings for v1. | `docs/COMPOSE_STACK.md` + #23/#26 non-goals `[verified]` | Use deterministic indexes, JSONL manifests, and markdown pages; search/live memory stays external. |
 | D8 | Reuse the shipped marker grammar and content-preserving upsert. | `baseline_promote.py`, TD4 #31 `[verified]` | Do not introduce a second `baseline:knowledge:*` marker family; extend helpers around `baseline:begin/end`. |
 | D9 | Keep existing tracker rows as shared capability owners. | `docs/BASELINE_LOOP_CLOSURE.md` §7 `[verified]` | K rows implement #23/#25/#26 slices, but P5/P6/P10/P11 remain the umbrella rows for shared loop capabilities. |
+| D10 | Treat replay bundle redaction as a first-class safety deliverable. | PR #45 review, 2026-07-07 | K10 cannot create egress bundles until deterministic secret scanning, bundle gitignore coverage, and a redaction report exist. |
+| D11 | External proposals need provenance-integrity checks before becoming candidates. | `baseline_ingest.py`, PR #45 review `[verified]` | Replay/handoff proposal ingest must verify `replay_of` and evidence trace references against `archive/index.jsonl`, not rely only on human promote review. |
 
 ## 3. Foundation - research and prior art
 
@@ -61,7 +63,7 @@ without giving an LLM silent write access to policy.
 | AgentRR `[researched]` | Recording and summarizing agent trajectories supports replay for similar tasks. | `baseline replay select` should emit deterministic manifests and bundles tied to session identity. |
 | AgentHER `[researched]` | Failed trajectories can be relabeled into useful training data when classification and confidence gates are explicit. | Replay ingest needs rubrics, confidence, judge identity, and human gates; no blind promotion. |
 | Helicone replay / LangSmith trajectory evals / OpenAI agent evals `[researched]` | Production replay/eval systems rely on traces, graders, and full interaction context. | Because this repo has archived transcripts but not always full tool traces, v1 replay stays conservative. |
-| W3C PROV-DM `[researched]` | Provenance models connect entities, activities, agents, derivations, and bundles. | Use a small provenance envelope for handoff records, replay manifests, and proposal sidecars. |
+| W3C PROV-DM `[researched]` | Provenance models connect entities, activities, agents, derivations, and bundles. | Use the concept of derivation, but keep field names aligned to issue #19's concrete breadcrumb vocabulary. |
 
 ## 4. Architecture
 
@@ -78,7 +80,8 @@ flowchart LR
 
   Archive --> ReplaySelect["baseline replay select"]
   ReplaySelect --> Manifest["baseline/replay/manifest.jsonl"]
-  Manifest --> Bundle["baseline/replay/bundles/*"]
+  Manifest --> Redact["redaction preflight + report"]
+  Redact --> Bundle["baseline/replay/bundles/*"]
   Bundle --> Replayer["external agent / panel"]
   Replayer --> ReplayIngest["baseline replay ingest"]
   ReplayIngest --> Proposals
@@ -86,7 +89,8 @@ flowchart LR
   Candidates --> Calibrate["baseline calibrate"]
   Calibrate --> Promote["baseline promote"]
   Promote --> Published["baseline/global/ + agent slices"]
-  Lint -.-> Promote
+  Lint -.-> Pages
+  Lint -.-> Proposals
 ```
 
 ### 4.1 Relation to existing tracker rows and code
@@ -96,10 +100,10 @@ fork shared baseline-loop work already tracked in `docs/BASELINE_LOOP_CLOSURE.md
 
 | This plan | Existing owner | Reconciliation |
 |---|---|---|
-| K2 project-page upserts | TD4 content-preserving promote, shipped in #31 | Reuse or generalize `upsert_promoted_content()` and `parse_promoted_blocks()` instead of writing a second marker-block system. |
-| K3 `baseline lint` | P6 contradiction detection | K3 is the #26 implementation slice for P6 plus link/staleness/orphan checks; close or cross-link P6 when K3 lands. |
-| K7/K9 replay select/ingest | P5 cross-agent project correlation | Replay provenance should feed P5 once correlation exists; K7 can start without P5, but K9 must preserve agent/lineage fields for it. |
-| K8 replay bundles | P10/P11 watchlist + tombstone/redaction design | K8 depends on the P11 redaction/fingerprint substrate, or must explicitly split out a small redaction prerequisite before bundling. |
+| K3 project-page upserts | TD4 content-preserving promote, shipped in #31 | Reuse or generalize `upsert_promoted_content()` and `parse_promoted_blocks()` instead of writing a second marker-block system. |
+| K4 `baseline lint` | P6 contradiction detection | K4 is the #26 implementation slice for P6 plus link/staleness/orphan checks; close or cross-link P6 when K4 lands. |
+| K8/K11 replay select/ingest | P5 cross-agent project correlation | Replay provenance should feed P5 once correlation exists; K8 can start without P5, but K11 must preserve agent/lineage fields for it. |
+| K9/K10 replay redaction and bundles | P10/P11 watchlist + tombstone/redaction design | K10 is hard-blocked on K9's deterministic redaction preflight. K9 may reuse P10/P11 helpers when they exist, but this tracker owns the replay-bundle egress gate. |
 
 ### 4.2 Knowledge layer (#26)
 
@@ -108,8 +112,10 @@ Add `baseline/SCHEMA.md` as the contract for derived knowledge:
 - Page types: global guardrail, project page, handoff index, replay manifest,
   proposal, candidate, calibration report.
 - Ownership: human-owned prose, generated marker blocks, append-only ledgers.
-- Provenance envelope: `source_entity`, `source_activity`, `source_agent`,
-  `derived_from`, `evidence_ids`, `bundle_id`, `created_at`.
+- Trace/provenance fields aligned to #19: `source`, `source_file`,
+  `markdown_path`, `session_id`, `timestamp`, `project_slug`, `repo`,
+  `evidence_anchor`, `evidence_excerpt`, `transform`, `bundle_id`, and
+  optional `calibration_effect`.
 - Link rules: every generated block links to source evidence or a proposal id.
 - Lint rules: schema conformance, broken links, orphan pages, stale generated
   blocks, duplicate claims, and contradiction candidates.
@@ -140,10 +146,15 @@ Handoff mining should be deterministic and auditable:
 - Normalize records into `baseline/handoffs/index.jsonl`.
 - Render `baseline handoffs audit` as markdown for human review.
 - Feed stable patterns into project pages and optional proposal JSON.
+- Extract structured fields with heading/marker scraping only. This is
+  deterministic for repo handoffs that follow the local convention (`## Next
+  Steps / Open Threads`, ramp-up kit, decisions), but arbitrary formats are
+  best-effort: non-conforming handoffs are flagged with parse warnings, not
+  silently summarized or mis-parsed.
 - Derive project slugs explicitly: `archive/index.jsonl` carries `messages`,
   `sha256`, and `markdown` at top level, but `cwd` and `project` live under
   each record's `metadata`. The current `metadata.project` value is a
-  URL-encoded absolute path, so K4/K7 need a decode-and-slug step with tests.
+  URL-encoded absolute path, so K6/K8 need a decode-and-slug step with tests.
 
 Suggested normalized handoff record:
 
@@ -153,20 +164,26 @@ Suggested normalized handoff record:
   "project_slug": "agent-sessions",
   "project_raw": "%2FC%3A%2FUsers%2Favidu%2FProjects%2FAgent%20Sessions",
   "repo": "https://github.com/avidullu/agent-sessions",
-  "agent": "codex",
-  "source_path": "SESSION_HANDOFF.md",
   "source_kind": "repo-handoff",
   "observed_at": "2026-07-07T00:00:00Z",
   "open_threads": ["baseline knowledge + replay design"],
   "key_decisions": ["schema before replay"],
   "ramp_up_links": ["docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md"],
-  "evidence_ids": ["archive:..."],
-  "provenance": {
-    "source_entity": "SESSION_HANDOFF.md",
-    "source_activity": "handoff-mining",
-    "source_agent": "codex",
-    "derived_from": ["git:b6251f3"]
-  }
+  "parse_warnings": [],
+  "trace": [
+    {
+      "source": "codex",
+      "source_file": "SESSION_HANDOFF.md",
+      "markdown_path": "SESSION_HANDOFF.md",
+      "session_id": null,
+      "timestamp": "2026-07-07T00:00:00Z",
+      "project_slug": "agent-sessions",
+      "repo": "https://github.com/avidullu/agent-sessions",
+      "evidence_anchor": "## Next Steps / Open Threads",
+      "evidence_excerpt": "schema/compiled wiki first, handoff mining as the first producer",
+      "transform": "handoff-heading-extraction"
+    }
+  ]
 }
 ```
 
@@ -180,10 +197,11 @@ Proposed CLI:
   - deterministically picks sessions with enough self-contained context,
     excludes coding sessions, and writes a manifest.
 - `baseline replay bundle --manifest <path>`
-  - creates gitignored prompt/evidence packets with redaction and rubric files.
+  - runs redaction preflight, writes a redaction report, then creates gitignored
+    prompt/evidence packets with rubric files only if the safety gate passes.
 - `baseline replay ingest --result <path>`
-  - validates an external replay result and converts improvements into structured
-    proposals or candidate records.
+  - validates an external replay result, verifies archive references, and
+    converts improvements into structured proposals or candidate records.
 
 The nested CLI shape is intentional in this design for readability. The current
 baseline CLI is flat (`suggest`, `promote`, `publish`, `ingest`, `bundle`, etc.),
@@ -200,6 +218,19 @@ Replay result minimum fields:
 - `confidence`: numeric or enum, with explanation.
 - `recommended_action`: `proposal`, `watchlist`, or `reject`.
 
+Replay ingest cannot rely on the current shallow `validate_proposal()` alone.
+For `source_kind = "replay"` or `source_kind = "handoff"`, ingest must:
+
+- verify `replay_of`, when present, resolves to an `archive/index.jsonl` record;
+- verify each structured trace `markdown_path` or `session_id` resolves to an
+  archive record, or report a rejected proposal with the missing reference;
+- thread accepted trace fields through `Prediction`, `proposal_to_prediction()`,
+  `prediction_to_dict()`, and prediction sidecars so provenance survives ingest.
+
+Existing free-text `evidence` entries can remain valid for hand-written
+proposals, but external replay/handoff producers must supply structured trace
+records before their outputs become candidates.
+
 Daily automation follows #25: it may run only deterministic queueing stages
 (`replay select` and `replay bundle`) after R1-select, R2-dedup, and R5-safety
 pass on fixtures/sampled bundles. Replay execution, judging, ingest review, and
@@ -212,8 +243,35 @@ Replay gate names keep issue #25's vocabulary:
 | R1-select | Reviewed selected sessions are genuinely replayable. |
 | R2-dedup | Re-running select/bundle with no new sessions produces zero new manifest entries. |
 | R3-signal | At least one replay-derived proposal validates end to end. |
-| R4-value | Acceptance rate of `replay.*` candidates is measured beside other candidates. |
+| R4-value | Acceptance rate of `replay.*` candidates is measured against keyword-derived and handoff-derived candidates in the ledger. Pause replay expansion if the first 20 reviewed replay candidates produce zero accepts, or if replay acceptance is less than half the baseline candidate acceptance rate. |
 | R5-safety | Bundles are redacted, gitignored, and contain no sampled secrets. |
+
+### 4.5 Redaction and egress safety
+
+Replay bundles are the only planned artifact that can carry full archived task
+prompts and original deliverables to an external replayer or judge. That makes
+redaction a first-class deliverable, not an implementation detail inside K10.
+
+V0 redaction is deterministic and fail-closed:
+
+- Scan task prompts, original deliverables, selected excerpts, filenames, and
+  bundle metadata before writing any external packet.
+- Detect common high-confidence secret forms: GitHub tokens (`ghp_`, `gho_`,
+  `github_pat_`), OpenAI-style `sk-` keys, AWS access keys, private-key blocks,
+  Slack `xox*` tokens, connection strings with passwords, and environment
+  assignments for names containing `TOKEN`, `SECRET`, `PASSWORD`, `API_KEY`, or
+  `PRIVATE_KEY`.
+- Replace lower-risk private paths/emails with stable placeholders when doing so
+  does not destroy task meaning; block the bundle when a high-confidence secret
+  appears.
+- Write a `redaction-report.json` beside the gitignored bundle with counts,
+  placeholder ids, blocked reasons, source refs, and scanner version.
+- Add gitignore coverage for replay bundles before any bundle-writing command
+  exists.
+
+K10 is blocked until this preflight has fixture coverage and R5-safety is
+passing. If P10/P11 redaction helpers land first, K9 reuses them; otherwise this
+tracker ships the minimal deterministic scanner as the replay egress gate.
 
 ## 5. Artifacts and contracts
 
@@ -224,9 +282,10 @@ Replay gate names keep issue #25's vocabulary:
 | `baseline/handoffs/index.jsonl` | `baseline handoffs audit` | project page updater, proposal generator | Deterministic, append/upsert by source id. |
 | `baseline/handoffs/audit.md` | `baseline handoffs audit` | human reviewer | Human-readable gaps and confidence. |
 | `baseline/replay/manifest.jsonl` | `baseline replay select` | bundle command | Tracked only if it contains session refs/exclusion reasons and no excerpts. |
-| `baseline/replay/bundles/*` | `baseline replay bundle` | external replayer/panel | K8 must add gitignore coverage; bundles may contain session excerpts. |
+| `baseline/replay/bundles/*` | `baseline replay bundle` | external replayer/panel | Gitignored; bundles may contain session excerpts. |
+| `baseline/replay/bundles/*/redaction-report.json` | redaction preflight | human reviewer, R5-safety | Gitignored by default; records scanner version, replacements, and blocked reasons. |
 | `baseline/replay/ledger.jsonl` | `baseline replay ingest` | calibration/eval | Append-only replay result history. |
-| `baseline/proposals/*.json` | humans, handoff miner, replay ingest | `baseline ingest` | Extend schema or add sidecars for provenance fields. |
+| `baseline/proposals/*.json` | humans, handoff miner, replay ingest | `baseline ingest` | Replay/handoff producers include structured trace fields that ingest validates against `archive/index.jsonl`. |
 
 ## 6. Honest limits - what this does NOT do
 
@@ -243,16 +302,18 @@ Legend: `Todo`, `In progress`, `Done`, `Blocked/gated`. One small PR per row.
 | ID | Deliverable | Issue | Depends on | Gated? | Status | PR |
 |---|---|---|---|---|---|---|
 | K0 | Tracked design plan, docs index, and handoff pointer | #23/#25/#26 | - | No | Done | #45 |
-| K1 | `baseline/SCHEMA.md` with page types, existing marker grammar, provenance, and lint/validator contract | #26 | K0 | Yes | Todo | - |
-| K2 | Reuse/extend `upsert_promoted_content()` for project-page generated sections | #26 | K1, TD4 #31 | Yes | Todo | - |
-| K3 | `baseline lint` skeleton for schema, links, stale blocks, orphan pages, and P6 contradiction checks | #26 | K1,K2 | Yes | Todo | - |
-| K4 | Handoff discovery and normalized `baseline/handoffs/index.jsonl` records | #23 | K1 | No | Todo | - |
-| K5 | `baseline handoffs audit` markdown report and project-page feed | #23/#26 | K2,K4 | No | Todo | - |
-| K6 | Handoff-derived proposal generation with evidence/provenance | #23 | K4,K5 | Yes | Todo | - |
-| K7 | `baseline replay select` deterministic manifests, excluding coding sessions | #25 | K1 | No | Todo | - |
-| K8 | `baseline replay bundle` gitignored packets with P10/P11 redaction/fingerprint checks and rubric files | #25 | K7, P10/P11 | Yes | Todo | - |
-| K9 | `baseline replay ingest` validates external replay results into proposals/candidates | #25 | K6,K8 | Yes | Todo | - |
-| K10 | Efficacy gates for schema lint, handoff precision, replay R1-R5, and proposal acceptance | #23/#25/#26 | K3,K5,K9 | Yes | Todo | - |
+| K1 | `baseline/SCHEMA.md` with page types, existing marker grammar, #19-aligned trace fields, and lint/validator contract | #26/#19 | K0 | Yes | Todo | - |
+| K2 | Read-only `baseline handoffs audit` coverage/freshness report; no page/proposal writes | #23 | K0 | No | Todo | - |
+| K3 | Reuse/extend `upsert_promoted_content()` for project-page generated sections | #26 | K1, TD4 #31 | Yes | Todo | - |
+| K4 | `baseline lint` skeleton for schema, links, stale blocks, orphan pages, and P6 contradiction checks | #26 | K1,K3 | Yes | Todo | - |
+| K5 | Proposal + `Prediction` trace-field extension and ingest reference validation against `archive/index.jsonl` | #19/#23/#25 | K1 | Yes | Todo | - |
+| K6 | Handoff discovery records in `baseline/handoffs/index.jsonl` and project-page feed | #23/#26 | K2,K3,K5 | No | Todo | - |
+| K7 | Handoff-derived proposal generation with trace records | #23 | K5,K6 | Yes | Todo | - |
+| K8 | `baseline replay select` deterministic manifests, excluding coding sessions | #25 | K1 | No | Todo | - |
+| K9 | Replay redaction v0: deterministic scanner, redaction report, fixture tests, and bundle gitignore coverage | #25 | K0, P10/P11 design | Yes | Todo | - |
+| K10 | `baseline replay bundle` gitignored packets with rubric files after redaction preflight | #25 | K8,K9 | Yes | Todo | - |
+| K11 | `baseline replay ingest` validates external replay results into proposals/candidates | #25 | K5,K10 | Yes | Todo | - |
+| K12 | Efficacy gates for schema lint, handoff precision, replay R1-R5, and proposal acceptance | #23/#25/#26 | K4,K7,K11 | Yes | Todo | - |
 
 Additional gate names:
 
@@ -269,7 +330,7 @@ Additional gate names:
 
 | Issue | Fold into this plan? | Reason |
 |---|---|---|
-| #19 - provenance trace logs | Yes, as substrate | Replay and handoff evidence need trace ids, but v1 can start with a lightweight provenance envelope. |
+| #19 - provenance trace logs | Yes, as substrate | Replay and handoff evidence need trace ids; v1 trace fields should be a strict subset of #19's breadcrumb vocabulary. |
 | #23 - mine handoffs | Yes, primary | First producer for the knowledge layer. |
 | #25 - replay loop | Yes, primary | Second producer after schema, handoff mining, and redaction contracts. |
 | #26 - wiki-style knowledge layer | Yes, primary | Foundation for both handoff mining and replay output. |
@@ -282,11 +343,15 @@ Additional gate names:
 2. Should the default stale threshold be configurable per project, with 90 days
    as the v1 default?
 3. Should K1 formalize `baseline/proposals/proposal.schema.json` as real JSON
-   Schema, or keep validation in Python and treat the file as an example?
-4. Should replay provenance extend proposal objects directly, or live in a
+   Schema, or keep validation in Python and treat the file as an example while
+   K5 threads trace fields through `Prediction`, `proposal_to_prediction()`,
+   `prediction_to_dict()`, and prediction sidecars?
+4. Should structured trace fields live directly on proposal objects, or in a
    sibling sidecar only if existing proposal writers need strict compatibility?
 5. Which session classes are allowed for replay v1 besides planning, writing,
    documentation, and research?
+6. Should R5-safety allow a manual override for blocked bundles, or should v1
+   remain strictly fail-closed with no override?
 
 ## 10. Definition of done
 
@@ -294,15 +359,22 @@ Additional gate names:
       validators enforce it for new producers.
 - [ ] Project pages have deterministic generated blocks with evidence links.
 - [ ] `baseline lint` fails on broken generated links and stale/orphan blocks.
-- [ ] `baseline handoffs audit` finds repo and archive handoff artifacts and
-      writes normalized records.
+- [ ] `baseline handoffs audit` finds repo and archive handoff artifacts, reports
+      missing/stale/non-conforming handoffs, and does not require generated page
+      writes.
 - [ ] At least one handoff-derived finding reaches candidate/proposal review with
-      provenance.
+      #19-aligned trace records.
+- [ ] Handoff/replay proposal ingest rejects unresolved `replay_of`,
+      `markdown_path`, and `session_id` references before candidate creation.
+- [ ] Redaction preflight is deterministic, fail-closed for high-confidence
+      secrets, covered by fixtures, and records a redaction report for every
+      attempted bundle.
 - [ ] `baseline replay select` and `baseline replay bundle` produce reviewed,
       redacted packets for self-contained non-coding sessions.
 - [ ] `baseline replay ingest` accepts an external replay result and converts it
       into the existing proposal/candidate/calibration flow.
-- [ ] Efficacy gates prove no auto-promotion and no silent page rewrites.
+- [ ] Efficacy gates prove no auto-promotion, no silent page rewrites, and a
+      measured replay value signal versus non-replay candidates.
 
 ## 11. References
 
@@ -314,6 +386,7 @@ Additional gate names:
 
 ### Changelog
 
+- 2026-07-07 - Addressed consolidated PR #45 review by promoting replay redaction to a first-class deliverable, aligning trace fields with #19, adding ingest provenance-integrity validation, factoring shared provenance plumbing, allowing read-only handoff audit before schema writes, and defining replay value kill criteria.
 - 2026-07-07 - Addressed PR #45 review by reconciling K rows with P5/P6/P10/P11, reusing shipped marker/upsert code, restoring replay R1-R5 gate names, and clarifying schema validation.
 - 2026-07-07 - Opened draft PR #45 for the design tracker.
 - 2026-07-07 - Created design tracker, indexed it in docs, updated the handoff pointer, and proposed execution sequence for #23, #25, and #26.

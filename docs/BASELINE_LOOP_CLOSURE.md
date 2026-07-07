@@ -105,9 +105,9 @@ Reuse map:
 | P3 | Calibration loop — `suggest` reads feedback + ledger; adjusts confidence | P0 | No | ☑ | #15 |
 | P4 | `baseline ingest` — structured proposals from `baseline/proposals/` | P0 | No | ☑ | #16 |
 | P10 | Watchlist tier + `baseline backlog` — promotability backlog for non-promoted predictions | P3 | No | ☐ | [design](BASELINE_WATCHLIST_TOMBSTONES.md) |
-| P11 | Rejection tombstones + deterministic dedup/redaction — block relearned rejects and support replay bundle safety | P3 | No | ☐ | [design](BASELINE_WATCHLIST_TOMBSTONES.md), [consumer](BASELINE_KNOWLEDGE_REPLAY_PLAN.md) |
+| P11 | Rejection tombstones + deterministic dedup/redaction — block relearned rejects and support replay bundle safety (K9/K10) | P3 | No | ☐ | [design](BASELINE_WATCHLIST_TOMBSTONES.md), [consumer](BASELINE_KNOWLEDGE_REPLAY_PLAN.md) |
 | P5 | Cross-agent project correlation in `archive/index.jsonl` | P0 | No | ☐ | [consumer](BASELINE_KNOWLEDGE_REPLAY_PLAN.md) |
-| P6 | Contradiction detection vs promoted baseline; implemented by wiki-lint slice K3 | P1 | Yes | ☐ | [design](BASELINE_KNOWLEDGE_REPLAY_PLAN.md) |
+| P6 | Contradiction detection vs promoted baseline; implemented by wiki-lint slice K4 | P1 | Yes | ☐ | [design](BASELINE_KNOWLEDGE_REPLAY_PLAN.md) |
 | P7 | `baseline onboard --project <slug>` ramp-up packet | P1,P2 | No | ☐ | — |
 | P8 | Promote top 3 existing predictions (PR-only, regression gates, handoff) | P1 | Yes | ☐ | — |
 | P9 | Efficacy gate E1–E6 all `pass` in `efficacy.toml` | P1–P4,P8 | Yes | ☐ | — |
@@ -137,6 +137,6 @@ Reuse map:
 
 ### Changelog
 
-- 2026-07-07 — Cross-linked P5/P6/P11 to the knowledge/replay design tracker so shared capabilities have one owner.
+- 2026-07-07 — Cross-linked P5/P6/P11 to the knowledge/replay design tracker so shared capabilities have one owner; updated links after K-row split.
 - 2026-07-06 — Added P10/P11 design reference (`BASELINE_WATCHLIST_TOMBSTONES.md`); marked P1–P4 ☑.
 - 2026-07-05 — Created tracked project; linked template provenance and archive hit counts.

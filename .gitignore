@@ -18,3 +18,6 @@ sources.toml
 # Agent evidence bundles can contain raw excerpts from private/client code or sessions.
 baseline/evidence/*.json
 baseline/evidence/*.prompt.md
+
+# Replay bundles can contain full prompts/deliverables even after redaction review.
+baseline/replay/bundles/
