@@ -40,9 +40,7 @@ baseline/
     vscode/copilot-instructions.generated.md
   projects/
     <repo-slug>/
-      decisions.md
-      pitfalls.md
-      test-and-release.md
+      README.md
   candidates/
     YYYY-MM-DD-extraction.md
 ```
@@ -69,6 +67,10 @@ baseline/
 - Handoff mining: `baseline handoffs audit` writes a report-only coverage and
   freshness audit at `baseline/handoffs/audit.md`; persistent handoff indexes
   and project/proposal feeds are later gated work.
+- Project pages: generated sections in `baseline/projects/<slug>/README.md`
+  should use `render_project_page_block()` and
+  `upsert_project_page_content()` so the shipped `baseline:begin/end` marker
+  parser preserves hand-written prose.
 
 ## Guardrails
 

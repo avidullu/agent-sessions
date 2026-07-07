@@ -68,6 +68,9 @@ Rules:
 - IDs are stable dotted or dashed identifiers scoped to the target page.
 - Producers must preserve all content outside owned marker blocks.
 - Producers must not introduce a second marker family for knowledge pages.
+- Project-page producers should render sections with `render_project_page_block()`
+  and write them through `upsert_project_page_content()`, which reuses the same
+  marker parser/upsert path as promoted guardrails.
 - Metadata such as `generated_by`, `generated_at`, and `proposal_id` belongs in
   the block body or in structured sidecars unless the shared parser changes.
 
@@ -145,4 +148,5 @@ Required validator behavior:
 
 ## 9. Changelog
 
+- 2026-07-07: Added K3 project-page marker-block helper contract.
 - 2026-07-07: Initial schema for K1 of the baseline knowledge/replay tracker.

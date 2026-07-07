@@ -88,12 +88,12 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated.
 | T10 | `test_gemini_extractor.py` | T0 | No | ☑ | 7 tests, 100% coverage |
 | T11 | `test_grok_extractor.py` | T0 | No | ☑ | 5 tests, 100% coverage |
 | T12 | `test_archive.py` | T0 | No | ☑ | 35 tests, archive core logic covered |
-| T13 | `test_baseline.py` | T0 | No | ☑ | 71 tests, baseline scaffold/suggest/calibrate/promote/schema |
+| T13 | `test_baseline.py` | T0 | No | ☑ | 77 tests, baseline scaffold/suggest/calibrate/promote/schema/project-page upserts |
 | T14 | `test_baseline_agent.py` | T0 | No | ☑ | 19 tests, evidence bundles and schema references |
 | T15 | `test_cli.py` | T0 | No | ☑ | 45 tests, CLI parsing + dispatch |
 | T16 | `test_baseline_handoffs.py` | T0 | No | ☑ | 7 tests, report-only handoff audit |
 | T17 | `test_tool_wrapper.py` | T0 | No | ☑ | 1 test, wrapper import path |
-| T18 | Run `pytest --cov` and verify >80% overall | T1–T17 | No | ☑ | **95.91%** (424 passed) |
+| T18 | Run `pytest --cov` and verify >80% overall | T1–T17 | No | ☑ | **96.16%** (430 passed) |
 
 ## 8. Open questions
 
