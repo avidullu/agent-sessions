@@ -33,27 +33,28 @@ Today landed a long run of small PRs:
   excluding coding sessions (D5); idempotent for gate R2-dedup.
 - #54 K9: `baseline replay redact` deterministic fail-closed secret scanner and
   valueless redaction report; egress remains gitignored.
+- #55 K10: `baseline replay bundle` writes gitignored redacted packets
+  (task + deliverable + rubric + report) only for sessions that pass the K9 gate.
 
-PR #55 is open for K10 (**awaiting explicit human OK to merge — first egress writer**):
+PR #56 is open for K11:
 
-- Branch: `claude/replay-bundle`
-- `baseline replay bundle` writes one gitignored packet per selected session
-  under `baseline/replay/bundles/<id>/`: `packet.json` (redacted task prompt +
-  original deliverable + access-tier constraint block), `rubric.md`, and
-  `redaction-report.json`. Each session's task/deliverable is redacted (K9);
-  any session whose egress content trips the fail-closed scanner is skipped with
-  a report and **never written**. Bundles stay gitignored — verified `git
-  status` shows nothing under `baseline/replay/bundles/` after a real run
-  (20 written, 0 skipped on the dogfood archive).
+- Branch: `claude/replay-ingest`
+- `baseline replay ingest --result <path>` validates an external replay result
+  (its `replay_of`/trace references must resolve against `archive/index.jsonl`),
+  appends every result to the append-only `baseline/replay/ledger.jsonl`, and —
+  for `recommended_action == "proposal"` — emits a `replay.*` proposal that
+  passes the K5 `validate_proposal` gate and flows through `baseline ingest`.
+  Unresolvable results are rejected (non-zero) and recorded in the ledger.
+- No dogfood artifacts committed: a fabricated replay result would inject a
+  synthetic candidate into the real baseline, so only tests exercise it.
 
 ## Next Steps / Open Threads
 
-1. Merge K10 only after explicit human approval (first slice that writes
-   transcript excerpts to disk, gitignored).
-2. Then K11 (`baseline replay ingest`, reuses K5 trace validation, adds a
-   `replay.*` namespace, appends `baseline/replay/ledger.jsonl`), and K12
-   (efficacy gates W/H/R wired into `baseline eval`; flip tracker rows to Done).
-3. Merge gate for every slice: `git diff --check`, `ruff`, `mypy`, full pytest
+1. K12 is the last slice: wire the W/H/R efficacy gates into `baseline eval`
+   (schema-lint clean, handoff precision/freshness, replay R1-R5, no
+   auto-promotion) and flip the remaining tracker rows to `Done`, then mark the
+   project `DONE`/archived.
+2. Merge gate for every slice: `git diff --check`, `ruff`, `mypy`, full pytest
    with coverage, plus `baseline lint --dry-run` when generated artifacts change.
 
 Known open boundaries:
