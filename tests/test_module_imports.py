@@ -25,6 +25,7 @@ BASELINE_MODULES = (
     "agent_sessions.baseline_publish",
     "agent_sessions.baseline_ingest",
     "agent_sessions.baseline_agent",
+    "agent_sessions.baseline_handoffs",
     "agent_sessions.cli",
 )
 

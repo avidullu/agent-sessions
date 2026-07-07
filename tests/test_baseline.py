@@ -379,6 +379,10 @@ class TestReadmeFunctions:
         assert "<!-- baseline:begin" in text
         assert "`markdown_path`" in text
 
+    def test_committed_baseline_schema_matches_template(self) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        assert (repo_root / "baseline" / "SCHEMA.md").read_text(encoding="utf-8") == baseline_schema()
+
     def test_candidates_readme(self) -> None:
         text = candidates_readme()
         assert "Baseline Candidates" in text

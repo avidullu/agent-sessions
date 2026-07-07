@@ -191,6 +191,26 @@ class TestBuildParser:
         assert args.access_level == "repo-read-only"
         assert args.dry_run is True
 
+    def test_baseline_handoffs_audit(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "baseline",
+                "handoffs",
+                "audit",
+                "--stale-days",
+                "30",
+                "--max-archive-records",
+                "10",
+                "--dry-run",
+            ]
+        )
+        assert args.baseline_cmd == "handoffs"
+        assert args.handoffs_cmd == "audit"
+        assert args.stale_days == 30
+        assert args.max_archive_records == 10
+        assert args.dry_run is True
+
     def test_config_option(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["--config", "custom.toml", "discover"])
@@ -449,6 +469,13 @@ class TestMainBaselineSubcommands:
             encoding="utf-8",
         )
         assert main(["baseline", "bundle", "--dry-run"]) == 0
+
+    def test_handoffs_audit(self) -> None:
+        (self.repo_root / "SESSION_HANDOFF.md").write_text(
+            "# Session Handoff\n\n## You Are Here\n\nHere.\n",
+            encoding="utf-8",
+        )
+        assert main(["baseline", "handoffs", "audit", "--dry-run"]) == 0
 
     def test_ingest(self) -> None:
         proposal = self.repo_root / "baseline" / "proposals" / "guardrail.test.json"

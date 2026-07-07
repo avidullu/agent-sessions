@@ -20,13 +20,15 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
 - **Active tracked project:** `docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md` scopes
   issues #23, #25, and #26 as one sequence: schema/compiled wiki first, handoff
   mining as the first producer, replay selection/bundling/ingest after
-  provenance and redaction contracts. PR #45 merged the tracker. PR #46 is open
-  for K1: `baseline/SCHEMA.md`, scaffold coverage, bundle packet schema
-  references, and tests/docs updates. Wait for review comments/LGTM before
-  merge. K2 next: report-only `baseline handoffs audit`, writing only
-  `baseline/handoffs/audit.md`; K6 owns persistent `baseline/handoffs/index.jsonl`
-  and project-page/proposal feeds. Related issue #19 is folded in as lightweight
-  provenance substrate; #32 remains separate backfill/regenerate work.
+  provenance and redaction contracts. PR #45 merged the tracker. PR #46 merged
+  K1: `baseline/SCHEMA.md`, scaffold coverage, bundle packet schema references,
+  and tests/docs updates. K2 is active on branch `codex/handoffs-audit` in
+  `C:\Users\avidu\Projects\Agent Sessions - handoffs-audit`: report-only
+  `baseline handoffs audit`, writing only `baseline/handoffs/audit.md`; K6 owns
+  persistent `baseline/handoffs/index.jsonl` and project-page/proposal feeds.
+  Current K2 audit report scanned 3,114 archive records and found 946 archive
+  handoff candidates. Related issue #19 is folded in as lightweight provenance
+  substrate; #32 remains separate backfill/regenerate work.
 - **Completed tracked project:** `docs/FIRST_USER_SETUP_TRACKER.md` (#42 + #18
   setup UX). MVP completed by PRs #43 and #44; optional future work is the P7
   `doctor`/`setup` command. Issue #32 remains separate backfill/regenerate work
@@ -73,6 +75,7 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
 - `docs/BASELINE_LOOP_CLOSURE.md`
 - `docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md`
 - `baseline/SCHEMA.md`
+- `baseline/handoffs/audit.md`
 - `docs/archives/TECH_DEBT_PLAN.md`
 - `docs/CALIBRATION_EFFICACY.md`
 - `docs/PROJECT_DOC_TEMPLATE.md`
@@ -104,3 +107,6 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
 - Handoff split decision (2026-07-07): K2 audit is report-only and may write
   `baseline/handoffs/audit.md`; K6 owns persistent handoff index writes and
   downstream project-page/proposal feeds.
+- K1 review follow-ups handled in K2 branch (2026-07-07): golden drift guard
+  for `baseline/SCHEMA.md` vs `baseline_schema()`, explicit absent-schema
+  branch coverage, and clarified calibration TOML artifacts in the schema table.
