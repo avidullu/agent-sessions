@@ -170,6 +170,24 @@ def test_detects_stale_generated_block(repo_root: Path) -> None:
     assert stale[0].severity == "warning"
 
 
+def test_warns_on_invalid_generated_date(repo_root: Path) -> None:
+    _write_schema(repo_root)
+    page = repo_root / "baseline" / "projects" / "demo" / "README.md"
+    page.parent.mkdir(parents=True, exist_ok=True)
+    page.write_text(
+        "# demo\n\n"
+        '<!-- baseline:begin id="knowledge.activity" -->\n'
+        "## Activity\n\n"
+        "**Generated at:** 2026-13-40\n"
+        '<!-- baseline:end id="knowledge.activity" -->\n',
+        encoding="utf-8",
+    )
+    findings = lint_baseline(_config(repo_root), today=dt.date(2026, 7, 7))
+    invalid_dates = [finding for finding in findings if finding.rule_id == "W3-generated-date"]
+    assert len(invalid_dates) == 1
+    assert invalid_dates[0].severity == "warning"
+
+
 def test_detects_orphan_project_page(repo_root: Path) -> None:
     _write_schema(repo_root)
     page = repo_root / "baseline" / "projects" / "demo" / "README.md"
@@ -179,6 +197,22 @@ def test_detects_orphan_project_page(repo_root: Path) -> None:
     orphan = [finding for finding in findings if finding.rule_id == "W2-orphan"]
     assert len(orphan) == 1
     assert orphan[0].severity == "warning"
+
+
+def test_generated_project_block_suppresses_orphan_warning(repo_root: Path) -> None:
+    _write_schema(repo_root)
+    page = repo_root / "baseline" / "projects" / "demo" / "README.md"
+    page.parent.mkdir(parents=True, exist_ok=True)
+    page.write_text(
+        "# demo\n\n"
+        '<!-- baseline:begin id="handoffs.index" -->\n'
+        "## Handoff Signals\n\n"
+        "**Generated at:** 2026-07-07\n"
+        '<!-- baseline:end id="handoffs.index" -->\n',
+        encoding="utf-8",
+    )
+    findings = lint_baseline(_config(repo_root), today=dt.date(2026, 7, 7))
+    assert not [finding for finding in findings if finding.rule_id == "W2-orphan"]
 
 
 def test_inbound_project_link_suppresses_orphan_warning(repo_root: Path) -> None:

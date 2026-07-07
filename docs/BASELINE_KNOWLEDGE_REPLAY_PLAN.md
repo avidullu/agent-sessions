@@ -310,8 +310,8 @@ Legend: `Todo`, `In progress`, `Done`, `Blocked/gated`. One small PR per row.
 | K2 | Report-only `baseline handoffs audit` coverage/freshness report; writes `baseline/handoffs/audit.md` only and no page/proposal/index writes | #23 | K0 | No | Done | #47 |
 | K3 | Reuse/extend `upsert_promoted_content()` for project-page generated sections | #26 | K1, TD4 #31 | Yes | Done | #48 |
 | K4 | `baseline lint` skeleton for schema, links, stale blocks, orphan pages, and P6 contradiction checks | #26 | K1,K3 | Yes | Done | #49 |
-| K5 | Proposal + `Prediction` trace-field extension and ingest reference validation against `archive/index.jsonl` | #19/#23/#25 | K1 | Yes | In progress | #50 |
-| K6 | `baseline handoffs index` discovery records in `baseline/handoffs/index.jsonl` and project-page feed | #23/#26 | K2,K3,K5 | No | Todo | - |
+| K5 | Proposal + `Prediction` trace-field extension and ingest reference validation against `archive/index.jsonl` | #19/#23/#25 | K1 | Yes | Done | #50 |
+| K6 | `baseline handoffs index` discovery records in `baseline/handoffs/index.jsonl` and project-page feed | #23/#26 | K2,K3,K5 | No | In progress | - |
 | K7 | Handoff-derived proposal generation with trace records | #23 | K5,K6 | Yes | Todo | - |
 | K8 | `baseline replay select` deterministic manifests, excluding coding sessions | #25 | K1 | No | Todo | - |
 | K9 | Replay redaction v0: deterministic scanner, redaction report, fixture tests, and bundle gitignore coverage | #25 | K0, P10/P11 design | Yes | Todo | - |
@@ -353,9 +353,13 @@ Additional gate names:
    sibling sidecar only if existing proposal writers need strict compatibility?
    **K5 puts `trace` directly on proposal objects and copies it into
    `Prediction.trace` / prediction sidecars.**
-5. Which session classes are allowed for replay v1 besides planning, writing,
+5. Should K6 write project pages for every discovered raw project slug?
+   **No. K6 persists all discovered handoff candidates in
+   `baseline/handoffs/index.jsonl`, but writes `handoffs.index` marker blocks
+   only to configured or already-scaffolded project pages.**
+6. Which session classes are allowed for replay v1 besides planning, writing,
    documentation, and research?
-6. Should R5-safety allow a manual override for blocked bundles, or should v1
+7. Should R5-safety allow a manual override for blocked bundles, or should v1
    remain strictly fail-closed with no override?
 
 ## 10. Definition of done
@@ -391,6 +395,7 @@ Additional gate names:
 
 ### Changelog
 
+- 2026-07-07 - Merged PR #50 for K5 and started K6 persistent handoff index/project-page feed work; K6 also folds in the small optional #49 invalid-date lint warning and #50 path-prefix normalization follow-ups.
 - 2026-07-07 - Merged PR #49 for K4 and started K5 trace reference validation.
 - 2026-07-07 - Opened PR #50 for K5 proposal trace reference validation.
 - 2026-07-07 - Opened PR #49 for K4 `baseline lint` skeleton.

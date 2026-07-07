@@ -1,6 +1,6 @@
 # Baseline Handoff Audit (2026-07-07)
 
-> K2 report-only output. This command writes only `baseline/handoffs/audit.md` by default; K6 owns `baseline/handoffs/index.jsonl`, project-page feeds, and proposal writes.
+> K2 report-only output. This command writes only `baseline/handoffs/audit.md` by default; K6 owns `baseline/handoffs/index.jsonl` and project-page feeds; K7 owns proposal writes.
 
 ## Summary
 
@@ -58,5 +58,5 @@
 ## Gaps And Follow-Ups
 
 - No repo handoff gaps detected by this report-only audit.
-- K6 will own persistent normalized records in `baseline/handoffs/index.jsonl`.
+- K6 owns persistent normalized records in `baseline/handoffs/index.jsonl`.
 - K7 will own handoff-derived proposal generation with structured trace records.

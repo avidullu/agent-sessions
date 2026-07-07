@@ -181,6 +181,17 @@ def _handle_baseline_handoffs_audit(config: ArchiveConfig, args: argparse.Namesp
     )
 
 
+def _handle_baseline_handoffs_index(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .baseline_handoffs import baseline_handoffs_index
+
+    return baseline_handoffs_index(
+        config,
+        output=args.output,
+        max_archive_records=args.max_archive_records,
+        dry_run=args.dry_run,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Export local coding-agent sessions.")
     parser.add_argument("--repo-root", type=Path, default=default_repo_root(), help="Archive repository root.")
@@ -327,6 +338,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_handoffs_audit.add_argument("--dry-run", action="store_true")
     p_handoffs_audit.set_defaults(func=_handle_baseline_handoffs_audit)
+
+    p_handoffs_index = handoffs_sub.add_parser(
+        "index",
+        help="Write persistent handoff index records and project-page feeds.",
+    )
+    p_handoffs_index.add_argument("--output", type=Path, help="Handoff JSONL index output path.")
+    p_handoffs_index.add_argument(
+        "--max-archive-records",
+        type=int,
+        default=0,
+        help="Maximum archive records to scan; 0 scans all indexed records.",
+    )
+    p_handoffs_index.add_argument("--dry-run", action="store_true")
+    p_handoffs_index.set_defaults(func=_handle_baseline_handoffs_index)
 
     return parser
 

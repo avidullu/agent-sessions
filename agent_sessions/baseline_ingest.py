@@ -36,7 +36,10 @@ class ArchiveReferences:
 
 
 def normalized_markdown_path(value: Any) -> str:
-    return str(value).replace("\\", "/").lstrip("./").strip()
+    path = str(value).replace("\\", "/").strip()
+    while path.startswith("./"):
+        path = path.removeprefix("./")
+    return path.lstrip("/")
 
 
 def archive_references(records: list[dict[str, Any]]) -> ArchiveReferences:

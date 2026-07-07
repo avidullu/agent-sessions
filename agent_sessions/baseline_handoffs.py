@@ -1,17 +1,22 @@
-"""Report-only handoff coverage audit for baseline knowledge work."""
+"""Handoff audit and persistent handoff index commands."""
 
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
+import json
 import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
+from .baseline_promote import render_project_page_block, upsert_project_page_content
 from .baseline_settings import load_baseline_settings
+from .baseline_types import BaselineSettings
 from .config import ArchiveConfig
-from .utils import archive_markdown_path, read_jsonl_dicts
+from .utils import archive_markdown_path, read_jsonl_dicts, slugify
 
 
 DEFAULT_AUDIT_PATH = Path("baseline/handoffs/audit.md")
@@ -46,6 +51,7 @@ class RepoHandoffAudit:
 @dataclass(frozen=True)
 class ArchiveHandoffHit:
     source: str
+    source_file: str | None
     markdown_path: str
     session_id: str | None
     project_raw: str | None
@@ -64,6 +70,22 @@ class HandoffAudit:
     repo_files: tuple[RepoHandoffAudit, ...]
     archive_hits: tuple[ArchiveHandoffHit, ...]
     missing_expected_paths: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class HandoffIndexRecord:
+    id: str
+    source_kind: str
+    source: str
+    source_file: str
+    markdown_path: str
+    session_id: str
+    project_raw: str
+    project_slug: str
+    sections: tuple[str, ...]
+    signals: tuple[str, ...]
+    warnings: tuple[str, ...]
+    trace: tuple[dict[str, str], ...]
 
 
 def baseline_handoffs_audit(
@@ -90,6 +112,39 @@ def baseline_handoffs_audit(
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(report, encoding="utf-8", newline="\n")
     print(f"Wrote {target}")
+    return 0
+
+
+def baseline_handoffs_index(
+    config: ArchiveConfig,
+    output: Path | None = None,
+    max_archive_records: int = 0,
+    dry_run: bool = False,
+) -> int:
+    settings = load_baseline_settings(config)
+    target = output or settings.root / "handoffs" / "index.jsonl"
+    if not target.is_absolute():
+        target = config.repo_root / target
+    current = build_handoff_index_records(config, settings, max_archive_records=max_archive_records)
+    existing = load_handoff_index(target)
+    records = merge_handoff_records(existing, current)
+    index_text = render_handoff_index_jsonl(records)
+    page_updates = project_page_updates(settings, records, generated_at=dt.date.today().isoformat())
+
+    if dry_run:
+        print(index_text, end="")
+        print(f"Would write {target}")
+        for path in page_updates:
+            print(f"Would write {path}")
+        return 0
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(index_text, encoding="utf-8", newline="\n")
+    print(f"Wrote {target}")
+    for path, content in page_updates.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8", newline="\n")
+        print(f"Wrote {path}")
     return 0
 
 
@@ -199,12 +254,245 @@ def archive_handoff_hit(record: dict[str, Any], text: str, markdown: str) -> Arc
     warnings = tuple(["no standard handoff headings"] if not sections else [])
     return ArchiveHandoffHit(
         source=str(record.get("source", "unknown")),
+        source_file=optional_str(record.get("source_file")),
         markdown_path=markdown.replace("\\", "/"),
         session_id=optional_str(metadata.get("session_id") or metadata.get("id")),
         project_raw=optional_str(metadata.get("project") or metadata.get("cwd")),
         sections=sections,
         signals=signals,
         warnings=warnings,
+    )
+
+
+def build_handoff_index_records(
+    config: ArchiveConfig,
+    settings: BaselineSettings,
+    max_archive_records: int = 0,
+) -> list[HandoffIndexRecord]:
+    audit = build_handoff_audit(config, max_archive_records=max_archive_records)
+    slug_map = project_slug_map(settings, audit.archive_hits)
+    return [handoff_index_record(hit, slug_map[hit]) for hit in audit.archive_hits]
+
+
+def handoff_index_record(hit: ArchiveHandoffHit, project_slug: str) -> HandoffIndexRecord:
+    source_file = hit.source_file or ""
+    session_id = hit.session_id or ""
+    project_raw = hit.project_raw or ""
+    record_id = stable_handoff_id(hit)
+    trace = {
+        "source": hit.source,
+        "source_file": source_file,
+        "markdown_path": hit.markdown_path,
+        "session_id": session_id,
+        "project_slug": project_slug,
+        "transform": "baseline handoffs index",
+    }
+    return HandoffIndexRecord(
+        id=record_id,
+        source_kind="repo-handoff",
+        source=hit.source,
+        source_file=source_file,
+        markdown_path=hit.markdown_path,
+        session_id=session_id,
+        project_raw=project_raw,
+        project_slug=project_slug,
+        sections=hit.sections,
+        signals=hit.signals,
+        warnings=hit.warnings,
+        trace=(strip_empty_trace(trace),),
+    )
+
+
+def strip_empty_trace(trace: dict[str, str]) -> dict[str, str]:
+    return {key: value for key, value in trace.items() if value}
+
+
+def stable_handoff_id(hit: ArchiveHandoffHit) -> str:
+    source_id = hit.session_id or hit.markdown_path
+    digest = hashlib.sha256(f"{hit.source}:{source_id}".encode("utf-8")).hexdigest()[:12]
+    return f"handoff.{digest}"
+
+
+def project_slug_map(settings: BaselineSettings, hits: tuple[ArchiveHandoffHit, ...]) -> dict[ArchiveHandoffHit, str]:
+    base: dict[ArchiveHandoffHit, str] = {hit: project_slug_for_raw(settings, hit.project_raw) for hit in hits}
+    configured_slugs = {pilot.slug for pilot in settings.pilots}
+    raw_by_slug: dict[str, set[str]] = {}
+    for hit, slug in base.items():
+        raw_by_slug.setdefault(slug, set()).add(normalize_project_raw(hit.project_raw or ""))
+    collisions = {
+        slug
+        for slug, raw_values in raw_by_slug.items()
+        if slug and slug not in configured_slugs and len(raw_values) > 1
+    }
+    if not collisions:
+        return base
+    result: dict[ArchiveHandoffHit, str] = {}
+    for hit, slug in base.items():
+        if slug not in collisions:
+            result[hit] = slug
+            continue
+        raw = normalize_project_raw(hit.project_raw or hit.markdown_path)
+        digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:8]
+        result[hit] = f"{slug}-{digest}"
+    return result
+
+
+def project_slug_for_raw(settings: BaselineSettings, raw: str | None) -> str:
+    decoded = normalize_project_raw(raw or "")
+    basename = project_basename(decoded)
+    decoded_slug = slugify(decoded)
+    basename_slug = slugify(basename)
+    candidates = {decoded_slug, basename_slug}
+    substring_matches: list[tuple[int, str]] = []
+    for pilot in settings.pilots:
+        pilot_aliases = {pilot.slug, *pilot.aliases}
+        alias_slugs = {slugify(alias) for alias in pilot_aliases}
+        if candidates & alias_slugs:
+            return pilot.slug
+        for alias in alias_slugs:
+            if alias and (alias in basename_slug or alias in decoded_slug):
+                substring_matches.append((len(alias), pilot.slug))
+    if substring_matches:
+        return max(substring_matches)[1]
+    return slugify(basename or decoded or "unknown-project")
+
+
+def normalize_project_raw(raw: str) -> str:
+    return unquote(raw).replace("\\", "/").rstrip("/")
+
+
+def project_basename(raw: str) -> str:
+    normalized = raw.rstrip("/")
+    if not normalized:
+        return ""
+    slugged = slugify(normalized)
+    if "-projects-" in slugged:
+        candidate = slugged.rsplit("-projects-", 1)[1]
+        candidate = candidate.split("-claude-worktrees-", 1)[0]
+        if candidate:
+            return candidate
+    return normalized.split("/")[-1]
+
+
+def handoff_record_to_dict(record: HandoffIndexRecord) -> dict[str, Any]:
+    return {
+        "id": record.id,
+        "source_kind": record.source_kind,
+        "source": record.source,
+        "source_file": record.source_file,
+        "markdown_path": record.markdown_path,
+        "session_id": record.session_id,
+        "project_raw": record.project_raw,
+        "project_slug": record.project_slug,
+        "sections": list(record.sections),
+        "signals": list(record.signals),
+        "warnings": list(record.warnings),
+        "trace": [dict(item) for item in record.trace],
+    }
+
+
+def handoff_record_from_dict(data: dict[str, Any]) -> HandoffIndexRecord:
+    trace = data.get("trace", [])
+    trace_items: list[dict[str, str]] = []
+    if isinstance(trace, list):
+        for item in trace:
+            if isinstance(item, dict):
+                trace_items.append({str(key): str(value) for key, value in item.items() if value not in (None, "")})
+    return HandoffIndexRecord(
+        id=str(data.get("id", "")),
+        source_kind=str(data.get("source_kind", "repo-handoff")),
+        source=str(data.get("source", "")),
+        source_file=str(data.get("source_file", "")),
+        markdown_path=str(data.get("markdown_path", "")),
+        session_id=str(data.get("session_id", "")),
+        project_raw=str(data.get("project_raw", "")),
+        project_slug=str(data.get("project_slug", "")),
+        sections=tuple(str(item) for item in data.get("sections", []) if item),
+        signals=tuple(str(item) for item in data.get("signals", []) if item),
+        warnings=tuple(str(item) for item in data.get("warnings", []) if item),
+        trace=tuple(trace_items),
+    )
+
+
+def load_handoff_index(path: Path) -> list[HandoffIndexRecord]:
+    if not path.exists():
+        return []
+    return [handoff_record_from_dict(record) for record in read_jsonl_dicts(path, label=str(path))]
+
+
+def merge_handoff_records(
+    existing: list[HandoffIndexRecord],
+    current: list[HandoffIndexRecord],
+) -> list[HandoffIndexRecord]:
+    merged = {record.id: record for record in existing if record.id}
+    for record in current:
+        merged[record.id] = record
+    return sorted(merged.values(), key=lambda record: (record.project_slug, record.markdown_path, record.id))
+
+
+def render_handoff_index_jsonl(records: list[HandoffIndexRecord]) -> str:
+    lines = [
+        json.dumps(handoff_record_to_dict(record), ensure_ascii=False, sort_keys=True)
+        for record in sorted(records, key=lambda record: (record.project_slug, record.markdown_path, record.id))
+    ]
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+def project_page_updates(
+    settings: BaselineSettings,
+    records: list[HandoffIndexRecord],
+    *,
+    generated_at: str,
+) -> dict[Path, str]:
+    by_project: dict[str, list[HandoffIndexRecord]] = {}
+    for record in records:
+        by_project.setdefault(record.project_slug, []).append(record)
+    known_projects = known_project_slugs(settings)
+    updates: dict[Path, str] = {}
+    for slug, project_records in sorted(by_project.items()):
+        if slug not in known_projects:
+            continue
+        page = settings.root / "projects" / slug / "README.md"
+        existing = page.read_text(encoding="utf-8") if page.exists() else ""
+        block = render_project_handoff_feed(slug, project_records, generated_at=generated_at)
+        updates[page] = upsert_project_page_content(existing, {"handoffs.index": block}, slug)
+    return updates
+
+
+def known_project_slugs(settings: BaselineSettings) -> set[str]:
+    configured = {pilot.slug for pilot in settings.pilots}
+    existing = {
+        path.parent.name
+        for path in (settings.root / "projects").glob("*/README.md")
+        if path.parent.name
+    }
+    return configured | existing
+
+
+def render_project_handoff_feed(
+    slug: str,
+    records: list[HandoffIndexRecord],
+    *,
+    generated_at: str,
+) -> str:
+    sorted_records = sorted(records, key=lambda record: (record.markdown_path, record.id))
+    lines = [f"Indexed handoff candidates: `{len(sorted_records)}`.", "", "### Candidates"]
+    for record in sorted_records[:10]:
+        session = f" session `{record.session_id}`" if record.session_id else ""
+        sections = display_list(record.sections)
+        lines.append(
+            f"- [{record.markdown_path}](../../../{record.markdown_path}){session}; sections: {sections}."
+        )
+    if len(sorted_records) > 10:
+        lines.append(f"- `{len(sorted_records) - 10}` more indexed handoff candidate(s).")
+    traces = [record.trace[0] for record in sorted_records[:10] if record.trace]
+    return render_project_page_block(
+        "handoffs.index",
+        "Handoff Signals",
+        "\n".join(lines),
+        generated_by="baseline handoffs index",
+        generated_at=generated_at,
+        traces=traces,
     )
 
 
@@ -253,7 +541,7 @@ def render_handoff_audit(audit: HandoffAudit) -> str:
         f"# Baseline Handoff Audit ({audit.generated_at[:10]})",
         "",
         "> K2 report-only output. This command writes only `baseline/handoffs/audit.md` by default; "
-        "K6 owns `baseline/handoffs/index.jsonl`, project-page feeds, and proposal writes.",
+        "K6 owns `baseline/handoffs/index.jsonl` and project-page feeds; K7 owns proposal writes.",
         "",
         "## Summary",
         "",
@@ -322,7 +610,7 @@ def render_gaps_section(audit: HandoffAudit) -> list[str]:
                 lines.append(f"- `{repo_file.path}`: {warning}.")
     lines.extend(
         [
-            "- K6 will own persistent normalized records in `baseline/handoffs/index.jsonl`.",
+            "- K6 owns persistent normalized records in `baseline/handoffs/index.jsonl`.",
             "- K7 will own handoff-derived proposal generation with structured trace records.",
             "",
         ]

@@ -29,7 +29,7 @@ illustrative proposal example until proposal validation is formalized in code.
 | Candidate sidecars | `baseline/candidates/*.predictions.json` | generated | Structured prediction payloads and trace data. |
 | Proposal inputs | `baseline/proposals/*.json` | human or bounded producer | Reviewable proposal drafts ingested into candidates. |
 | Handoff audit | `baseline/handoffs/audit.md` | generated report | K2 audit output only; no pages, proposals, or index writes. |
-| Handoff index | `baseline/handoffs/index.jsonl` | generated records | K6 persistent normalized handoff records. |
+| Handoff index | `baseline/handoffs/index.jsonl` | generated records | K6 persistent normalized handoff records; project-page feeds are marker blocks on configured or existing project pages only. |
 | Replay manifest | `baseline/replay/manifest.jsonl` | generated records | Deterministic selected session refs and exclusion reasons, no excerpts. |
 | Replay bundles | `baseline/replay/bundles/*` | generated egress | Gitignored packets that may contain excerpts after redaction preflight. |
 | Replay ledger | `baseline/replay/ledger.jsonl` | append-only generated records | Replay-result history after validated ingest. |
@@ -47,8 +47,9 @@ illustrative proposal example until proposal validation is formalized in code.
   preserve unrelated runs.
 - Candidate and proposal artifacts are review inputs. They do not become policy
   until promotion writes reviewed guidance.
-- Handoff audit is report-only. Persistent handoff indexing and project-page
-  feeds are separate K6 behavior.
+- Handoff audit is report-only. Persistent handoff indexing writes
+  `baseline/handoffs/index.jsonl` for all discovered records, while project-page
+  feeds update only configured or already-scaffolded project pages.
 - Replay bundle egress is blocked unless deterministic redaction passes and
   bundle paths are gitignored.
 
@@ -128,8 +129,10 @@ Slug derivation priority:
 4. A stable disambiguator when names collide.
 
 K6/K8 implementations must include fixture coverage for Windows paths with case
-differences, spaces, URL-encoded drive paths, and duplicate basenames so two
-projects do not collapse into one page or handoff record.
+differences, spaces, URL-encoded drive paths, hyphen-encoded Claude project
+paths, and duplicate basenames so two unknown projects do not collapse into one
+page or handoff record. Configured pilot aliases may intentionally collapse
+multiple raw paths into one canonical project slug.
 
 ## 7. Validation Contract
 
@@ -143,9 +146,11 @@ Required validator behavior:
 - Reject malformed marker pairs and duplicate generated block ids in a page.
 - Fail generated writes that would alter human-owned prose.
 - Fail on broken links inside generated marker blocks.
-- Warn on orphan project pages until K6 creates generated project-page feeds.
-- Warn on stale generated blocks by age; later producers should add source-record
-  freshness checks.
+- Warn on project pages that have neither inbound baseline links nor generated
+  blocks; K6 `handoffs.index` feeds satisfy the generated-block side of that
+  check.
+- Warn on stale generated blocks by age and malformed generated dates; later
+  producers should add source-record freshness checks.
 - Warn on explicit contradiction markers; deeper P6 duplicate/contradiction
   analysis can harden this rule.
 - Reject replay or handoff proposal ingest when required trace references do
@@ -162,6 +167,7 @@ Required validator behavior:
 
 ## 9. Changelog
 
+- 2026-07-07: Added K6 persistent handoff index records and configured project-page `handoffs.index` feeds.
 - 2026-07-07: Added K5 proposal trace propagation and ingest reference validation.
 - 2026-07-07: Added K4 `baseline lint` severity model and first validator scope.
 - 2026-07-07: Added K3 project-page marker-block helper contract.

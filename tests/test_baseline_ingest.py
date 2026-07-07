@@ -12,6 +12,7 @@ from agent_sessions.baseline_ingest import (
     baseline_ingest,
     discover_proposal_paths,
     load_proposals,
+    normalized_markdown_path,
     proposal_to_prediction,
     render_ingest_report,
     validate_proposal,
@@ -57,6 +58,11 @@ TRACE_PROPOSAL = {
 
 
 class TestValidateProposal:
+    def test_normalized_markdown_path_only_removes_path_prefixes(self) -> None:
+        assert normalized_markdown_path("./archive/codex/session.md") == "archive/codex/session.md"
+        assert normalized_markdown_path("/archive/codex/session.md") == "archive/codex/session.md"
+        assert normalized_markdown_path(".github/workflows/ci.yml") == ".github/workflows/ci.yml"
+
     def test_valid_proposal(self) -> None:
         assert validate_proposal(VALID_PROPOSAL) == []
 
