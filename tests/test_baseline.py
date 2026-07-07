@@ -36,6 +36,7 @@ from agent_sessions.baseline import (
     load_index_records,
     metacognition_readme,
     prediction_to_dict,
+    project_readme,
     project_evidence,
     project_signal_counts,
     render_calibration_summary,
@@ -1143,6 +1144,31 @@ class TestPromotionHelpers:
         assert "Old text." not in output
         assert list(parse_promoted_blocks(output)) == ["guardrail.one"]
 
+    def test_upsert_promoted_content_empty_file_exact_output(self) -> None:
+        from agent_sessions.baseline import render_promoted_block, upsert_promoted_content
+
+        block = render_promoted_block(
+            {"id": "guardrail.one", "title": "One", "confidence": 0.9, "text": "Rule one.", "evidence": []},
+            run_id="run",
+            feedback_note="",
+            promoted_at="2026-07-06",
+        )
+        output = upsert_promoted_content("", {"guardrail.one": block}, "engineering-guardrails.md")
+        assert output == (
+            "# Engineering Guardrails\n\n"
+            "Promoted guidance derived from reviewed baseline candidates.\n\n"
+            '<!-- baseline:begin id="guardrail.one" -->\n'
+            "## One\n\n"
+            "**ID:** `guardrail.one`\n"
+            "**Promoted:** 2026-07-06\n"
+            "**Run:** run\n"
+            "**Confidence:** 0.90\n\n"
+            "Rule one.\n\n"
+            "### Evidence\n"
+            "- No evidence recorded in prediction sidecar.\n"
+            '<!-- baseline:end id="guardrail.one" -->\n'
+        )
+
     def test_render_project_page_block_includes_trace_metadata(self) -> None:
         block = render_project_page_block(
             "knowledge.activity",
@@ -1168,10 +1194,8 @@ class TestPromotionHelpers:
 
     def test_upsert_project_page_content_preserves_human_prose(self) -> None:
         existing = (
-            "# badminton-highlight-indexer\n\n"
-            "Project-specific promoted baseline notes for `badminton-highlight-indexer` will land here.\n\n"
-            "## Human note\n\n"
-            "Keep the clip-indexing context visible for reviewers.\n"
+            project_readme("badminton-highlight-indexer")
+            + "\n## Human note\n\nKeep the clip-indexing context visible for reviewers.\n"
         )
         block = render_project_page_block(
             "knowledge.activity",
@@ -1215,6 +1239,22 @@ class TestPromotionHelpers:
         assert output.count('<!-- baseline:begin id="knowledge.activity" -->') == 1
         assert "Sessions: 3" in output
         assert "Sessions: 2" not in output
+
+    def test_upsert_project_page_content_preserves_edited_placeholder_like_text(self) -> None:
+        existing = project_readme("badminton-highlight-indexer").replace(
+            "will land here.",
+            "will land here after review.",
+        )
+        block = render_project_page_block(
+            "knowledge.activity",
+            "Activity",
+            "Sessions: 2",
+            generated_by="baseline project-pages",
+            generated_at="2026-07-07",
+        )
+        output = upsert_project_page_content(existing, {"knowledge.activity": block}, "badminton-highlight-indexer")
+        assert "will land here after review." in output
+        assert list(parse_promoted_blocks(output)) == ["knowledge.activity"]
 
     def test_upsert_project_page_content_no_blocks_returns_existing(self) -> None:
         existing = "# Project\n\nHuman text.\n"

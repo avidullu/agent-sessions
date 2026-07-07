@@ -122,6 +122,13 @@ class TestBuildParser:
         assert args.baseline_cmd == "eval"
         assert args.dry_run is True
 
+    def test_baseline_lint(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["baseline", "lint", "--stale-days", "45", "--dry-run"])
+        assert args.baseline_cmd == "lint"
+        assert args.stale_days == 45
+        assert args.dry_run is True
+
     def test_baseline_suggest_no_calibration(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["baseline", "suggest", "--no-calibration", "--dry-run"])
@@ -457,6 +464,10 @@ class TestMainBaselineSubcommands:
         # A scaffold-only repo fails most gates; eval returns 1 in that case and
         # 0 when all pass. Either way the subcommand dispatches and exits cleanly.
         assert main(["baseline", "eval", "--dry-run"]) in (0, 1)
+
+    def test_lint(self) -> None:
+        (self.repo_root / "baseline" / "SCHEMA.md").write_text("# Schema\n", encoding="utf-8")
+        assert main(["baseline", "lint", "--dry-run"]) == 0
 
     def test_publish(self) -> None:
         assert main(["baseline", "publish", "--dry-run"]) == 0

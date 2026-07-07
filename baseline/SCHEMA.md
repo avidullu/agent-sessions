@@ -71,6 +71,9 @@ Rules:
 - Project-page producers should render sections with `render_project_page_block()`
   and write them through `upsert_project_page_content()`, which reuses the same
   marker parser/upsert path as promoted guardrails.
+- Project-page upserts may remove the scaffold placeholder only when the line
+  exactly matches the known placeholder text; edited placeholder-like prose is
+  human-owned content.
 - Metadata such as `generated_by`, `generated_at`, and `proposal_id` belongs in
   the block body or in structured sidecars unless the shared parser changes.
 
@@ -124,16 +127,21 @@ projects do not collapse into one page or handoff record.
 
 ## 7. Validation Contract
 
-`baseline lint` is the planned schema-wide validator. Until it exists, each
-writer owns its command-specific checks.
+`baseline lint` is the schema-wide validator for deterministic checks that can
+run before generated project-page feeds exist. It returns non-zero for errors;
+warnings are review signals that later K rows can make stricter as producers
+start writing richer artifacts.
 
 Required validator behavior:
 
 - Reject malformed marker pairs and duplicate generated block ids in a page.
 - Fail generated writes that would alter human-owned prose.
-- Report broken generated links and orphan project pages.
-- Report stale generated blocks when their source records are newer or missing.
-- Flag duplicate or contradictory claims as candidates for human review.
+- Fail on broken links inside generated marker blocks.
+- Warn on orphan project pages until K6 creates generated project-page feeds.
+- Warn on stale generated blocks by age; later producers should add source-record
+  freshness checks.
+- Warn on explicit contradiction markers; deeper P6 duplicate/contradiction
+  analysis can harden this rule.
 - Reject replay or handoff proposal ingest when required trace references do
   not resolve.
 - Fail replay bundle writes when redaction detects high-confidence secrets.
@@ -148,5 +156,6 @@ Required validator behavior:
 
 ## 9. Changelog
 
+- 2026-07-07: Added K4 `baseline lint` severity model and first validator scope.
 - 2026-07-07: Added K3 project-page marker-block helper contract.
 - 2026-07-07: Initial schema for K1 of the baseline knowledge/replay tracker.

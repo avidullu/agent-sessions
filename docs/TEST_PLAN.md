@@ -13,11 +13,11 @@ PROJECT DOC TEMPLATE — copy this file to docs/<YOUR_PLAN>.md and fill it in.
 
 ## 0. TL;DR
 
-The `agent_sessions` package has **zero existing tests**. This plan delivers >80% line coverage across all 17 source modules (~1,589 lines) using pytest. Tests focus on unit-testing pure functions, mocking I/O boundaries (filesystem, subprocess, TOML parsing), and exercising the CLI surface through argparse.
+The `agent_sessions` package now has broad pytest coverage across archive, extractor, CLI, and baseline workflows. The current full-suite gate is **452 passed** with **96.48%** line coverage. Tests focus on unit-testing pure functions, mocking I/O boundaries (filesystem, subprocess, TOML parsing), and exercising the CLI surface through argparse.
 
 ## 1. Problem & goal
 
-**Problem:** No test coverage exists. Any refactor, new extractor, or baseline logic change risks silent regressions.
+**Problem:** Coverage must stay high as baseline replay, promotion, and linting workflows add new write paths. Any refactor, new extractor, or baseline logic change risks silent regressions without targeted tests.
 
 **Goal:** Achieve >80% line coverage via pytest with:
 - Pure-function unit tests for models, utils, path_templates, render, config
@@ -42,6 +42,7 @@ tests/
 │                            #   keyword_hits, apply_feedback, render_candidate_report, calibration
 ├── test_baseline_agent.py   # baseline_bundle, select_records, evidence_record, render_agent_prompt
 ├── test_baseline_handoffs.py # baseline handoff audit parsing, report rendering, write boundaries
+├── test_baseline_lint.py    # baseline lint markers, generated links, stale/orphan/contradiction checks
 ├── test_cli.py              # build_parser, main dispatch, arg validation
 ├── test_tool_wrapper.py     # tools/agent_archive.py wrapper import path
 ├── test_registry.py         # register, get_extractor, known_kinds
@@ -88,12 +89,13 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated.
 | T10 | `test_gemini_extractor.py` | T0 | No | ☑ | 7 tests, 100% coverage |
 | T11 | `test_grok_extractor.py` | T0 | No | ☑ | 5 tests, 100% coverage |
 | T12 | `test_archive.py` | T0 | No | ☑ | 35 tests, archive core logic covered |
-| T13 | `test_baseline.py` | T0 | No | ☑ | 77 tests, baseline scaffold/suggest/calibrate/promote/schema/project-page upserts |
+| T13 | `test_baseline.py` | T0 | No | ☑ | 79 tests, baseline scaffold/suggest/calibrate/promote/schema/project-page upserts |
 | T14 | `test_baseline_agent.py` | T0 | No | ☑ | 19 tests, evidence bundles and schema references |
-| T15 | `test_cli.py` | T0 | No | ☑ | 45 tests, CLI parsing + dispatch |
+| T15 | `test_cli.py` | T0 | No | ☑ | 47 tests, CLI parsing + dispatch |
 | T16 | `test_baseline_handoffs.py` | T0 | No | ☑ | 7 tests, report-only handoff audit |
-| T17 | `test_tool_wrapper.py` | T0 | No | ☑ | 1 test, wrapper import path |
-| T18 | Run `pytest --cov` and verify >80% overall | T1–T17 | No | ☑ | **96.16%** (430 passed) |
+| T17 | `test_baseline_lint.py` | T0 | No | ☑ | 17 tests, marker parsing, generated-link, stale, orphan, contradiction, and report behavior |
+| T18 | `test_tool_wrapper.py` | T0 | No | ☑ | 1 test, wrapper import path |
+| T19 | Run `pytest --cov` and verify >80% overall | T1–T18 | No | ☑ | **96.48%** (452 passed) |
 
 ## 8. Open questions
 
