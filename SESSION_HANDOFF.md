@@ -17,10 +17,10 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
 
 ## Next Steps / Open Threads
 
-- **Active tracked project:** `docs/FIRST_USER_SETUP_TRACKER.md` (#42 + #18
-  setup UX). Decision locked 2026-07-07: docs/tracker PR first, then optional
-  CLI `doctor`/summary polish; issue #32 remains separate backfill/regenerate
-  work except for boundary notes.
+- **Completed tracked project:** `docs/FIRST_USER_SETUP_TRACKER.md` (#42 + #18
+  setup UX). MVP completed by PRs #43 and #44; optional future work is the P7
+  `doctor`/`setup` command. Issue #32 remains separate backfill/regenerate work
+  except for boundary notes.
 - **Active tracked project:** `docs/BASELINE_LOOP_CLOSURE.md` (§7 closure tracker).
 - **Completed tracked project:** tech-debt remediation (TD1-TD15, PRs #28-#40)
   is DONE and archived at `docs/archives/TECH_DEBT_PLAN.md`. Related follow-up:

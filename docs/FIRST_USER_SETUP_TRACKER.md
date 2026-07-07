@@ -1,6 +1,6 @@
 # First-User Setup UX
 
-> **Status:** `IN PROGRESS` - owner-approved scope, docs slice in progress. **Owner:** `avidullu`. **Created:** `2026-07-07`. **Last updated:** `2026-07-07`
+> **Status:** `DONE` - setup UX MVP complete; optional `doctor` command deferred. **Owner:** `avidullu`. **Created:** `2026-07-07`. **Last updated:** `2026-07-07`
 > **Lifecycle:** `DRAFT -> IN PROGRESS -> DONE -> archived`
 > **Tracking anchors:** Section 7 is the source of truth; indexed in `docs/README.md`; pointer in `SESSION_HANDOFF.md`.
 > **Relation to existing docs:** extends `README.md`, `docs/MULTI_MACHINE.md`, and `docs/AUTOMATION.md`; folds issue #18 into issue #42.
@@ -102,15 +102,16 @@ are needed.
 
 | ID | Deliverable | Depends on | Gated? | Status | PR |
 |---|---|---|---|---|---|
-| P0 | Add this tracked project doc and index/handoff pointers. | - | No | In review | #43 |
-| P1 | README documents expected outputs for discovery, status, export, baseline scaffold, and baseline suggest. | P0 | No | In review | #43 |
-| P2 | README explains Markdown vs PDF behavior and optional `reportlab` support. | P0 | No | In review | #43 |
-| P3 | README/setup docs explain inventory-only skipped sources. | P0 | No | In review | #43 |
-| P4 | README gives concise post-export and post-baseline next steps. | P0 | No | In review | #43 |
-| P5 | Add new-machine setup and sync validation checklist. | P0 | No | In review | #43 |
-| P6 | Add troubleshooting for noisy git status, dirty/diverged git state, missing WSL paths, missing PDF support, and local `sources.toml`. | P5 | No | In review | #43 |
+| P0 | Add this tracked project doc and index/handoff pointers. | - | No | Done | #43 |
+| P1 | README documents expected outputs for discovery, status, export, baseline scaffold, and baseline suggest. | P0 | No | Done | #43 |
+| P2 | README explains Markdown vs PDF behavior and optional `reportlab` support. | P0 | No | Done | #43 |
+| P3 | README/setup docs explain inventory-only skipped sources. | P0 | No | Done | #43 |
+| P4 | README gives concise post-export and post-baseline next steps. | P0 | No | Done | #43 |
+| P5 | Add new-machine setup and sync validation checklist. | P0 | No | Done | #43 |
+| P6 | Add troubleshooting for noisy git status, dirty/diverged git state, missing WSL paths, missing PDF support, and local `sources.toml`. | P5 | No | Done | #43 |
 | P7 | Optional `doctor` or `setup` command for dependency/source checks. | P1-P6 | Yes | Stretch | - |
-| P8 | Document #32 boundary: archive backfill/regenerate remains separate. | P0 | No | In review | #43 |
+| P8 | Document #32 boundary: archive backfill/regenerate remains separate. | P0 | No | Done | #43 |
+| P9 | Export command prints a concise next-steps summary and tests cover skipped inventory/PDF/dry-run branches. | P1-P6 | No | Done | #44 |
 
 ## 8. Open questions
 
@@ -121,10 +122,10 @@ are needed.
 
 ## 9. Definition of done
 
-- [ ] P0-P6 and P8 are merged.
-- [ ] README and setup checklist make the #42 acceptance criteria easy to verify.
-- [ ] New-machine instructions cover Windows and WSL/Linux paths and validation.
-- [ ] Optional code slice, if taken, has full pytest coverage, ruff, and mypy clean.
+- [x] P0-P6 and P8 are merged.
+- [x] README and setup checklist make the #42 acceptance criteria easy to verify.
+- [x] New-machine instructions cover Windows and WSL/Linux paths and validation.
+- [x] Optional code slice, if taken, has full pytest coverage, ruff, and mypy clean.
 
 ## 10. References
 
@@ -137,3 +138,4 @@ are needed.
 
 - `2026-07-07` - Created after owner approved the recommended scope.
 - `2026-07-07` - Sent P0-P6/P8 docs for review in PR #43.
+- `2026-07-07` - PR #43 merged; P9 CLI summary polish completed in PR #44.

@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .archive import discover_sources, export_sources, pdf_existing, prune_index_records
+from .archive import ExportResult, discover_sources, export_sources, pdf_existing, prune_index_records
 from .archive_status import archive_status
 from .baseline import baseline_scaffold, baseline_suggest
 from .config import ArchiveConfig, load_config
@@ -19,6 +19,39 @@ def _handle_discover(config: ArchiveConfig, args: argparse.Namespace) -> int:
     return discover_sources(config, samples=args.samples, write=args.write)
 
 
+def _export_summary_lines(
+    result: ExportResult,
+    *,
+    write_pdfs: bool,
+    copy_raw_files: bool,
+    dry_run: bool,
+) -> list[str]:
+    lines = [f"Exported {result.exported} session files."]
+    if result.skipped_sources:
+        lines.append("Skipped sources without extractors:")
+        lines.extend(f"- {source}" for source in result.skipped_sources)
+        if any("(inventory)" in source for source in result.skipped_sources):
+            lines.append("Inventory-only sources are expected until transcript files are available.")
+    if result.pdf_missing:
+        lines.append("PDF export requested but reportlab is not installed. Run: python -m pip install reportlab")
+
+    lines.extend(["", "Next steps:"])
+    if dry_run:
+        lines.append("- Dry run only: no archive files were written.")
+    else:
+        lines.append("- Review `archive/INDEX.md` and `archive/index.jsonl`.")
+        if write_pdfs:
+            lines.append("- PDFs are written beside Markdown files when `reportlab` is available.")
+        else:
+            lines.append("- Markdown files are under `archive/`; rerun with `--pdf` for optional PDFs.")
+        if copy_raw_files:
+            lines.append("- Raw backups, if written, are under ignored `raw/`.")
+        lines.append("- Check intended changes with `git status --short archive/ docs/DISCOVERY.md`.")
+        lines.append("- Stage explicit paths only; keep `sources.toml`, `raw/`, and unrelated files out.")
+        lines.append("- For baseline review, run `python tools/agent_archive.py baseline scaffold` and `baseline suggest`.")
+    return lines
+
+
 def _handle_export(config: ArchiveConfig, args: argparse.Namespace) -> int:
     if not args.all and not args.source:
         raise SystemExit("export requires --all or at least one --source")
@@ -30,13 +63,16 @@ def _handle_export(config: ArchiveConfig, args: argparse.Namespace) -> int:
         copy_raw_files=args.copy_raw,
         dry_run=args.dry_run,
     )
-    print(f"Exported {result.exported} session files.")
-    if result.skipped_sources:
-        print("Skipped sources without extractors:")
-        for source in result.skipped_sources:
-            print(f"- {source}")
-    if result.pdf_missing:
-        print("PDF export requested but reportlab is not installed. Run: python -m pip install reportlab")
+    print(
+        "\n".join(
+            _export_summary_lines(
+                result,
+                write_pdfs=args.pdf,
+                copy_raw_files=args.copy_raw,
+                dry_run=args.dry_run,
+            )
+        )
+    )
     return 0
 
 

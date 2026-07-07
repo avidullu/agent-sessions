@@ -7,7 +7,9 @@ from pathlib import Path
 
 import pytest
 
+from agent_sessions.archive import ExportResult
 from agent_sessions.cli import build_parser, main
+from agent_sessions.cli import _export_summary_lines
 
 
 class TestBuildParser:
@@ -205,6 +207,49 @@ class TestBuildParser:
             parser.parse_args([])
 
 
+class TestExportSummaryLines:
+    def test_dry_run_summary(self) -> None:
+        lines = _export_summary_lines(
+            ExportResult(exported=0),
+            write_pdfs=False,
+            copy_raw_files=False,
+            dry_run=True,
+        )
+
+        assert "Exported 0 session files." in lines
+        assert "- Dry run only: no archive files were written." in lines
+
+    def test_real_export_summary_names_outputs(self) -> None:
+        lines = _export_summary_lines(
+            ExportResult(exported=3),
+            write_pdfs=True,
+            copy_raw_files=True,
+            dry_run=False,
+        )
+
+        assert "- Review `archive/INDEX.md` and `archive/index.jsonl`." in lines
+        assert "- PDFs are written beside Markdown files when `reportlab` is available." in lines
+        assert "- Raw backups, if written, are under ignored `raw/`." in lines
+        assert any("baseline scaffold" in line for line in lines)
+
+    def test_skipped_inventory_and_missing_pdf_summary(self) -> None:
+        lines = _export_summary_lines(
+            ExportResult(
+                exported=2,
+                pdf_missing=True,
+                skipped_sources=("copilot-vscode-windows-inventory (inventory)",),
+            ),
+            write_pdfs=True,
+            copy_raw_files=False,
+            dry_run=False,
+        )
+
+        assert "Skipped sources without extractors:" in lines
+        assert "- copilot-vscode-windows-inventory (inventory)" in lines
+        assert "Inventory-only sources are expected until transcript files are available." in lines
+        assert any("reportlab is not installed" in line for line in lines)
+
+
 class TestMain:
     @pytest.fixture(autouse=True)
     def _chdir_repo_root(self, repo_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -233,7 +278,7 @@ class TestMain:
         with pytest.raises(SystemExit):
             main(["export"])
 
-    def test_export_all(self, repo_root: Path) -> None:
+    def test_export_all(self, repo_root: Path, capsys: pytest.CaptureFixture[str]) -> None:
         (repo_root / "config" / "default_sources.toml").parent.mkdir(
             parents=True, exist_ok=True
         )
@@ -243,6 +288,39 @@ class TestMain:
         )
         result = main(["export", "--all", "--dry-run"])
         assert result == 0
+        assert "Dry run only" in capsys.readouterr().out
+
+    def test_export_reports_skipped_sources_and_pdf_hint(
+        self,
+        repo_root: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        (repo_root / "config" / "default_sources.toml").parent.mkdir(
+            parents=True, exist_ok=True
+        )
+        (repo_root / "config" / "default_sources.toml").write_text(
+            '[archive]\narchive_dir = "archive"\nraw_dir = "raw"\n',
+            encoding="utf-8",
+        )
+
+        def fake_export_sources(*args: object, **kwargs: object) -> ExportResult:
+            assert kwargs["write_pdfs"] is True
+            return ExportResult(
+                exported=1,
+                pdf_missing=True,
+                skipped_sources=("test-inventory (inventory)",),
+            )
+
+        monkeypatch.setattr("agent_sessions.cli.export_sources", fake_export_sources)
+
+        result = main(["export", "--all", "--pdf"])
+
+        output = capsys.readouterr().out
+        assert result == 0
+        assert "test-inventory (inventory)" in output
+        assert "reportlab is not installed" in output
+        assert "Inventory-only sources are expected" in output
 
     def test_pdf_requires_source(self, repo_root: Path) -> None:
         (repo_root / "config" / "default_sources.toml").parent.mkdir(
