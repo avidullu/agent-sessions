@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from agent_sessions.baseline_ingest import (
+    archive_references,
     baseline_ingest,
     discover_proposal_paths,
     load_proposals,
@@ -31,6 +32,27 @@ VALID_PROPOSAL = {
     "evidence": ["archive/example/session.md"],
     "suggested_baseline_text": "Run real gates before claiming done.",
     "open_questions": [],
+}
+
+ARCHIVE_RECORD = {
+    "source": "codex-windows",
+    "kind": "codex",
+    "source_file": "C:/Users/avidu/.codex/session.jsonl",
+    "markdown": "archive\\codex-windows\\session.md",
+    "metadata": {"session_id": "session-1"},
+}
+
+TRACE_PROPOSAL = {
+    **VALID_PROPOSAL,
+    "source_kind": "repo-handoff",
+    "trace": [
+        {
+            "source": "baseline handoffs audit",
+            "markdown_path": "archive/codex-windows/session.md",
+            "session_id": "session-1",
+            "project_slug": "agent-sessions",
+        }
+    ],
 }
 
 
@@ -68,6 +90,33 @@ class TestValidateProposal:
         data = dict(VALID_PROPOSAL, evidence="not-a-list")
         errors = validate_proposal(data)
         assert any("evidence must be a list" in error for error in errors)
+
+    def test_external_source_kind_requires_structured_trace(self) -> None:
+        data = dict(VALID_PROPOSAL, source_kind="handoff")
+        errors = validate_proposal(data, archive_references([ARCHIVE_RECORD]))
+        assert any("must include structured trace" in error for error in errors)
+
+    def test_trace_must_be_list_of_objects(self) -> None:
+        data = dict(VALID_PROPOSAL, trace="not-a-list")
+        assert validate_proposal(data) == ["trace must be a list"]
+        data = dict(VALID_PROPOSAL, trace=["not-an-object"])
+        errors = validate_proposal(data, archive_references([ARCHIVE_RECORD]))
+        assert errors == ["trace[0] must be a JSON object"]
+
+    def test_rejects_unresolved_trace_references(self) -> None:
+        data = {
+            **TRACE_PROPOSAL,
+            "replay_of": "missing-session",
+            "trace": [{"markdown_path": "archive/missing.md", "session_id": "missing-session"}],
+        }
+        errors = validate_proposal(data, archive_references([ARCHIVE_RECORD]))
+        assert "unresolved replay_of `missing-session`" in errors
+        assert "trace[0].markdown_path `archive/missing.md` does not resolve" in errors
+        assert "trace[0].session_id `missing-session` does not resolve" in errors
+
+    def test_resolves_trace_references_against_archive_index(self) -> None:
+        errors = validate_proposal(TRACE_PROPOSAL, archive_references([ARCHIVE_RECORD]))
+        assert errors == []
 
 
 class TestDiscoverProposalPaths:
@@ -111,6 +160,13 @@ class TestLoadProposals:
         assert accepted == []
         assert rejected[0][1] == ["proposal must be a JSON object"]
 
+    def test_rejects_external_proposal_without_archive_index(self, tmp_path: Path) -> None:
+        proposal = tmp_path / "handoff.json"
+        proposal.write_text(json.dumps(TRACE_PROPOSAL), encoding="utf-8")
+        accepted, rejected = load_proposals([proposal])
+        assert accepted == []
+        assert rejected[0][1] == ["archive/index.jsonl missing; cannot validate trace references"]
+
 
 class TestRenderIngestReport:
     def test_report_lists_accepted_and_rejected(self, tmp_path: Path) -> None:
@@ -146,6 +202,20 @@ class TestWriteIngestArtifacts:
         payload = json.loads(sidecar_path.read_text(encoding="utf-8"))
         assert payload["run_id"] == "custom-ingest"
         assert payload["predictions"][0]["id"] == "guardrail.explicit-test-gates"
+
+    def test_writes_trace_to_sidecar(self, repo_root: Path) -> None:
+        config = ArchiveConfig(
+            repo_root=repo_root,
+            archive_dir=repo_root / "archive",
+            raw_dir=repo_root / "raw",
+            sources=(),
+        )
+        settings = load_baseline_settings(config)
+        prediction = proposal_to_prediction(TRACE_PROPOSAL)
+        output = repo_root / "baseline" / "candidates" / "trace-ingest.md"
+        _, sidecar_path = write_ingest_artifacts(settings, [prediction], "# Ingest report\n", output)
+        payload = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        assert payload["predictions"][0]["trace"][0]["session_id"] == "session-1"
 
 
 class TestBaselineIngest:
@@ -193,6 +263,25 @@ class TestBaselineIngest:
         payload = json.loads(sidecar.read_text(encoding="utf-8"))
         assert payload["candidate"].endswith("tmp/pr16-ingested.md")
         assert payload["predictions"][0]["id"] == "guardrail.explicit-test-gates"
+
+    def test_ingest_validates_and_threads_trace_references(self, repo_root: Path) -> None:
+        archive_dir = repo_root / "archive"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / "index.jsonl").write_text(json.dumps(ARCHIVE_RECORD) + "\n", encoding="utf-8")
+        proposals_dir = repo_root / "baseline" / "proposals"
+        proposals_dir.mkdir(parents=True, exist_ok=True)
+        (proposals_dir / "handoff.json").write_text(json.dumps(TRACE_PROPOSAL), encoding="utf-8")
+        config = ArchiveConfig(
+            repo_root=repo_root,
+            archive_dir=archive_dir,
+            raw_dir=repo_root / "raw",
+            sources=(),
+        )
+        result = baseline_ingest(config)
+        assert result == 0
+        ingested = list((repo_root / "baseline" / "candidates").glob("*-ingested.md"))
+        payload = json.loads(ingested[0].with_suffix(".predictions.json").read_text(encoding="utf-8"))
+        assert payload["predictions"][0]["trace"][0]["markdown_path"] == "archive/codex-windows/session.md"
 
     def test_ingest_dry_run(self, repo_root: Path) -> None:
         proposals_dir = repo_root / "baseline" / "proposals"

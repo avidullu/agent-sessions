@@ -13,7 +13,7 @@ PROJECT DOC TEMPLATE — copy this file to docs/<YOUR_PLAN>.md and fill it in.
 
 ## 0. TL;DR
 
-The `agent_sessions` package now has broad pytest coverage across archive, extractor, CLI, and baseline workflows. The current full-suite gate is **452 passed** with **96.48%** line coverage. Tests focus on unit-testing pure functions, mocking I/O boundaries (filesystem, subprocess, TOML parsing), and exercising the CLI surface through argparse.
+The `agent_sessions` package now has broad pytest coverage across archive, extractor, CLI, and baseline workflows. The current full-suite gate is **459 passed** with **96.52%** line coverage. Tests focus on unit-testing pure functions, mocking I/O boundaries (filesystem, subprocess, TOML parsing), and exercising the CLI surface through argparse.
 
 ## 1. Problem & goal
 
@@ -42,6 +42,7 @@ tests/
 │                            #   keyword_hits, apply_feedback, render_candidate_report, calibration
 ├── test_baseline_agent.py   # baseline_bundle, select_records, evidence_record, render_agent_prompt
 ├── test_baseline_handoffs.py # baseline handoff audit parsing, report rendering, write boundaries
+├── test_baseline_ingest.py  # proposal ingest validation, trace references, sidecar writes
 ├── test_baseline_lint.py    # baseline lint markers, generated links, stale/orphan/contradiction checks
 ├── test_cli.py              # build_parser, main dispatch, arg validation
 ├── test_tool_wrapper.py     # tools/agent_archive.py wrapper import path
@@ -94,8 +95,9 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated.
 | T15 | `test_cli.py` | T0 | No | ☑ | 47 tests, CLI parsing + dispatch |
 | T16 | `test_baseline_handoffs.py` | T0 | No | ☑ | 7 tests, report-only handoff audit |
 | T17 | `test_baseline_lint.py` | T0 | No | ☑ | 17 tests, marker parsing, generated-link, stale, orphan, contradiction, and report behavior |
-| T18 | `test_tool_wrapper.py` | T0 | No | ☑ | 1 test, wrapper import path |
-| T19 | Run `pytest --cov` and verify >80% overall | T1–T18 | No | ☑ | **96.48%** (452 passed) |
+| T18 | `test_baseline_ingest.py` | T0 | No | ☑ | 29 tests, proposal ingest and trace-reference validation |
+| T19 | `test_tool_wrapper.py` | T0 | No | ☑ | 1 test, wrapper import path |
+| T20 | Run `pytest --cov` and verify >80% overall | T1–T19 | No | ☑ | **96.52%** (459 passed) |
 
 ## 8. Open questions
 

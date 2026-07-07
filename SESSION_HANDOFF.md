@@ -26,11 +26,13 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   `baseline handoffs audit`, writing only `baseline/handoffs/audit.md`; the K2
   audit report scanned 3,114 archive records and found 946 archive handoff
   candidates. PR #48 merged K3: shared `baseline:begin/end` marker-block
-  helpers for project-page generated sections. PR #49 is open for K4 on branch
-  `codex/baseline-lint` in
-  `C:\Users\avidu\Projects\Agent Sessions - baseline-lint`: read-only
+  helpers for project-page generated sections. PR #49 merged K4: read-only
   `baseline lint` skeleton for schema, marker, generated-link, stale-block,
-  orphan-page, and explicit contradiction checks. K6 still owns persistent
+  orphan-page, and explicit contradiction checks. K5 is active on branch
+  `codex/trace-reference-validation` in
+  `C:\Users\avidu\Projects\Agent Sessions - trace-reference-validation`:
+  proposal trace-field threading plus `archive/index.jsonl` reference
+  validation for replay/handoff proposal ingest. K6 still owns persistent
   `baseline/handoffs/index.jsonl` and project-page/proposal feeds. Related
   issue #19 is folded in as lightweight provenance substrate; #32 remains
   separate backfill/regenerate work.
@@ -127,3 +129,11 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   links are errors; orphan pages, stale blocks, and explicit contradiction
   markers start as warnings until downstream producers provide richer source
   records.
+- K4 review follow-ups left for later rows (2026-07-07): invalid generated dates
+  should become lint findings instead of exceptions; K12 should map rule ids to
+  gate ids explicitly; duplicate baseline markdown reads are acceptable for now
+  but can be optimized if the tree grows.
+- K5 trace validation decision (2026-07-07): human proposals keep optional
+  free-text evidence; `source_kind` of `replay`, `handoff`, or `repo-handoff`
+  requires structured trace and resolvable `markdown_path`/`session_id`
+  references before candidate sidecars are written.

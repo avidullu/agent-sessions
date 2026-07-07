@@ -98,12 +98,18 @@ field is available:
 | `bundle_id` | Replay or agent bundle identifier when the evidence came from a bundle. |
 | `calibration_effect` | Optional feedback/calibration note, for example accepted, edited, or rejected. |
 
+Structured proposal fields:
+
+- `source_kind` is optional for human-authored proposals; replay and handoff
+  producers should use `replay`, `handoff`, or `repo-handoff`.
+- `replay_of`, when present, is the original archive session id and must resolve
+  against `archive/index.jsonl`.
+
 Resolution rules:
 
 - `markdown_path` is repo-relative and uses forward slashes.
 - `session_id` and `markdown_path` references from replay or handoff producers
-  must resolve against `archive/index.jsonl` before candidate creation once K5
-  lands.
+  must resolve against `archive/index.jsonl` before candidate creation.
 - Hand-written proposals may continue to use free-text `evidence` lists, but
   external replay and handoff producers must include structured trace records
   before ingest promotes them into candidates.
@@ -156,6 +162,7 @@ Required validator behavior:
 
 ## 9. Changelog
 
+- 2026-07-07: Added K5 proposal trace propagation and ingest reference validation.
 - 2026-07-07: Added K4 `baseline lint` severity model and first validator scope.
 - 2026-07-07: Added K3 project-page marker-block helper contract.
 - 2026-07-07: Initial schema for K1 of the baseline knowledge/replay tracker.

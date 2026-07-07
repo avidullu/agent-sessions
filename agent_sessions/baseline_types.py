@@ -41,6 +41,7 @@ class Prediction:
     status: str
     evidence: list[str]
     text: str
+    trace: tuple[dict[str, str], ...] = ()
     feedback: str = "none"
 
 
@@ -67,7 +68,7 @@ def parse_verdict(feedback_item: dict[str, str] | None) -> str:
 
 
 def prediction_to_dict(prediction: Prediction) -> dict[str, Any]:
-    return {
+    result: dict[str, Any] = {
         "id": prediction.id,
         "title": prediction.title,
         "scope": prediction.scope,
@@ -79,3 +80,6 @@ def prediction_to_dict(prediction: Prediction) -> dict[str, Any]:
         "evidence": prediction.evidence,
         "text": prediction.text,
     }
+    if prediction.trace:
+        result["trace"] = [dict(item) for item in prediction.trace]
+    return result

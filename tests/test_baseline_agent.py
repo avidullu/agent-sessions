@@ -190,6 +190,8 @@ class TestProposalSchema:
         assert "category" in schema
         assert "risk" in schema
         assert "confidence" in schema
+        assert "source_kind" in schema
+        assert "replay_of" in schema
         assert "trace" in schema
 
 
