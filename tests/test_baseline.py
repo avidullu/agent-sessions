@@ -18,6 +18,7 @@ from agent_sessions.baseline import (
     baseline_files,
     baseline_promote,
     baseline_readme,
+    baseline_schema,
     baseline_scaffold,
     baseline_suggest,
     category_promotion_target,
@@ -361,6 +362,7 @@ class TestBaselineFiles:
         files = baseline_files(settings)
         assert isinstance(files, dict)
         assert len(files) > 0
+        assert settings.root / "SCHEMA.md" in files
         # Should include project readme for pilot
         project_readme_path = settings.root / "projects" / "test" / "README.md"
         assert project_readme_path in files
@@ -370,6 +372,12 @@ class TestReadmeFunctions:
     def test_baseline_readme(self) -> None:
         text = baseline_readme()
         assert "Engineering Baseline" in text
+
+    def test_baseline_schema(self) -> None:
+        text = baseline_schema()
+        assert "Baseline Derived Layer Schema" in text
+        assert "<!-- baseline:begin" in text
+        assert "`markdown_path`" in text
 
     def test_candidates_readme(self) -> None:
         text = candidates_readme()
@@ -401,6 +409,7 @@ class TestBaselineScaffold:
         result = baseline_scaffold(config, dry_run=False)
         assert result == 0
         assert (repo_root / "baseline" / "README.md").exists()
+        assert (repo_root / "baseline" / "SCHEMA.md").exists()
         assert (repo_root / "baseline" / "candidates" / "README.md").exists()
 
 

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from agent_sessions.baseline_agent import (
+    baseline_schema_contract,
     baseline_bundle,
     bullet_list,
     bundle_constraints,
@@ -189,6 +190,7 @@ class TestProposalSchema:
         assert "category" in schema
         assert "risk" in schema
         assert "confidence" in schema
+        assert "trace" in schema
 
 
 class TestRenderAgentPrompt:
@@ -198,11 +200,28 @@ class TestRenderAgentPrompt:
             "access_level": "session-only",
             "constraints": ["Do not promote.", "Use evidence."],
             "proposal_schema": {"id": "string"},
+            "schema_contract": {"path": "baseline/SCHEMA.md", "content": "# Schema"},
         }
         prompt = render_agent_prompt(bundle)
         assert "AI Baseline Proposal Task" in prompt
         assert "test-bundle" in prompt
         assert "session-only" in prompt
+        assert "baseline/SCHEMA.md" in prompt
+
+    def test_schema_contract_loads_when_present(self, repo_root: Path) -> None:
+        schema_path = repo_root / "baseline" / "SCHEMA.md"
+        schema_path.write_text("# Local Schema\n\nUse markers.", encoding="utf-8")
+        config = ArchiveConfig(
+            repo_root=repo_root,
+            archive_dir=repo_root / "archive",
+            raw_dir=repo_root / "raw",
+            sources=(),
+        )
+        contract = baseline_schema_contract(config)
+        assert contract == {
+            "path": "baseline/SCHEMA.md",
+            "content": "# Local Schema\n\nUse markers.",
+        }
 
 
 class TestBulletList:
@@ -256,6 +275,8 @@ class TestBaselineBundle:
         md_dir.mkdir(parents=True, exist_ok=True)
         md_path = md_dir / "session.md"
         md_path.write_text("# Test\n\nContent.", encoding="utf-8")
+        schema_path = repo_root / "baseline" / "SCHEMA.md"
+        schema_path.write_text("# Local Schema\n\nUse markers.", encoding="utf-8")
 
         index_path = archive_dir / "index.jsonl"
         index_path.write_text(
@@ -289,3 +310,8 @@ class TestBaselineBundle:
         prompts = list(evidence_dir.glob("*.prompt.md"))
         assert len(bundles) >= 1
         assert len(prompts) >= 1
+        bundle_data = json.loads(bundles[0].read_text(encoding="utf-8"))
+        prompt = prompts[0].read_text(encoding="utf-8")
+        assert bundle_data["schema_contract"]["path"] == "baseline/SCHEMA.md"
+        assert "Local Schema" in bundle_data["schema_contract"]["content"]
+        assert "baseline/SCHEMA.md" in prompt

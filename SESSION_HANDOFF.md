@@ -17,17 +17,16 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
 
 ## Next Steps / Open Threads
 
-- **Design review:** `docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md` scopes issues #23,
-  #25, and #26 as one sequence: schema/compiled wiki first, handoff mining as the
-  first producer, replay selection/bundling/ingest after provenance and redaction
-  contracts. Draft PR #45 is open with review feedback addressed on-branch:
-  redaction is now a first-class replay egress gate, replay/handoff ingest must
-  validate trace refs against `archive/index.jsonl`, K2 read-only handoff audit
-  can land before schema-gated writes, K8/K11 map to loop-closure P5, K4 maps to
-  P6, K9/K10 cover replay redaction and bundle egress, and K3 reuses the shipped
-  marker/upsert machinery from TD4 #31. Related issue #19 is folded in as
-  lightweight provenance substrate; #32 remains separate backfill/regenerate
-  work.
+- **Active tracked project:** `docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md` scopes
+  issues #23, #25, and #26 as one sequence: schema/compiled wiki first, handoff
+  mining as the first producer, replay selection/bundling/ingest after
+  provenance and redaction contracts. PR #45 merged the tracker. PR #46 is open
+  for K1: `baseline/SCHEMA.md`, scaffold coverage, bundle packet schema
+  references, and tests/docs updates. Wait for review comments/LGTM before
+  merge. K2 next: report-only `baseline handoffs audit`, writing only
+  `baseline/handoffs/audit.md`; K6 owns persistent `baseline/handoffs/index.jsonl`
+  and project-page/proposal feeds. Related issue #19 is folded in as lightweight
+  provenance substrate; #32 remains separate backfill/regenerate work.
 - **Completed tracked project:** `docs/FIRST_USER_SETUP_TRACKER.md` (#42 + #18
   setup UX). MVP completed by PRs #43 and #44; optional future work is the P7
   `doctor`/`setup` command. Issue #32 remains separate backfill/regenerate work
@@ -73,6 +72,7 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
 - `docs/README.md`
 - `docs/BASELINE_LOOP_CLOSURE.md`
 - `docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md`
+- `baseline/SCHEMA.md`
 - `docs/archives/TECH_DEBT_PLAN.md`
 - `docs/CALIBRATION_EFFICACY.md`
 - `docs/PROJECT_DOC_TEMPLATE.md`
@@ -101,3 +101,6 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
 - Knowledge/replay sequencing decision (2026-07-07): land `baseline/SCHEMA.md`
   and deterministic project-page marker blocks before handoff mining or replay;
   replay execution stays out-of-band and excludes coding sessions in v1.
+- Handoff split decision (2026-07-07): K2 audit is report-only and may write
+  `baseline/handoffs/audit.md`; K6 owns persistent handoff index writes and
+  downstream project-page/proposal feeds.

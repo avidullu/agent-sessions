@@ -9,6 +9,22 @@
   "evidence": [
     "relative archive or repo references"
   ],
+  "trace": [
+    {
+      "source": "archive source or producer",
+      "source_file": "raw source file or repo handoff path",
+      "markdown_path": "repo-relative markdown path",
+      "session_id": "archive session id when available",
+      "timestamp": "ISO 8601 timestamp when available",
+      "project_slug": "baseline project slug",
+      "repo": "repository URL or canonical repo id",
+      "evidence_anchor": "heading, marker id, or excerpt id",
+      "evidence_excerpt": "short redacted quote or summary",
+      "transform": "deterministic producer transform",
+      "bundle_id": "agent/replay bundle id when applicable",
+      "calibration_effect": "accepted | edited | rejected | observed"
+    }
+  ],
   "suggested_baseline_text": "Concise proposed guidance.",
   "open_questions": [
     "questions for the user before promotion"
