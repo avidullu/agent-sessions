@@ -33,7 +33,7 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   validation for replay/handoff proposal ingest. PR #51 merged K6: persistent
   `baseline/handoffs/index.jsonl`, marker-owned `handoffs.index` project-page
   feeds for configured/existing pages, and small #49/#50 review follow-ups.
-  K7 is active on branch `codex/handoff-proposal-generation` in
+  PR #52 is open for K7 on branch `codex/handoff-proposal-generation` in
   `C:\Users\avidu\Projects\Agent Sessions - handoff-proposals`: generated
   handoff-derived proposal JSON under `baseline/proposals/`, structured trace
   validation through `baseline ingest --dry-run`, and the #51 review follow-up
