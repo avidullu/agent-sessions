@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from .baseline_settings import load_baseline_settings
 from .baseline_types import BaselineSettings, Prediction, prediction_to_dict
 from .config import ArchiveConfig
+from .utils import read_jsonl_dicts
 
 
 REQUIRED_FIELDS = (
@@ -24,9 +26,98 @@ REQUIRED_FIELDS = (
 )
 VALID_RISKS = {"low", "medium", "high"}
 SKIP_FILENAMES = {"proposal.schema.json", "README.md"}
+EXTERNAL_SOURCE_KINDS = {"handoff", "repo-handoff", "replay"}
 
 
-def validate_proposal(data: dict[str, Any]) -> list[str]:
+@dataclass(frozen=True)
+class ArchiveReferences:
+    markdown_paths: frozenset[str]
+    session_ids: frozenset[str]
+
+
+def normalized_markdown_path(value: Any) -> str:
+    return str(value).replace("\\", "/").lstrip("./").strip()
+
+
+def archive_references(records: list[dict[str, Any]]) -> ArchiveReferences:
+    markdown_paths: set[str] = set()
+    session_ids: set[str] = set()
+    for record in records:
+        markdown = str(record.get("markdown", "")).strip()
+        if markdown:
+            markdown_paths.add(normalized_markdown_path(markdown))
+        metadata = record.get("metadata")
+        if isinstance(metadata, dict):
+            session_id = str(metadata.get("session_id") or metadata.get("id") or "").strip()
+            if session_id:
+                session_ids.add(session_id)
+        session_id = str(record.get("session_id") or "").strip()
+        if session_id:
+            session_ids.add(session_id)
+    return ArchiveReferences(frozenset(markdown_paths), frozenset(session_ids))
+
+
+def load_archive_references(config: ArchiveConfig) -> ArchiveReferences | None:
+    index_path = config.archive_dir / "index.jsonl"
+    if not index_path.exists():
+        return None
+    return archive_references(read_jsonl_dicts(index_path, label="archive/index.jsonl"))
+
+
+def structured_trace(data: dict[str, Any]) -> list[dict[str, Any]]:
+    trace = data.get("trace") or []
+    if not isinstance(trace, list):
+        return []
+    return [item for item in trace if isinstance(item, dict)]
+
+
+def prediction_trace(data: dict[str, Any]) -> tuple[dict[str, str], ...]:
+    cleaned: list[dict[str, str]] = []
+    for item in structured_trace(data):
+        trace_item = {str(key): str(value) for key, value in item.items() if value not in ("", None)}
+        if trace_item:
+            cleaned.append(trace_item)
+    return tuple(cleaned)
+
+
+def validate_trace_references(data: dict[str, Any], refs: ArchiveReferences | None) -> list[str]:
+    errors: list[str] = []
+    source_kind = str(data.get("source_kind", "")).strip().lower()
+    trace = data.get("trace")
+    trace_items = structured_trace(data)
+    has_structured_trace = bool(trace_items)
+    needs_trace = source_kind in EXTERNAL_SOURCE_KINDS
+    if source_kind and source_kind not in EXTERNAL_SOURCE_KINDS | {"human"}:
+        errors.append(f"invalid source_kind `{data['source_kind']}`")
+    if trace is not None and not isinstance(trace, list):
+        errors.append("trace must be a list")
+        return errors
+    if isinstance(trace, list):
+        for index, item in enumerate(trace):
+            if not isinstance(item, dict):
+                errors.append(f"trace[{index}] must be a JSON object")
+    if needs_trace and not trace_items:
+        errors.append(f"source_kind `{source_kind}` proposals must include structured trace")
+    replay_of = str(data.get("replay_of", "")).strip()
+    must_resolve = bool(replay_of) or has_structured_trace or needs_trace
+    if must_resolve and refs is None:
+        errors.append("archive/index.jsonl missing; cannot validate trace references")
+        return errors
+    if refs is None:
+        return errors
+    if replay_of and replay_of not in refs.session_ids:
+        errors.append(f"unresolved replay_of `{replay_of}`")
+    for index, item in enumerate(trace_items):
+        markdown_path = str(item.get("markdown_path", "")).strip()
+        if markdown_path and normalized_markdown_path(markdown_path) not in refs.markdown_paths:
+            errors.append(f"trace[{index}].markdown_path `{normalized_markdown_path(markdown_path)}` does not resolve")
+        session_id = str(item.get("session_id", "")).strip()
+        if session_id and session_id not in refs.session_ids:
+            errors.append(f"trace[{index}].session_id `{session_id}` does not resolve")
+    return errors
+
+
+def validate_proposal(data: dict[str, Any], refs: ArchiveReferences | None = None) -> list[str]:
     errors: list[str] = []
     for field in REQUIRED_FIELDS:
         if field not in data or data[field] in ("", None):
@@ -43,6 +134,7 @@ def validate_proposal(data: dict[str, Any]) -> list[str]:
     evidence = data.get("evidence")
     if evidence is not None and not isinstance(evidence, list):
         errors.append("evidence must be a list")
+    errors.extend(validate_trace_references(data, refs))
     return errors
 
 
@@ -57,6 +149,7 @@ def proposal_to_prediction(data: dict[str, Any]) -> Prediction:
         status="proposed",
         evidence=[str(item) for item in data.get("evidence", [])],
         text=str(data["suggested_baseline_text"]),
+        trace=prediction_trace(data),
         feedback="ingested",
     )
 
@@ -71,7 +164,10 @@ def discover_proposal_paths(proposals_dir: Path, proposal: Path | None = None) -
     )
 
 
-def load_proposals(paths: list[Path]) -> tuple[list[Prediction], list[tuple[Path, list[str]]]]:
+def load_proposals(
+    paths: list[Path],
+    refs: ArchiveReferences | None = None,
+) -> tuple[list[Prediction], list[tuple[Path, list[str]]]]:
     accepted: list[Prediction] = []
     rejected: list[tuple[Path, list[str]]] = []
     for path in paths:
@@ -83,7 +179,7 @@ def load_proposals(paths: list[Path]) -> tuple[list[Prediction], list[tuple[Path
         if not isinstance(data, dict):
             rejected.append((path, ["proposal must be a JSON object"]))
             continue
-        errors = validate_proposal(data)
+        errors = validate_proposal(data, refs)
         if errors:
             rejected.append((path, errors))
             continue
@@ -153,7 +249,8 @@ def baseline_ingest(
         print(f"No proposal JSON files found in {proposals_dir}.")
         return 0
 
-    accepted, rejected = load_proposals(paths)
+    refs = load_archive_references(config)
+    accepted, rejected = load_proposals(paths, refs)
     report = render_ingest_report(accepted, rejected, paths)
     run_id = output.stem if output else f"{dt.date.today().isoformat()}-ingested"
     if output is not None and not output.is_absolute():

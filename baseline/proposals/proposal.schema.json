@@ -6,6 +6,8 @@
   "risk": "low | medium | high",
   "confidence": "0.00-1.00",
   "approval_mode": "strict | umbrella | auto-promote | observe-only",
+  "source_kind": "human | replay | handoff | repo-handoff",
+  "replay_of": "original archive session id when source_kind is replay",
   "evidence": [
     "relative archive or repo references"
   ],

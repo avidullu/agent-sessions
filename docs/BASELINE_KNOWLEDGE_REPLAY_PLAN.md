@@ -309,8 +309,8 @@ Legend: `Todo`, `In progress`, `Done`, `Blocked/gated`. One small PR per row.
 | K1 | `baseline/SCHEMA.md` with page types, existing marker grammar, #19-aligned trace fields, and lint/validator contract | #26/#19 | K0 | Yes | Done | #46 |
 | K2 | Report-only `baseline handoffs audit` coverage/freshness report; writes `baseline/handoffs/audit.md` only and no page/proposal/index writes | #23 | K0 | No | Done | #47 |
 | K3 | Reuse/extend `upsert_promoted_content()` for project-page generated sections | #26 | K1, TD4 #31 | Yes | Done | #48 |
-| K4 | `baseline lint` skeleton for schema, links, stale blocks, orphan pages, and P6 contradiction checks | #26 | K1,K3 | Yes | In progress | #49 |
-| K5 | Proposal + `Prediction` trace-field extension and ingest reference validation against `archive/index.jsonl` | #19/#23/#25 | K1 | Yes | Todo | - |
+| K4 | `baseline lint` skeleton for schema, links, stale blocks, orphan pages, and P6 contradiction checks | #26 | K1,K3 | Yes | Done | #49 |
+| K5 | Proposal + `Prediction` trace-field extension and ingest reference validation against `archive/index.jsonl` | #19/#23/#25 | K1 | Yes | In progress | #50 |
 | K6 | `baseline handoffs index` discovery records in `baseline/handoffs/index.jsonl` and project-page feed | #23/#26 | K2,K3,K5 | No | Todo | - |
 | K7 | Handoff-derived proposal generation with trace records | #23 | K5,K6 | Yes | Todo | - |
 | K8 | `baseline replay select` deterministic manifests, excluding coding sessions | #25 | K1 | No | Todo | - |
@@ -347,11 +347,12 @@ Additional gate names:
 2. Should the default stale threshold be configurable per project, with 90 days
    as the v1 default?
 3. Should K1 formalize `baseline/proposals/proposal.schema.json` as real JSON
-   Schema, or keep validation in Python and treat the file as an example while
-   K5 threads trace fields through `Prediction`, `proposal_to_prediction()`,
-   `prediction_to_dict()`, and prediction sidecars?
+   Schema, or keep validation in Python and treat the file as an example?
+   **Keep validation in Python for K5; the schema JSON remains illustrative.**
 4. Should structured trace fields live directly on proposal objects, or in a
    sibling sidecar only if existing proposal writers need strict compatibility?
+   **K5 puts `trace` directly on proposal objects and copies it into
+   `Prediction.trace` / prediction sidecars.**
 5. Which session classes are allowed for replay v1 besides planning, writing,
    documentation, and research?
 6. Should R5-safety allow a manual override for blocked bundles, or should v1
@@ -390,6 +391,8 @@ Additional gate names:
 
 ### Changelog
 
+- 2026-07-07 - Merged PR #49 for K4 and started K5 trace reference validation.
+- 2026-07-07 - Opened PR #50 for K5 proposal trace reference validation.
 - 2026-07-07 - Opened PR #49 for K4 `baseline lint` skeleton.
 - 2026-07-07 - Merged PR #48 for K3 and started K4 `baseline lint` skeleton.
 - 2026-07-07 - Opened PR #48 for K3 shared project-page marker-block upsert helpers.
