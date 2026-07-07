@@ -14,6 +14,7 @@ from .utils import archive_markdown_path
 
 
 DEFAULT_OUTPUT_DIR = Path("baseline/evidence")
+BASELINE_SCHEMA_PATH = Path("baseline/SCHEMA.md")
 
 
 def baseline_bundle(
@@ -41,6 +42,9 @@ def baseline_bundle(
         ],
         "evidence": [evidence_record(config, record, max_chars_per_session) for record in selected],
     }
+    schema_contract = baseline_schema_contract(config)
+    if schema_contract is not None:
+        bundle["schema_contract"] = schema_contract
     prompt = render_agent_prompt(bundle)
     target_dir = output_dir or config.repo_root / DEFAULT_OUTPUT_DIR
     if not target_dir.is_absolute():
@@ -128,12 +132,39 @@ def proposal_schema() -> dict[str, Any]:
         "confidence": "0.00-1.00",
         "approval_mode": "strict | umbrella | auto-promote | observe-only",
         "evidence": ["relative archive or repo references"],
+        "trace": [
+            {
+                "source": "archive source or producer",
+                "source_file": "raw source file or repo handoff path",
+                "markdown_path": "repo-relative markdown path",
+                "session_id": "archive session id when available",
+                "timestamp": "ISO 8601 timestamp when available",
+                "project_slug": "baseline project slug",
+                "repo": "repository URL or canonical repo id",
+                "evidence_anchor": "heading, marker id, or excerpt id",
+                "evidence_excerpt": "short redacted quote or summary",
+                "transform": "deterministic producer transform",
+                "bundle_id": "agent/replay bundle id when applicable",
+                "calibration_effect": "accepted | edited | rejected | observed",
+            }
+        ],
         "suggested_baseline_text": "Concise proposed guidance.",
         "open_questions": ["questions for the user before promotion"],
     }
 
 
+def baseline_schema_contract(config: ArchiveConfig) -> dict[str, str] | None:
+    schema_path = config.repo_root / BASELINE_SCHEMA_PATH
+    if not schema_path.exists():
+        return None
+    return {
+        "path": str(BASELINE_SCHEMA_PATH).replace("\\", "/"),
+        "content": schema_path.read_text(encoding="utf-8", errors="replace").strip(),
+    }
+
+
 def render_agent_prompt(bundle: dict[str, Any]) -> str:
+    schema_section = render_schema_contract_section(bundle)
     return f"""# AI Baseline Proposal Task
 
 You are helping draft engineering baseline candidates from bounded evidence.
@@ -164,11 +195,26 @@ Return Markdown candidate proposals. For each proposal include:
 ```json
 {json.dumps(bundle['proposal_schema'], indent=2)}
 ```
+{schema_section}
 
 ## Evidence Bundle
 
 Use the adjacent JSON bundle as the source of truth:
 `{bundle['bundle_id']}.json`
+"""
+
+
+def render_schema_contract_section(bundle: dict[str, Any]) -> str:
+    schema_contract = bundle.get("schema_contract")
+    if not isinstance(schema_contract, dict):
+        return ""
+    path = str(schema_contract.get("path", BASELINE_SCHEMA_PATH.as_posix()))
+    return f"""
+## Baseline Schema Contract
+
+Follow `{path}` for artifact ownership, marker grammar, trace fields, and
+validator expectations. The full schema text is included in the adjacent JSON
+bundle under `schema_contract.content`.
 """
 
 

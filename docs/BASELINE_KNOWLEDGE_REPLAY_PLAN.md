@@ -1,6 +1,6 @@
 # Baseline Knowledge + Replay Plan
 
-> **Status:** `DRAFT` - design review for issues #23, #25, and #26. **Owner:** `avidullu`. **Created:** `2026-07-07`. **Last updated:** `2026-07-07`
+> **Status:** `IN PROGRESS` - execution tracker for issues #23, #25, and #26. **Owner:** `avidullu`. **Created:** `2026-07-07`. **Last updated:** `2026-07-07`
 > **Lifecycle:** `DRAFT -> IN PROGRESS -> DONE -> archived`
 > **Tracking anchors:** Section 7 is the source of truth; indexed in `docs/README.md`; pointer in `SESSION_HANDOFF.md`.
 > **Relation to existing docs:** extends `docs/BASELINE_LOOP_CLOSURE.md`, `docs/CALIBRATION_EFFICACY.md`, and `docs/COMPOSE_STACK.md`; treats issue #19 as a shared provenance dependency.
@@ -10,10 +10,10 @@
 
 ## 0. TL;DR
 
-Build the compounding knowledge layer, read-only handoff audit, and replay
+Build the compounding knowledge layer, report-only handoff audit, and replay
 pipeline as one safety-first program. The shared substrate is a deterministic,
 human-gated `baseline/SCHEMA.md`, #19-aligned trace fields, marker-owned project
-pages, and lint gates. Read-only handoff coverage can ship early; any generated
+pages, and lint gates. Report-only handoff coverage can ship early; any generated
 knowledge writes or replay egress wait for schema, provenance, ingest-integrity,
 and redaction contracts.
 
@@ -40,7 +40,7 @@ without giving an LLM silent write access to policy.
 
 | # | Decision | Source / date | Implication |
 |---|---|---|---|
-| D1 | Do `baseline/SCHEMA.md` before generated knowledge writes or replay egress. | #26 + research, 2026-07-07 | Derived pages, proposals, replay bundles, and ingested replay results get ownership, provenance, and lint rules before they write. A read-only handoff coverage audit may ship earlier. |
+| D1 | Do `baseline/SCHEMA.md` before generated knowledge writes or replay egress. | #26 + research, 2026-07-07 | Derived pages, proposals, replay bundles, and ingested replay results get ownership, provenance, and lint rules before they write. A report-only handoff coverage audit may ship earlier. |
 | D2 | Keep raw sources immutable and derived pages deterministic. | LLM-wiki prior art `[researched]` | Use marker-block upserts and generated sections; do not let an LLM freely rewrite project pages. |
 | D3 | Ship handoff mining before replay. | #23/#25 scope comparison `[design]` | Handoffs are already summary artifacts, so they validate schema/provenance with less execution risk. |
 | D4 | Replay execution is out-of-band in v1. | #25 + eval tooling research `[researched]` | This repo selects and bundles sessions; another agent/panel runs the replay and submits structured output. |
@@ -73,8 +73,10 @@ flowchart LR
   Schema --> Pages["baseline/projects/<slug>/README.md"]
   Schema --> Lint["baseline lint"]
 
-  Handoffs["handoff artifacts"] --> HandoffMiner["baseline handoffs audit"]
-  HandoffMiner --> HandoffIndex["baseline/handoffs/index.jsonl"]
+  Handoffs["handoff artifacts"] --> HandoffAudit["baseline handoffs audit"]
+  HandoffAudit --> AuditReport["baseline/handoffs/audit.md"]
+  Handoffs --> HandoffIndexer["baseline handoffs index"]
+  HandoffIndexer --> HandoffIndex["baseline/handoffs/index.jsonl"]
   HandoffIndex --> Pages
   HandoffIndex --> Proposals["baseline/proposals/*.json"]
 
@@ -143,8 +145,10 @@ Handoff mining should be deterministic and auditable:
 
 - Discover `SESSION_HANDOFF.md`, `session-handoff.md`, `MEMORY.md` start-here
   pointers, and agent-specific handoff sections in archived sessions.
-- Normalize records into `baseline/handoffs/index.jsonl`.
-- Render `baseline handoffs audit` as markdown for human review.
+- K2 `baseline handoffs audit` writes only `baseline/handoffs/audit.md` as a
+  coverage/freshness report; it does not write pages, proposals, or indexes.
+- K6 `baseline handoffs index` normalizes records into
+  `baseline/handoffs/index.jsonl`.
 - Feed stable patterns into project pages and optional proposal JSON.
 - Extract structured fields with heading/marker scraping only. This is
   deterministic for repo handoffs that follow the local convention (`## Next
@@ -279,7 +283,7 @@ tracker ships the minimal deterministic scanner as the replay egress gate.
 |---|---|---|---|
 | `baseline/SCHEMA.md` | Human-reviewed docs PR | all baseline producers | Required before generated knowledge writes. |
 | `baseline/projects/<slug>/README.md` | humans + marker-block upserts | agents and reviewers | Existing page shape is reused. |
-| `baseline/handoffs/index.jsonl` | `baseline handoffs audit` | project page updater, proposal generator | Deterministic, append/upsert by source id. |
+| `baseline/handoffs/index.jsonl` | `baseline handoffs index` | project page updater, proposal generator | Deterministic, append/upsert by source id. |
 | `baseline/handoffs/audit.md` | `baseline handoffs audit` | human reviewer | Human-readable gaps and confidence. |
 | `baseline/replay/manifest.jsonl` | `baseline replay select` | bundle command | Tracked only if it contains session refs/exclusion reasons and no excerpts. |
 | `baseline/replay/bundles/*` | `baseline replay bundle` | external replayer/panel | Gitignored; bundles may contain session excerpts. |
@@ -302,12 +306,12 @@ Legend: `Todo`, `In progress`, `Done`, `Blocked/gated`. One small PR per row.
 | ID | Deliverable | Issue | Depends on | Gated? | Status | PR |
 |---|---|---|---|---|---|---|
 | K0 | Tracked design plan, docs index, and handoff pointer | #23/#25/#26 | - | No | Done | #45 |
-| K1 | `baseline/SCHEMA.md` with page types, existing marker grammar, #19-aligned trace fields, and lint/validator contract | #26/#19 | K0 | Yes | Todo | - |
-| K2 | Read-only `baseline handoffs audit` coverage/freshness report; no page/proposal writes | #23 | K0 | No | Todo | - |
+| K1 | `baseline/SCHEMA.md` with page types, existing marker grammar, #19-aligned trace fields, and lint/validator contract | #26/#19 | K0 | Yes | In progress | - |
+| K2 | Report-only `baseline handoffs audit` coverage/freshness report; writes `baseline/handoffs/audit.md` only and no page/proposal/index writes | #23 | K0 | No | Todo | - |
 | K3 | Reuse/extend `upsert_promoted_content()` for project-page generated sections | #26 | K1, TD4 #31 | Yes | Todo | - |
 | K4 | `baseline lint` skeleton for schema, links, stale blocks, orphan pages, and P6 contradiction checks | #26 | K1,K3 | Yes | Todo | - |
 | K5 | Proposal + `Prediction` trace-field extension and ingest reference validation against `archive/index.jsonl` | #19/#23/#25 | K1 | Yes | Todo | - |
-| K6 | Handoff discovery records in `baseline/handoffs/index.jsonl` and project-page feed | #23/#26 | K2,K3,K5 | No | Todo | - |
+| K6 | `baseline handoffs index` discovery records in `baseline/handoffs/index.jsonl` and project-page feed | #23/#26 | K2,K3,K5 | No | Todo | - |
 | K7 | Handoff-derived proposal generation with trace records | #23 | K5,K6 | Yes | Todo | - |
 | K8 | `baseline replay select` deterministic manifests, excluding coding sessions | #25 | K1 | No | Todo | - |
 | K9 | Replay redaction v0: deterministic scanner, redaction report, fixture tests, and bundle gitignore coverage | #25 | K0, P10/P11 design | Yes | Todo | - |
@@ -386,7 +390,8 @@ Additional gate names:
 
 ### Changelog
 
-- 2026-07-07 - Addressed consolidated PR #45 review by promoting replay redaction to a first-class deliverable, aligning trace fields with #19, adding ingest provenance-integrity validation, factoring shared provenance plumbing, allowing read-only handoff audit before schema writes, and defining replay value kill criteria.
+- 2026-07-07 - Started K1 by adding `baseline/SCHEMA.md`, wiring schema references into bundle packets, and separating K2 report-only handoff audit from K6 persistent handoff indexing.
+- 2026-07-07 - Addressed consolidated PR #45 review by promoting replay redaction to a first-class deliverable, aligning trace fields with #19, adding ingest provenance-integrity validation, factoring shared provenance plumbing, allowing report-only handoff audit before schema writes, and defining replay value kill criteria.
 - 2026-07-07 - Addressed PR #45 review by reconciling K rows with P5/P6/P10/P11, reusing shipped marker/upsert code, restoring replay R1-R5 gate names, and clarifying schema validation.
 - 2026-07-07 - Opened draft PR #45 for the design tracker.
 - 2026-07-07 - Created design tracker, indexed it in docs, updated the handoff pointer, and proposed execution sequence for #23, #25, and #26.

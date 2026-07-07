@@ -2,7 +2,7 @@
 
 | Doc | Purpose |
 | --- | --- |
-| [BASELINE_KNOWLEDGE_REPLAY_PLAN.md](BASELINE_KNOWLEDGE_REPLAY_PLAN.md) | **Design (review)** - compounding knowledge layer, handoff mining, and replay loop (#23, #25, #26) |
+| [BASELINE_KNOWLEDGE_REPLAY_PLAN.md](BASELINE_KNOWLEDGE_REPLAY_PLAN.md) | **Active tracked project** - compounding knowledge layer, handoff mining, and replay loop (#23, #25, #26) |
 | [FIRST_USER_SETUP_TRACKER.md](FIRST_USER_SETUP_TRACKER.md) | **DONE** - first-user and new-machine setup UX MVP (#42 + #18) |
 | [NEW_MACHINE_SETUP.md](NEW_MACHINE_SETUP.md) | Copy/paste setup and sync validation checklist for adding another computer |
 | [BASELINE_LOOP_CLOSURE.md](BASELINE_LOOP_CLOSURE.md) | **Active tracked project** — close promote/publish/calibrate loop (§7 tracker) |
