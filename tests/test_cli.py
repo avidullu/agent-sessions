@@ -218,6 +218,17 @@ class TestBuildParser:
         assert args.max_archive_records == 10
         assert args.dry_run is True
 
+    def test_baseline_replay_select(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            ["baseline", "replay", "select", "--kind", "planning", "--limit", "5", "--dry-run"]
+        )
+        assert args.baseline_cmd == "replay"
+        assert args.replay_cmd == "select"
+        assert args.kind == "planning"
+        assert args.limit == 5
+        assert args.dry_run is True
+
     def test_baseline_handoffs_index(self) -> None:
         parser = build_parser()
         args = parser.parse_args(
@@ -511,6 +522,15 @@ class TestMainBaselineSubcommands:
 
     def test_publish(self) -> None:
         assert main(["baseline", "publish", "--dry-run"]) == 0
+
+    def test_replay_select(self) -> None:
+        archive_dir = self.repo_root / "archive"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / "index.jsonl").write_text(
+            '{"source":"s","kind":"k","sha256":"a","messages":1,"markdown":"a/s.md","metadata":{}}\n',
+            encoding="utf-8",
+        )
+        assert main(["baseline", "replay", "select", "--dry-run"]) == 0
 
     def test_bundle(self) -> None:
         archive_dir = self.repo_root / "archive"

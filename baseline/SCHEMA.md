@@ -178,6 +178,7 @@ Required validator behavior:
 
 ## 9. Changelog
 
+- 2026-07-07: Added K8 `baseline replay select` deterministic, excerpt-free replay manifest (`baseline/replay/manifest.jsonl`) excluding coding sessions.
 - 2026-07-07: Added K7 generated handoff proposal ownership rules and stable project-page generated dates for unchanged feeds.
 - 2026-07-07: Added K6 persistent handoff index records and configured project-page `handoffs.index` feeds.
 - 2026-07-07: Added K5 proposal trace propagation and ingest reference validation.
