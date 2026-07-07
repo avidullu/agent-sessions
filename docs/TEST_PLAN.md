@@ -100,7 +100,8 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated.
 | T20 | `test_baseline_replay.py` | T0 | No | ☑ | 31 tests, replay selection scoring, coding exclusion, kind filter, deterministic manifest, redaction preflight |
 | T21 | `test_baseline_redaction.py` | T0 | No | ☑ | 17 tests, fail-closed secret detection, placeholders, valueless deterministic report |
 | T22 | `test_baseline_replay_ingest.py` | T0 | No | ☑ | 14 tests, replay-result validation, replay.* proposal conversion (passes K5), ledger append |
-| T23 | Run `pytest --cov` and verify >80% overall | T1–T22 | No | ☑ | **96.98%** (571 passed) |
+| T23 | `test_baseline_eval.py` | T0 | No | ☑ | E1-E6 gates plus K12 W/H/R/governance gates and `gated` status |
+| T24 | Run `pytest --cov` and verify >80% overall | T1–T23 | No | ☑ | **96.94%** (576 passed) |
 
 `test_baseline_replay.py` (T20) also covers K10 `baseline replay bundle`: turn
 extraction, redacted packet/rubric/report writes, and fail-closed skip of
