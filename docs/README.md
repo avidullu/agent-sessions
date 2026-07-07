@@ -2,6 +2,8 @@
 
 | Doc | Purpose |
 | --- | --- |
+| [FIRST_USER_SETUP_TRACKER.md](FIRST_USER_SETUP_TRACKER.md) | **Active tracked project** - first-user and new-machine setup UX (#42 + #18) |
+| [NEW_MACHINE_SETUP.md](NEW_MACHINE_SETUP.md) | Copy/paste setup and sync validation checklist for adding another computer |
 | [BASELINE_LOOP_CLOSURE.md](BASELINE_LOOP_CLOSURE.md) | **Active tracked project** — close promote/publish/calibrate loop (§7 tracker) |
 | [CALIBRATION_EFFICACY.md](CALIBRATION_EFFICACY.md) | Measurable efficacy gates E1–E6 |
 | [BASELINE_WATCHLIST_TOMBSTONES.md](BASELINE_WATCHLIST_TOMBSTONES.md) | **Design (review)** — watchlist backlog + rejection tombstones (P10/P11) |

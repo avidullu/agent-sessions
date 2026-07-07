@@ -46,6 +46,57 @@ python .\tools\agent_archive.py export --all --copy-raw
 Raw files land under `raw/`, which is ignored by Git unless you intentionally
 force-add it.
 
+### Expected Outputs
+
+`discover --write docs\DISCOVERY.md` refreshes the local source inventory:
+
+- configured source roots, whether each root exists, and matching file counts;
+- sample files per source;
+- inventory-only sources such as Copilot/ZAI storage locations, even when they
+  are not exportable transcript sources yet.
+
+`status` prints archive freshness and convergence signals:
+
+- indexed records, visible configured files, new files, and changed files;
+- indexed records not visible from this machine, preserved from other machines;
+- source counts and inferred origin environments.
+
+`export --all` writes Markdown archive artifacts and updates the shared catalog:
+
+- `archive/**/*.md`
+- `archive/index.jsonl`
+- `archive/INDEX.md`
+
+`export --all --pdf` also writes `archive/**/*.pdf` when `reportlab` is
+installed. The `.[dev]` install includes `reportlab`; to check a minimal
+environment, run:
+
+```powershell
+python -c "import reportlab; print('reportlab ok')"
+```
+
+If PDF support is missing, Markdown export still works. The CLI will report that
+PDF export requires `reportlab`.
+
+Some configured sources are intentionally inventory-only. A message like this is
+expected unless transcript files exist in supported locations:
+
+```text
+Skipped sources without extractors:
+- copilot-vscode-windows-inventory (inventory)
+- copilot-vscode-wsl-ubuntu-inventory (inventory)
+- zai-vscode-wsl-ubuntu-inventory (inventory)
+```
+
+After a real export, review only the intended generated paths:
+
+```powershell
+git status --short archive/ docs/DISCOVERY.md
+```
+
+Stage explicit paths only. Do not commit `sources.toml`, `raw/`, or unrelated
+files.
+
 ## Agent-Assisted Setup
 
 To set this up on a new computer with Codex, Claude, Gemini, Grok, DeepSeek, or
@@ -119,7 +170,8 @@ Value preview:
 
 See [docs/AUTOMATION.md](docs/AUTOMATION.md) for scheduled export details and
 [docs/MULTI_MACHINE.md](docs/MULTI_MACHINE.md) for how indexes converge across
-computers.
+computers. For a step-by-step manual checklist, see
+[docs/NEW_MACHINE_SETUP.md](docs/NEW_MACHINE_SETUP.md).
 
 ## Adding Agents
 
@@ -143,13 +195,20 @@ Create or refresh the baseline scaffold:
 python .\tools\agent_archive.py baseline scaffold
 ```
 
+Expected output: missing baseline folders and templates are created under
+`baseline/`, including calibration examples and proposal scaffolding. Existing
+files are preserved.
+
 Generate reviewable candidate predictions from the archive:
 
 ```powershell
 python .\tools\agent_archive.py baseline suggest
 ```
 
-Candidate reports are suggestions with provenance and calibration hooks. Copy
+Expected output: a dated candidate report appears under `baseline/candidates/`,
+with a matching `.predictions.json` sidecar, and the prediction ledger under
+`baseline/metacognition/` is updated. Candidate reports are suggestions with
+provenance and calibration hooks. Copy
 `baseline/calibration/feedback.example.toml` to
 `baseline/calibration/feedback.toml` to mark predictions as accepted, edited, or
 rejected before the next run.
@@ -189,8 +248,9 @@ See [plugins/pr-review-loop/README.md](plugins/pr-review-loop/README.md).
 
 ## Other Machines
 
-Clone this private repo on another machine, run the same discovery/export
-commands there, commit the new `archive/` Markdown/PDF files, and push.
+Clone this private repo on another machine, follow
+[docs/NEW_MACHINE_SETUP.md](docs/NEW_MACHINE_SETUP.md), commit the new `archive/`
+Markdown/PDF files, and push.
 The archive index is merge-aware, so records from other machines remain in the
 unified view when one machine exports only the local sources it can see.
 

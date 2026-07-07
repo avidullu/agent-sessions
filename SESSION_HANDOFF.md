@@ -17,6 +17,10 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
 
 ## Next Steps / Open Threads
 
+- **Active tracked project:** `docs/FIRST_USER_SETUP_TRACKER.md` (#42 + #18
+  setup UX). Decision locked 2026-07-07: docs/tracker PR first, then optional
+  CLI `doctor`/summary polish; issue #32 remains separate backfill/regenerate
+  work except for boundary notes.
 - **Active tracked project:** `docs/BASELINE_LOOP_CLOSURE.md` (§7 closure tracker).
 - **Completed tracked project:** tech-debt remediation (TD1-TD15, PRs #28-#40)
   is DONE and archived at `docs/archives/TECH_DEBT_PLAN.md`. Related follow-up:
@@ -50,6 +54,8 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
 
 - `README.md`
 - `docs/DISCOVERY.md`
+- `docs/FIRST_USER_SETUP_TRACKER.md`
+- `docs/NEW_MACHINE_SETUP.md`
 - `docs/ROADMAP.md`
 - `docs/ENGINEERING_BASELINE.md`
 - `docs/BASELINE_PLANNING.md`

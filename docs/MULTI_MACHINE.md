@@ -6,6 +6,9 @@ artifacts back to the private GitHub repo.
 
 ## How Machines Converge
 
+For a practical bootstrap checklist, see
+[NEW_MACHINE_SETUP.md](NEW_MACHINE_SETUP.md).
+
 1. Clone this private repo on each computer.
 2. Configure local source roots with `sources.toml` only when defaults are not
    enough. Keep `sources.toml` uncommitted.
@@ -28,6 +31,8 @@ not visible from the current machine.
 Existing rows written under the old path-only keying are left as-is; a one-time
 backfill and a `regenerate` (backup-and-rebuild) path are tracked separately, and
 `agent-archive prune` drops index rows whose archive Markdown no longer exists.
+Do not hand-edit the archive index during setup to solve old duplicate/stale
+records; use the future backfill/regenerate path tracked in issue #32.
 
 ## Unified User View
 
