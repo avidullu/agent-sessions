@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from agent_sessions.baseline_replay import (
+    baseline_replay_redact,
     baseline_replay_select,
     evaluate_record,
     infer_kind,
@@ -313,3 +314,43 @@ class TestBaselineReplaySelect:
         manifest = repo_root / "baseline" / "replay" / "manifest.jsonl"
         assert manifest.exists()
         assert manifest.read_text(encoding="utf-8") == ""
+
+
+class TestBaselineReplayRedact:
+    def _select(self, repo_root: Path, body: str) -> None:
+        _write_archive(
+            repo_root,
+            [_record("archive/demo/plan.md", sha="1" * 64, session="s1", messages=10, body=body)],
+        )
+        assert baseline_replay_select(_config(repo_root), limit=20) == 0
+
+    def test_clean_sessions_allow_and_write_report(self, repo_root: Path) -> None:
+        self._select(repo_root, _planning_markdown())
+        rc = baseline_replay_redact(_config(repo_root))
+        assert rc == 0
+        report = repo_root / "baseline" / "replay" / "bundles" / "redaction-preflight.json"
+        assert report.exists()
+        payload = json.loads(report.read_text(encoding="utf-8"))
+        assert payload["blocked"] == 0 and payload["total"] == 1
+
+    def test_secret_session_blocks_fail_closed(self, repo_root: Path) -> None:
+        body = _planning_markdown() + "\n\nleak ghp_" + "a" * 36 + "\n"
+        self._select(repo_root, body)
+        rc = baseline_replay_redact(_config(repo_root))
+        assert rc == 1  # fail-closed: non-zero blocks the egress gate
+        report = repo_root / "baseline" / "replay" / "bundles" / "redaction-preflight.json"
+        payload = json.loads(report.read_text(encoding="utf-8"))
+        assert payload["blocked"] == 1
+        # report carries no secret value
+        assert "ghp_" not in report.read_text(encoding="utf-8")
+
+    def test_missing_manifest_raises(self, repo_root: Path) -> None:
+        with pytest.raises(SystemExit):
+            baseline_replay_redact(_config(repo_root))
+
+    def test_dry_run_does_not_write_report(self, repo_root: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        self._select(repo_root, _planning_markdown())
+        rc = baseline_replay_redact(_config(repo_root), dry_run=True)
+        assert rc == 0
+        assert "Redaction preflight" in capsys.readouterr().out
+        assert not (repo_root / "baseline" / "replay" / "bundles" / "redaction-preflight.json").exists()

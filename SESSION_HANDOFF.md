@@ -29,28 +29,32 @@ Today landed a long run of small PRs:
 - #52 K7: `baseline handoffs proposals` deterministic proposal JSON generation
   with a hand-written-proposal overwrite guard and the #51 stable generated-date
   follow-up.
+- #53 K8: `baseline replay select` deterministic, excerpt-free replay manifest
+  excluding coding sessions (D5); idempotent for gate R2-dedup.
 
-PR #53 is open for K8:
+PR #54 is open for K9 (**safety-critical — awaiting explicit human OK to merge**):
 
-- Branch: `claude/replay-select`
-- `baseline replay select` scores archived sessions for replayability and writes
-  a deterministic `baseline/replay/manifest.jsonl` of selected + near-miss
-  candidates with exclusion reasons and **no transcript excerpts** (so the
-  manifest stays trackable). Coding sessions are excluded in v1 (D5). Re-running
-  reproduces the manifest byte-for-byte (gate R2-dedup).
-- Dogfood run: scanned 3,114 candidates -> 20 selected, 20 near-miss,
-  3,013 hard-excluded (mostly coding).
+- Branch: `claude/replay-redaction`
+- `agent_sessions/baseline_redaction.py`: deterministic, fail-closed secret
+  scanner (GitHub/OpenAI/AWS/Slack tokens, private keys, passworded connection
+  strings, `*TOKEN*`/`*SECRET*`/`*PASSWORD*`/`*API_KEY*`/`*PRIVATE_KEY*` env
+  assignments). High-confidence secrets **block** the egress gate; emails and
+  private paths are placeholdered. The redaction report records counts,
+  placeholder ids, blocked reasons, source refs, and scanner version — **never
+  secret values**.
+- `baseline replay redact` preflight scans the selected manifest sessions and
+  writes `baseline/replay/bundles/redaction-preflight.json` (gitignored),
+  returning non-zero when any candidate is blocked (gate R5-safety).
 
 ## Next Steps / Open Threads
 
-1. K9 (`replay redaction v0`) is next and is **safety-critical**: a deterministic
-   fail-closed secret scanner + `redaction-report.json`, gating replay egress.
-   `baseline/replay/bundles/` is already gitignored. Get an explicit human OK
-   before merging K9 since it is the only path that moves transcript excerpts
-   off the machine.
-2. Then K10 (`baseline replay bundle`, blocked on K8+K9), K11 (`baseline replay
-   ingest`, reuses K5 trace validation, writes `baseline/replay/ledger.jsonl`),
-   and K12 (efficacy gates W/H/R wired into `baseline eval`).
+1. Merge K9 only after explicit human approval (it is the sole path that would
+   move transcript excerpts off the machine, though K9 itself writes no bundle).
+2. Then K10 (`baseline replay bundle`, blocked on K8+K9 — runs the redaction
+   preflight, then writes gitignored prompt/evidence/rubric packets only if the
+   gate passes), K11 (`baseline replay ingest`, reuses K5 trace validation,
+   writes `baseline/replay/ledger.jsonl`), and K12 (efficacy gates W/H/R wired
+   into `baseline eval`).
 3. Merge gate for every slice: `git diff --check`, `ruff`, `mypy`, full pytest
    with coverage, plus `baseline lint --dry-run` when generated artifacts change.
 

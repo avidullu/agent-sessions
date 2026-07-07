@@ -17,6 +17,7 @@ reproduces the manifest byte-for-byte (gate R2-dedup).
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import re
 from dataclasses import dataclass, field
@@ -403,3 +404,53 @@ def load_manifest(path: Path) -> list[dict[str, Any]]:
 
 def selected_manifest_entries(path: Path) -> list[dict[str, Any]]:
     return [record for record in load_manifest(path) if record.get("selected") is True]
+
+
+def baseline_replay_redact(
+    config: ArchiveConfig,
+    *,
+    manifest: Path | None = None,
+    output: Path | None = None,
+    limit: int = 0,
+    dry_run: bool = False,
+) -> int:
+    """Redaction preflight (K9): scan the selected sessions and write a
+    fail-closed redaction report. Returns non-zero when any candidate contains a
+    high-confidence secret, so the egress gate blocks before any bundle exists.
+    No transcript content is written — only counts, placeholder ids, and blocked
+    reasons land in the report."""
+    from .baseline_redaction import build_preflight_report, preflight_to_dict, write_preflight_report
+
+    settings = load_baseline_settings(config)
+    manifest_path = manifest or settings.root / "replay" / "manifest.jsonl"
+    if not manifest_path.is_absolute():
+        manifest_path = config.repo_root / manifest_path
+    if not manifest_path.exists():
+        raise SystemExit(f"Replay manifest does not exist: {manifest_path}. Run `baseline replay select` first.")
+
+    entries = selected_manifest_entries(manifest_path)
+    if limit > 0:
+        entries = entries[:limit]
+    items: list[tuple[str, str]] = []
+    for entry in entries:
+        markdown_path = str(entry.get("markdown_path", ""))
+        md = archive_markdown_path(config.repo_root, markdown_path)
+        text = md.read_text(encoding="utf-8", errors="replace") if md.exists() else ""
+        items.append((str(entry.get("id") or markdown_path), text))
+
+    preflight = build_preflight_report(items, generated_at=dt.date.today().isoformat())
+    report_path = output or settings.root / "replay" / "bundles" / "redaction-preflight.json"
+    if not report_path.is_absolute():
+        report_path = config.repo_root / report_path
+    summary = (
+        f"Redaction preflight ({preflight.scanner_version}): {preflight.total} candidate(s), "
+        f"{preflight.blocked} blocked, {preflight.allowed} allowed."
+    )
+    if dry_run:
+        print(json.dumps(preflight_to_dict(preflight), indent=2, ensure_ascii=False, sort_keys=True))
+        print(summary)
+    else:
+        write_preflight_report(report_path, preflight)
+        print(f"Wrote {report_path}")
+        print(summary)
+    return 1 if preflight.blocked else 0

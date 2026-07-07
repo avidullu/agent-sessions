@@ -86,6 +86,11 @@ baseline/
   selected and near-miss candidates with exclusion reasons and no transcript
   excerpts. Coding sessions are excluded in v1; redaction and bundle egress are
   later gated work.
+- Replay redaction: `baseline replay redact` runs a deterministic, fail-closed
+  secret scan over the selected sessions and writes a valueless
+  `redaction-report.json` under the gitignored `baseline/replay/bundles/`.
+  High-confidence secrets block the egress gate (non-zero exit); low-risk emails
+  and private paths are placeholdered. Secret values are never recorded.
 
 ## Guardrails
 
