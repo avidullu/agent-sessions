@@ -6,11 +6,16 @@ import datetime as dt
 import json
 from pathlib import Path
 
+import pytest
+
+from agent_sessions.baseline_ingest import archive_references, validate_proposal
 from agent_sessions.baseline_handoffs import (
     ArchiveHandoffHit,
     archive_handoff_hit,
     baseline_handoffs_index,
+    baseline_handoffs_proposals,
     baseline_handoffs_audit,
+    build_handoff_proposals,
     build_handoff_audit,
     build_handoff_index_records,
     handoff_index_record,
@@ -20,6 +25,7 @@ from agent_sessions.baseline_handoffs import (
     load_handoff_index,
     project_slug_for_raw,
     project_slug_map,
+    project_page_updates,
     render_project_handoff_feed,
     scan_archive_handoff_hits,
     render_handoff_audit,
@@ -310,6 +316,54 @@ class TestHandoffIndex:
         ], generated_at="2026-07-07")
         assert "`1` more indexed handoff candidate(s)." in rendered
 
+    def test_project_page_feed_reuses_date_when_content_unchanged(self, repo_root: Path) -> None:
+        settings = load_baseline_settings(_config(repo_root))
+        record = handoff_index_record(_hit(), "project")
+        page = repo_root / "baseline" / "projects" / "project" / "README.md"
+        page.parent.mkdir(parents=True, exist_ok=True)
+        existing_block = render_project_handoff_feed("project", [record], generated_at="2026-07-07")
+        page.write_text(f"# project\n\n{existing_block}\n", encoding="utf-8")
+
+        updates = project_page_updates(settings, [record], generated_at="2026-07-08")
+
+        assert "**Generated at:** 2026-07-07" in updates[page]
+        assert "**Generated at:** 2026-07-08" not in updates[page]
+
+    def test_project_page_feed_updates_date_when_content_changes(self, repo_root: Path) -> None:
+        settings = load_baseline_settings(_config(repo_root))
+        first = handoff_index_record(_hit(), "project")
+        second = handoff_index_record(
+            _hit(markdown_path="archive/codex/s2.md", session_id="s2"),
+            "project",
+        )
+        page = repo_root / "baseline" / "projects" / "project" / "README.md"
+        page.parent.mkdir(parents=True, exist_ok=True)
+        existing_block = render_project_handoff_feed("project", [first], generated_at="2026-07-07")
+        page.write_text(f"# project\n\n{existing_block}\n", encoding="utf-8")
+
+        updates = project_page_updates(settings, [first, second], generated_at="2026-07-08")
+
+        assert "**Generated at:** 2026-07-08" in updates[page]
+        assert "[archive/codex/s2.md](../../../archive/codex/s2.md)" in updates[page]
+
+    def test_project_page_feed_uses_new_date_when_existing_block_has_no_date(self, repo_root: Path) -> None:
+        settings = load_baseline_settings(_config(repo_root))
+        record = handoff_index_record(_hit(), "project")
+        page = repo_root / "baseline" / "projects" / "project" / "README.md"
+        page.parent.mkdir(parents=True, exist_ok=True)
+        page.write_text(
+            "# project\n\n"
+            '<!-- baseline:begin id="handoffs.index" -->\n'
+            "## Handoff Signals\n\n"
+            "Old generated content.\n"
+            '<!-- baseline:end id="handoffs.index" -->\n',
+            encoding="utf-8",
+        )
+
+        updates = project_page_updates(settings, [record], generated_at="2026-07-08")
+
+        assert "**Generated at:** 2026-07-08" in updates[page]
+
 
 class TestBaselineHandoffsAudit:
     def test_writes_only_audit_file(self, repo_root: Path) -> None:
@@ -361,3 +415,92 @@ class TestBaselineHandoffsIndex:
         assert "Would write" in capsys.readouterr().out
         assert not (repo_root / "baseline" / "handoffs" / "index.jsonl").exists()
         assert not (repo_root / "baseline" / "projects" / "project" / "README.md").exists()
+
+
+class TestHandoffProposals:
+    def test_builds_valid_project_proposal_with_trace(self, repo_root: Path) -> None:
+        settings = load_baseline_settings(_config(repo_root))
+        hit = _hit(
+            markdown_path="archive/codex/session.md",
+            session_id="session",
+            project_raw="test-pilot",
+            sections=("You Are Here", "Ramp-Up Kit"),
+            signals=("session handoff", "ramp-up kit"),
+        )
+        proposal = build_handoff_proposals(settings, [handoff_index_record(hit, "test-pilot")])[0]
+        assert proposal["id"] == "handoff.test-pilot.handoff-signals"
+        assert proposal["scope"] == "project:test-pilot"
+        assert proposal["generated_by"] == "baseline handoffs proposals"
+        assert proposal["trace"][0]["transform"] == "baseline handoffs proposals"
+        refs = archive_references([{"markdown": "archive/codex/session.md", "metadata": {"session_id": "session"}}])
+        assert validate_proposal(proposal, refs) == []
+
+    def test_builds_warning_question_for_nonconforming_handoffs(self, repo_root: Path) -> None:
+        settings = load_baseline_settings(_config(repo_root))
+        hit = _hit(project_raw="test-pilot", warnings=("no standard handoff headings",))
+        proposal = build_handoff_proposals(settings, [handoff_index_record(hit, "test-pilot")])[0]
+        assert "1 indexed handoff candidate(s) lack standard headings" in proposal["open_questions"][1]
+
+    def test_build_skips_unknown_project_slugs(self, repo_root: Path) -> None:
+        settings = load_baseline_settings(_config(repo_root))
+        hit = _hit(project_raw="", markdown_path="archive/codex/session.md")
+        assert build_handoff_proposals(settings, [handoff_index_record(hit, "unknown-project")]) == []
+
+    def test_missing_index_raises(self, repo_root: Path) -> None:
+        with pytest.raises(SystemExit, match="Run `baseline handoffs index` first"):
+            baseline_handoffs_proposals(_config(repo_root), index=Path("missing-index.jsonl"))
+
+    def test_writes_handoff_proposals_from_index(self, repo_root: Path) -> None:
+        _write_archive_handoff(repo_root, project_raw="test-pilot")
+        assert baseline_handoffs_index(_config(repo_root)) == 0
+        result = baseline_handoffs_proposals(_config(repo_root))
+        assert result == 0
+        proposal_path = repo_root / "baseline" / "proposals" / "handoff.test-pilot.handoff-signals.json"
+        proposal = json.loads(proposal_path.read_text(encoding="utf-8"))
+        assert proposal["source_kind"] == "repo-handoff"
+        assert proposal["trace"][0]["markdown_path"] == "archive/codex/s1.md"
+
+    def test_accepts_relative_index_and_output_dir(self, repo_root: Path) -> None:
+        _write_archive_handoff(repo_root, project_raw="test-pilot")
+        assert baseline_handoffs_index(_config(repo_root), output=Path("custom-index.jsonl")) == 0
+
+        result = baseline_handoffs_proposals(
+            _config(repo_root),
+            index=Path("custom-index.jsonl"),
+            output_dir=Path("custom-proposals"),
+        )
+
+        assert result == 0
+        assert (repo_root / "custom-proposals" / "handoff.test-pilot.handoff-signals.json").exists()
+
+    def test_proposals_dry_run_does_not_write(self, repo_root: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        _write_archive_handoff(repo_root, project_raw="test-pilot")
+        assert baseline_handoffs_index(_config(repo_root)) == 0
+        result = baseline_handoffs_proposals(_config(repo_root), dry_run=True)
+        assert result == 0
+        assert "Would write 1 handoff proposal(s)." in capsys.readouterr().out
+        assert not (repo_root / "baseline" / "proposals" / "handoff.test-pilot.handoff-signals.json").exists()
+
+    def test_proposals_require_positive_record_limit(self, repo_root: Path) -> None:
+        _write_archive_handoff(repo_root, project_raw="test-pilot")
+        assert baseline_handoffs_index(_config(repo_root)) == 0
+        with pytest.raises(SystemExit, match="max-records-per-project"):
+            baseline_handoffs_proposals(_config(repo_root), max_records_per_project=0)
+
+    def test_refuses_to_overwrite_human_proposal(self, repo_root: Path) -> None:
+        _write_archive_handoff(repo_root, project_raw="test-pilot")
+        assert baseline_handoffs_index(_config(repo_root)) == 0
+        proposal_path = repo_root / "baseline" / "proposals" / "handoff.test-pilot.handoff-signals.json"
+        proposal_path.parent.mkdir(parents=True, exist_ok=True)
+        proposal_path.write_text('{"id": "handoff.test-pilot.handoff-signals"}\n', encoding="utf-8")
+        with pytest.raises(SystemExit, match="Refusing to overwrite non-generated proposal"):
+            baseline_handoffs_proposals(_config(repo_root))
+
+    def test_refuses_to_overwrite_invalid_json_proposal(self, repo_root: Path) -> None:
+        _write_archive_handoff(repo_root, project_raw="test-pilot")
+        assert baseline_handoffs_index(_config(repo_root)) == 0
+        proposal_path = repo_root / "baseline" / "proposals" / "handoff.test-pilot.handoff-signals.json"
+        proposal_path.parent.mkdir(parents=True, exist_ok=True)
+        proposal_path.write_text("{invalid json\n", encoding="utf-8")
+        with pytest.raises(SystemExit, match="Refusing to overwrite non-JSON proposal"):
+            baseline_handoffs_proposals(_config(repo_root))

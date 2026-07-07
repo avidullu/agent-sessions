@@ -30,14 +30,17 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   `baseline lint` skeleton for schema, marker, generated-link, stale-block,
   orphan-page, and explicit contradiction checks. PR #50 merged K5:
   proposal trace-field threading plus `archive/index.jsonl` reference
-  validation for replay/handoff proposal ingest. PR #51 is open for K6 on branch
-  `codex/handoffs-index-feed` in
-  `C:\Users\avidu\Projects\Agent Sessions - handoffs-index-feed`: persistent
+  validation for replay/handoff proposal ingest. PR #51 merged K6: persistent
   `baseline/handoffs/index.jsonl`, marker-owned `handoffs.index` project-page
   feeds for configured/existing pages, and small #49/#50 review follow-ups.
-  K7 still owns handoff-derived proposal generation. Related
-  issue #19 is folded in as lightweight provenance substrate; #32 remains
-  separate backfill/regenerate work.
+  K7 is active on branch `codex/handoff-proposal-generation` in
+  `C:\Users\avidu\Projects\Agent Sessions - handoff-proposals`: generated
+  handoff-derived proposal JSON under `baseline/proposals/`, structured trace
+  validation through `baseline ingest --dry-run`, and the #51 review follow-up
+  that keeps project-page feed dates stable when generated content is unchanged.
+  Related issue #19 is folded in as lightweight provenance substrate; #32
+  remains separate backfill/regenerate work, including any future handoff-index
+  prune semantics.
 - **Completed tracked project:** `docs/FIRST_USER_SETUP_TRACKER.md` (#42 + #18
   setup UX). MVP completed by PRs #43 and #44; optional future work is the P7
   `doctor`/`setup` command. Issue #32 remains separate backfill/regenerate work
@@ -86,6 +89,7 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
 - `baseline/SCHEMA.md`
 - `baseline/handoffs/audit.md`
 - `baseline/handoffs/index.jsonl`
+- `baseline/proposals/handoff.*.handoff-signals.json`
 - `docs/archives/TECH_DEBT_PLAN.md`
 - `docs/CALIBRATION_EFFICACY.md`
 - `docs/PROJECT_DOC_TEMPLATE.md`
@@ -145,6 +149,14 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   feed blocks to configured or existing pages. Configured pilot aliases collapse
   multiple raw paths into the canonical slug; digest disambiguators are reserved
   for unknown slug collisions.
+- K7 handoff proposal decision (2026-07-07): generated handoff proposals are
+  deterministic review inputs for configured/existing projects only. They carry
+  `generated_by = "baseline handoffs proposals"` and `source_kind =
+  "repo-handoff"`, refuse to overwrite hand-written proposals, and must pass
+  `baseline ingest --dry-run` before review.
+- K6 review follow-up folded into K7 (2026-07-07): `handoffs.index` project-page
+  feeds preserve the existing `generated_at` value when the generated feed
+  content is otherwise unchanged, avoiding date-only churn on periodic runs.
 - K5 review follow-up folded into K6 (2026-07-07): `normalized_markdown_path()`
   now removes only explicit `./` or leading `/` path prefixes rather than using
   `lstrip("./")`.

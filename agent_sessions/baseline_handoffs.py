@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
 
-from .baseline_promote import render_project_page_block, upsert_project_page_content
+from .baseline_promote import parse_promoted_blocks, render_project_page_block, upsert_project_page_content
 from .baseline_settings import load_baseline_settings
 from .baseline_types import BaselineSettings
 from .config import ArchiveConfig
@@ -20,6 +20,7 @@ from .utils import archive_markdown_path, read_jsonl_dicts, slugify
 
 
 DEFAULT_AUDIT_PATH = Path("baseline/handoffs/audit.md")
+HANDOFF_PROPOSAL_PRODUCER = "baseline handoffs proposals"
 HANDOFF_FILENAMES = ("SESSION_HANDOFF.md", "session-handoff.md")
 MEMORY_FILENAMES = ("MEMORY.md", "memory/MEMORY.md")
 MEMORY_HANDOFF_PATHS = ("memory/session-handoff.md", "memory/SESSION_HANDOFF.md")
@@ -36,6 +37,7 @@ HANDOFF_TERMS = (
     "ramp-up kit",
     "next steps / open threads",
 )
+GENERATED_AT_LINE_RE = re.compile(r"^\*\*Generated at:\*\* (?P<generated_at>.+)$", re.MULTILINE)
 
 
 @dataclass(frozen=True)
@@ -146,6 +148,154 @@ def baseline_handoffs_index(
         path.write_text(content, encoding="utf-8", newline="\n")
         print(f"Wrote {path}")
     return 0
+
+
+def baseline_handoffs_proposals(
+    config: ArchiveConfig,
+    index: Path | None = None,
+    output_dir: Path | None = None,
+    max_records_per_project: int = 5,
+    dry_run: bool = False,
+) -> int:
+    if max_records_per_project <= 0:
+        raise SystemExit("--max-records-per-project must be greater than 0.")
+    settings = load_baseline_settings(config)
+    index_path = index or settings.root / "handoffs" / "index.jsonl"
+    if not index_path.is_absolute():
+        index_path = config.repo_root / index_path
+    if not index_path.exists():
+        raise SystemExit(f"Handoff index does not exist: {index_path}. Run `baseline handoffs index` first.")
+
+    proposals_dir = output_dir or settings.root / "proposals"
+    if not proposals_dir.is_absolute():
+        proposals_dir = config.repo_root / proposals_dir
+    records = load_handoff_index(index_path)
+    proposals = build_handoff_proposals(
+        settings,
+        records,
+        max_records_per_project=max_records_per_project,
+    )
+
+    if dry_run:
+        for proposal in proposals:
+            print(json.dumps(proposal, indent=2, ensure_ascii=False, sort_keys=True))
+            print(f"Would write {proposal_path(proposals_dir, proposal)}")
+        print(f"Would write {len(proposals)} handoff proposal(s).")
+        return 0
+
+    proposals_dir.mkdir(parents=True, exist_ok=True)
+    for proposal in proposals:
+        target = proposal_path(proposals_dir, proposal)
+        assert_generated_proposal_target(target)
+        payload = json.dumps(proposal, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+        target.write_text(payload, encoding="utf-8", newline="\n")
+        print(f"Wrote {target}")
+    return 0
+
+
+def build_handoff_proposals(
+    settings: BaselineSettings,
+    records: list[HandoffIndexRecord],
+    *,
+    max_records_per_project: int = 5,
+) -> list[dict[str, Any]]:
+    known_projects = known_project_slugs(settings)
+    by_project: dict[str, list[HandoffIndexRecord]] = {}
+    for record in records:
+        if record.project_slug not in known_projects:
+            continue
+        by_project.setdefault(record.project_slug, []).append(record)
+    return [
+        handoff_project_proposal(slug, project_records, max_records_per_project=max_records_per_project)
+        for slug, project_records in sorted(by_project.items())
+    ]
+
+
+def handoff_project_proposal(
+    slug: str,
+    records: list[HandoffIndexRecord],
+    *,
+    max_records_per_project: int = 5,
+) -> dict[str, Any]:
+    selected = sorted(records, key=lambda record: (record.markdown_path, record.id))[:max_records_per_project]
+    total = len(records)
+    standard_sections = sorted({section for record in records for section in record.sections})
+    signals = sorted({signal for record in records for signal in record.signals})
+    warnings = sum(1 for record in records if record.warnings)
+    proposal_id = f"handoff.{slug}.handoff-signals"
+    evidence = [
+        f"baseline/handoffs/index.jsonl contains {total} handoff candidate(s) for project `{slug}`.",
+        *(record.markdown_path for record in selected),
+    ]
+    open_questions = [
+        "Which linked handoffs contain durable project guidance rather than transient next steps?",
+    ]
+    if warnings:
+        open_questions.append(
+            f"{warnings} indexed handoff candidate(s) lack standard headings; should they be normalized or ignored?"
+        )
+    return {
+        "id": proposal_id,
+        "title": f"Review handoff signals for {slug}",
+        "scope": f"project:{slug}",
+        "category": "docs",
+        "risk": "low",
+        "confidence": handoff_proposal_confidence(total, standard_sections),
+        "approval_mode": "strict",
+        "generated_by": HANDOFF_PROPOSAL_PRODUCER,
+        "source_kind": "repo-handoff",
+        "evidence": evidence,
+        "trace": proposal_trace(selected),
+        "suggested_baseline_text": handoff_suggested_text(slug, total, standard_sections, signals),
+        "open_questions": open_questions,
+    }
+
+
+def handoff_proposal_confidence(total: int, sections: list[str]) -> float:
+    confidence = 0.45 + min(total, 10) * 0.03
+    if sections:
+        confidence += 0.1
+    return round(min(confidence, 0.85), 2)
+
+
+def proposal_trace(records: list[HandoffIndexRecord]) -> list[dict[str, str]]:
+    traces: list[dict[str, str]] = []
+    for record in records:
+        trace = dict(record.trace[0]) if record.trace else {}
+        trace["project_slug"] = record.project_slug
+        trace["transform"] = HANDOFF_PROPOSAL_PRODUCER
+        traces.append(strip_empty_trace(trace))
+    return traces
+
+
+def handoff_suggested_text(
+    slug: str,
+    total: int,
+    sections: list[str],
+    signals: list[str],
+) -> str:
+    section_text = ", ".join(sections) if sections else "handoff signals"
+    signal_text = ", ".join(signals[:5]) if signals else "session handoff references"
+    return (
+        f"Review the {total} indexed handoff candidate(s) for `{slug}` before promoting durable project guidance. "
+        f"Prioritize repeated, still-current lessons from {section_text}; use the linked evidence for {signal_text} "
+        "and leave transient next steps out of the baseline."
+    )
+
+
+def proposal_path(output_dir: Path, proposal: dict[str, Any]) -> Path:
+    return output_dir / f"{proposal['id']}.json"
+
+
+def assert_generated_proposal_target(path: Path) -> None:
+    if not path.exists():
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Refusing to overwrite non-JSON proposal: {path}") from exc
+    if not isinstance(data, dict) or data.get("generated_by") != HANDOFF_PROPOSAL_PRODUCER:
+        raise SystemExit(f"Refusing to overwrite non-generated proposal: {path}")
 
 
 def build_handoff_audit(
@@ -455,8 +605,26 @@ def project_page_updates(
         page = settings.root / "projects" / slug / "README.md"
         existing = page.read_text(encoding="utf-8") if page.exists() else ""
         block = render_project_handoff_feed(slug, project_records, generated_at=generated_at)
+        block = preserve_generated_at_when_feed_unchanged(existing, block, block_id="handoffs.index")
         updates[page] = upsert_project_page_content(existing, {"handoffs.index": block}, slug)
     return updates
+
+
+def preserve_generated_at_when_feed_unchanged(existing: str, block: str, *, block_id: str) -> str:
+    existing_block = parse_promoted_blocks(existing).get(block_id)
+    if not existing_block:
+        return block
+    match = GENERATED_AT_LINE_RE.search(existing_block)
+    if not match:
+        return block
+    if strip_generated_at_line(existing_block) != strip_generated_at_line(block):
+        return block
+    existing_generated_at = match.group("generated_at")
+    return GENERATED_AT_LINE_RE.sub(f"**Generated at:** {existing_generated_at}", block, count=1)
+
+
+def strip_generated_at_line(block: str) -> str:
+    return GENERATED_AT_LINE_RE.sub("**Generated at:** <stable>", block, count=1)
 
 
 def known_project_slugs(settings: BaselineSettings) -> set[str]:
