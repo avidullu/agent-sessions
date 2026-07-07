@@ -47,6 +47,8 @@ without giving an LLM silent write access to policy.
 | D5 | Exclude coding sessions from replay v1. | #25 non-goal `[verified]` | No workspace snapshots means code replay would be misleading until commit/worktree provenance exists. |
 | D6 | Add lightweight provenance now; integrate deeper #19 traces later. | #19 dependency `[design]` | Record source entity, activity, agent, derivation, and bundle ids without blocking on a full trace system. |
 | D7 | Do not build search or embeddings for v1. | `docs/COMPOSE_STACK.md` + #23/#26 non-goals `[verified]` | Use deterministic indexes, JSONL manifests, and markdown pages; search/live memory stays external. |
+| D8 | Reuse the shipped marker grammar and content-preserving upsert. | `baseline_promote.py`, TD4 #31 `[verified]` | Do not introduce a second `baseline:knowledge:*` marker family; extend helpers around `baseline:begin/end`. |
+| D9 | Keep existing tracker rows as shared capability owners. | `docs/BASELINE_LOOP_CLOSURE.md` §7 `[verified]` | K rows implement #23/#25/#26 slices, but P5/P6/P10/P11 remain the umbrella rows for shared loop capabilities. |
 
 ## 3. Foundation - research and prior art
 
@@ -75,7 +77,7 @@ flowchart LR
   HandoffIndex --> Proposals["baseline/proposals/*.json"]
 
   Archive --> ReplaySelect["baseline replay select"]
-  ReplaySelect --> Manifest["baseline/replay/manifests/*.jsonl"]
+  ReplaySelect --> Manifest["baseline/replay/manifest.jsonl"]
   Manifest --> Bundle["baseline/replay/bundles/*"]
   Bundle --> Replayer["external agent / panel"]
   Replayer --> ReplayIngest["baseline replay ingest"]
@@ -87,7 +89,19 @@ flowchart LR
   Lint -.-> Promote
 ```
 
-### 4.1 Knowledge layer (#26)
+### 4.1 Relation to existing tracker rows and code
+
+This doc is the execution tracker for issues #23, #25, and #26, but it must not
+fork shared baseline-loop work already tracked in `docs/BASELINE_LOOP_CLOSURE.md`.
+
+| This plan | Existing owner | Reconciliation |
+|---|---|---|
+| K2 project-page upserts | TD4 content-preserving promote, shipped in #31 | Reuse or generalize `upsert_promoted_content()` and `parse_promoted_blocks()` instead of writing a second marker-block system. |
+| K3 `baseline lint` | P6 contradiction detection | K3 is the #26 implementation slice for P6 plus link/staleness/orphan checks; close or cross-link P6 when K3 lands. |
+| K7/K9 replay select/ingest | P5 cross-agent project correlation | Replay provenance should feed P5 once correlation exists; K7 can start without P5, but K9 must preserve agent/lineage fields for it. |
+| K8 replay bundles | P10/P11 watchlist + tombstone/redaction design | K8 depends on the P11 redaction/fingerprint substrate, or must explicitly split out a small redaction prerequisite before bundling. |
+
+### 4.2 Knowledge layer (#26)
 
 Add `baseline/SCHEMA.md` as the contract for derived knowledge:
 
@@ -99,19 +113,25 @@ Add `baseline/SCHEMA.md` as the contract for derived knowledge:
 - Link rules: every generated block links to source evidence or a proposal id.
 - Lint rules: schema conformance, broken links, orphan pages, stale generated
   blocks, duplicate claims, and contradiction candidates.
+- Validation mechanism: `baseline/SCHEMA.md` is the human-readable contract;
+  conformance is enforced by `baseline lint` and command-specific validators.
+  `baseline/proposals/proposal.schema.json` is currently an illustrative example,
+  while `agent_sessions/baseline_ingest.py` is the actual proposal validator.
 
 Project pages remain markdown, but generated regions are bounded:
 
 ```markdown
-<!-- baseline:knowledge:start id="handoff-patterns" generated_by="baseline handoffs" -->
+<!-- baseline:begin id="knowledge.handoff-patterns" -->
 ...
-<!-- baseline:knowledge:end -->
+<!-- baseline:end id="knowledge.handoff-patterns" -->
 ```
 
 The first pass should update only marker-owned blocks. Human prose remains
-outside generated blocks.
+outside generated blocks. Metadata such as `generated_by` should live inside the
+block body or in structured sidecars unless K1 deliberately extends the existing
+parser grammar used by both promote and publish.
 
-### 4.2 Handoff mining (#23)
+### 4.3 Handoff mining (#23)
 
 Handoff mining should be deterministic and auditable:
 
@@ -120,13 +140,18 @@ Handoff mining should be deterministic and auditable:
 - Normalize records into `baseline/handoffs/index.jsonl`.
 - Render `baseline handoffs audit` as markdown for human review.
 - Feed stable patterns into project pages and optional proposal JSON.
+- Derive project slugs explicitly: `archive/index.jsonl` carries `messages`,
+  `sha256`, and `markdown` at top level, but `cwd` and `project` live under
+  each record's `metadata`. The current `metadata.project` value is a
+  URL-encoded absolute path, so K4/K7 need a decode-and-slug step with tests.
 
 Suggested normalized handoff record:
 
 ```json
 {
   "id": "handoff.agent-sessions.2026-07-07.codex",
-  "project": "agent-sessions",
+  "project_slug": "agent-sessions",
+  "project_raw": "%2FC%3A%2FUsers%2Favidu%2FProjects%2FAgent%20Sessions",
   "repo": "https://github.com/avidullu/agent-sessions",
   "agent": "codex",
   "source_path": "SESSION_HANDOFF.md",
@@ -145,7 +170,7 @@ Suggested normalized handoff record:
 }
 ```
 
-### 4.3 Replay loop (#25)
+### 4.4 Replay loop (#25)
 
 Replay v1 is selection, packaging, and ingest - not local autonomous execution.
 
@@ -160,6 +185,11 @@ Proposed CLI:
   - validates an external replay result and converts improvements into structured
     proposals or candidate records.
 
+The nested CLI shape is intentional in this design for readability. The current
+baseline CLI is flat (`suggest`, `promote`, `publish`, `ingest`, `bundle`, etc.),
+so K7 must either add nested subparsers deliberately or choose flat names such as
+`replay-select` / `replay-bundle` and document the convention.
+
 Replay result minimum fields:
 
 - `replay_of`: original archive/session id.
@@ -170,10 +200,20 @@ Replay result minimum fields:
 - `confidence`: numeric or enum, with explanation.
 - `recommended_action`: `proposal`, `watchlist`, or `reject`.
 
-Daily automation should stay off until R1 and R2 gates pass:
+Daily automation follows #25: it may run only deterministic queueing stages
+(`replay select` and `replay bundle`) after R1-select, R2-dedup, and R5-safety
+pass on fixtures/sampled bundles. Replay execution, judging, ingest review, and
+promotion stay human-triggered.
 
-- R1: replay selection precision is acceptable on manually reviewed manifests.
-- R2: bundle redaction and provenance lint pass on sampled bundles.
+Replay gate names keep issue #25's vocabulary:
+
+| Gate | Meaning |
+|---|---|
+| R1-select | Reviewed selected sessions are genuinely replayable. |
+| R2-dedup | Re-running select/bundle with no new sessions produces zero new manifest entries. |
+| R3-signal | At least one replay-derived proposal validates end to end. |
+| R4-value | Acceptance rate of `replay.*` candidates is measured beside other candidates. |
+| R5-safety | Bundles are redacted, gitignored, and contain no sampled secrets. |
 
 ## 5. Artifacts and contracts
 
@@ -183,8 +223,8 @@ Daily automation should stay off until R1 and R2 gates pass:
 | `baseline/projects/<slug>/README.md` | humans + marker-block upserts | agents and reviewers | Existing page shape is reused. |
 | `baseline/handoffs/index.jsonl` | `baseline handoffs audit` | project page updater, proposal generator | Deterministic, append/upsert by source id. |
 | `baseline/handoffs/audit.md` | `baseline handoffs audit` | human reviewer | Human-readable gaps and confidence. |
-| `baseline/replay/manifests/*.jsonl` | `baseline replay select` | bundle command | Tracked if it contains no sensitive excerpts. |
-| `baseline/replay/bundles/*` | `baseline replay bundle` | external replayer/panel | Gitignored by default; may contain session excerpts. |
+| `baseline/replay/manifest.jsonl` | `baseline replay select` | bundle command | Tracked only if it contains session refs/exclusion reasons and no excerpts. |
+| `baseline/replay/bundles/*` | `baseline replay bundle` | external replayer/panel | K8 must add gitignore coverage; bundles may contain session excerpts. |
 | `baseline/replay/ledger.jsonl` | `baseline replay ingest` | calibration/eval | Append-only replay result history. |
 | `baseline/proposals/*.json` | humans, handoff miner, replay ingest | `baseline ingest` | Extend schema or add sidecars for provenance fields. |
 
@@ -203,16 +243,27 @@ Legend: `Todo`, `In progress`, `Done`, `Blocked/gated`. One small PR per row.
 | ID | Deliverable | Issue | Depends on | Gated? | Status | PR |
 |---|---|---|---|---|---|---|
 | K0 | Tracked design plan, docs index, and handoff pointer | #23/#25/#26 | - | No | Done | #45 |
-| K1 | `baseline/SCHEMA.md` with page types, marker ownership, provenance, and lint contract | #26 | K0 | Yes | Todo | - |
-| K2 | Project-page marker-block upsert helper for generated knowledge sections | #26 | K1 | Yes | Todo | - |
-| K3 | `baseline lint` skeleton for schema, links, stale blocks, and orphan pages | #26 | K1,K2 | Yes | Todo | - |
+| K1 | `baseline/SCHEMA.md` with page types, existing marker grammar, provenance, and lint/validator contract | #26 | K0 | Yes | Todo | - |
+| K2 | Reuse/extend `upsert_promoted_content()` for project-page generated sections | #26 | K1, TD4 #31 | Yes | Todo | - |
+| K3 | `baseline lint` skeleton for schema, links, stale blocks, orphan pages, and P6 contradiction checks | #26 | K1,K2 | Yes | Todo | - |
 | K4 | Handoff discovery and normalized `baseline/handoffs/index.jsonl` records | #23 | K1 | No | Todo | - |
 | K5 | `baseline handoffs audit` markdown report and project-page feed | #23/#26 | K2,K4 | No | Todo | - |
 | K6 | Handoff-derived proposal generation with evidence/provenance | #23 | K4,K5 | Yes | Todo | - |
 | K7 | `baseline replay select` deterministic manifests, excluding coding sessions | #25 | K1 | No | Todo | - |
-| K8 | `baseline replay bundle` gitignored packets with redaction and rubric files | #25 | K7 | Yes | Todo | - |
+| K8 | `baseline replay bundle` gitignored packets with P10/P11 redaction/fingerprint checks and rubric files | #25 | K7, P10/P11 | Yes | Todo | - |
 | K9 | `baseline replay ingest` validates external replay results into proposals/candidates | #25 | K6,K8 | Yes | Todo | - |
-| K10 | Efficacy gates for schema lint, handoff precision, replay precision, and proposal acceptance | #23/#25/#26 | K3,K5,K9 | Yes | Todo | - |
+| K10 | Efficacy gates for schema lint, handoff precision, replay R1-R5, and proposal acceptance | #23/#25/#26 | K3,K5,K9 | Yes | Todo | - |
+
+Additional gate names:
+
+- `W1-schema`: `baseline lint` validates marker grammar, generated-block
+  ownership, and schema references.
+- `W2-links`: generated cross-links resolve and no project page is orphaned.
+- `H1-handoff-precision`: fixture handoff patterns are detected while irrelevant
+  docs are ignored.
+- `H2-handoff-freshness`: stale and missing handoffs are reported with reasons.
+- `R1-select` through `R5-safety`: replay gates from issue #25. Watchlist/tombstone
+  `E7` remains owned by P11 in `docs/BASELINE_WATCHLIST_TOMBSTONES.md`.
 
 ## 8. Related issue triage
 
@@ -228,18 +279,19 @@ Legend: `Todo`, `In progress`, `Done`, `Blocked/gated`. One small PR per row.
 
 1. Should `baseline/SCHEMA.md` be entirely hand-authored, or should commands also
    print machine-readable schema fragments from code?
-2. What stale threshold should `baseline lint` use for generated project-page
-   blocks: 30, 60, or 90 days?
-3. Should replay manifests be tracked in Git by default if they include only ids
-   and no excerpts?
-4. Should replay ingest extend `proposal.schema.json`, or should provenance live
-   in a sibling sidecar file to avoid breaking existing proposal writers?
+2. Should the default stale threshold be configurable per project, with 90 days
+   as the v1 default?
+3. Should K1 formalize `baseline/proposals/proposal.schema.json` as real JSON
+   Schema, or keep validation in Python and treat the file as an example?
+4. Should replay provenance extend proposal objects directly, or live in a
+   sibling sidecar only if existing proposal writers need strict compatibility?
 5. Which session classes are allowed for replay v1 besides planning, writing,
    documentation, and research?
 
 ## 10. Definition of done
 
-- [ ] `baseline/SCHEMA.md` exists and every new producer validates against it.
+- [ ] `baseline/SCHEMA.md` exists and `baseline lint` plus command-specific
+      validators enforce it for new producers.
 - [ ] Project pages have deterministic generated blocks with evidence links.
 - [ ] `baseline lint` fails on broken generated links and stale/orphan blocks.
 - [ ] `baseline handoffs audit` finds repo and archive handoff artifacts and
@@ -254,7 +306,7 @@ Legend: `Todo`, `In progress`, `Done`, `Blocked/gated`. One small PR per row.
 
 ## 11. References
 
-**Internal `[verified]`:** `docs/BASELINE_LOOP_CLOSURE.md`, `docs/CALIBRATION_EFFICACY.md`, `docs/COMPOSE_STACK.md`, `docs/BASELINE_WATCHLIST_TOMBSTONES.md`, `agent_sessions/baseline_agent.py`, `agent_sessions/baseline_ingest.py`, `baseline/proposals/proposal.schema.json`.
+**Internal `[verified]`:** `docs/BASELINE_LOOP_CLOSURE.md`, `docs/CALIBRATION_EFFICACY.md`, `docs/COMPOSE_STACK.md`, `docs/BASELINE_WATCHLIST_TOMBSTONES.md`, `docs/archives/TECH_DEBT_PLAN.md`, `agent_sessions/baseline_agent.py`, `agent_sessions/baseline_ingest.py`, `agent_sessions/baseline_promote.py`, `agent_sessions/baseline_publish.py`, `baseline/proposals/proposal.schema.json`.
 
 **Issues `[verified]`:** [#23](https://github.com/avidullu/agent-sessions/issues/23), [#25](https://github.com/avidullu/agent-sessions/issues/25), [#26](https://github.com/avidullu/agent-sessions/issues/26), related [#19](https://github.com/avidullu/agent-sessions/issues/19) and [#32](https://github.com/avidullu/agent-sessions/issues/32).
 
@@ -262,5 +314,6 @@ Legend: `Todo`, `In progress`, `Done`, `Blocked/gated`. One small PR per row.
 
 ### Changelog
 
+- 2026-07-07 - Addressed PR #45 review by reconciling K rows with P5/P6/P10/P11, reusing shipped marker/upsert code, restoring replay R1-R5 gate names, and clarifying schema validation.
 - 2026-07-07 - Opened draft PR #45 for the design tracker.
 - 2026-07-07 - Created design tracker, indexed it in docs, updated the handoff pointer, and proposed execution sequence for #23, #25, and #26.
