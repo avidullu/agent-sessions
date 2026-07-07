@@ -30,7 +30,7 @@ files, and two inferred origin environments: `windows-user:C:/Users/avidu` and
   `baseline lint` skeleton for schema, marker, generated-link, stale-block,
   orphan-page, and explicit contradiction checks. PR #50 merged K5:
   proposal trace-field threading plus `archive/index.jsonl` reference
-  validation for replay/handoff proposal ingest. K6 is active on branch
+  validation for replay/handoff proposal ingest. PR #51 is open for K6 on branch
   `codex/handoffs-index-feed` in
   `C:\Users\avidu\Projects\Agent Sessions - handoffs-index-feed`: persistent
   `baseline/handoffs/index.jsonl`, marker-owned `handoffs.index` project-page
