@@ -406,6 +406,7 @@ Additional gate names:
 
 ### Changelog
 
+- 2026-07-07 - Wrapped the session with PR #52 open, CI green, and awaiting review; next resume should review/merge #52 before starting K8.
 - 2026-07-07 - Opened PR #52 for K7 handoff-derived proposal generation and the #51 stable generated-date follow-up.
 - 2026-07-07 - Merged PR #51 for K6, recorded its non-blocking review follow-ups, and started K7 handoff-derived proposal generation; K7 also keeps `handoffs.index` dates stable when feed content is unchanged.
 - 2026-07-07 - Merged PR #50 for K5 and started K6 persistent handoff index/project-page feed work; K6 also folds in the small optional #49 invalid-date lint warning and #50 path-prefix normalization follow-ups.
