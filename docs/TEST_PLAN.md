@@ -41,7 +41,9 @@ tests/
 ├── test_baseline.py         # baseline_scaffold, baseline_suggest, build_predictions, confidence,
 │                            #   keyword_hits, apply_feedback, render_candidate_report, calibration
 ├── test_baseline_agent.py   # baseline_bundle, select_records, evidence_record, render_agent_prompt
+├── test_baseline_handoffs.py # baseline handoff audit parsing, report rendering, write boundaries
 ├── test_cli.py              # build_parser, main dispatch, arg validation
+├── test_tool_wrapper.py     # tools/agent_archive.py wrapper import path
 ├── test_registry.py         # register, get_extractor, known_kinds
 ├── test_claude_extractor.py # claude extract
 ├── test_codex_extractor.py  # codex extract
@@ -63,7 +65,8 @@ tests/
 - Does NOT test `write_pdf` rendering quality (requires reportlab + visual inspection)
 - Does NOT test real WSL path resolution (requires actual WSL environment)
 - Does NOT integration-test against real agent stores (Codex, Claude, etc.)
-- Does NOT test the `tools/agent_archive.py` wrapper (one-line import)
+- Tests the `tools/agent_archive.py` wrapper import path, but not every command
+  through that wrapper.
 - Coverage target is per-module, with lower thresholds acceptable for CLI dispatch (`main()`) and PDF generation (`write_pdf`)
 
 ## 7. Deliverables & progress tracker   ⟵ **source of truth**
@@ -85,10 +88,12 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated.
 | T10 | `test_gemini_extractor.py` | T0 | No | ☑ | 7 tests, 100% coverage |
 | T11 | `test_grok_extractor.py` | T0 | No | ☑ | 5 tests, 100% coverage |
 | T12 | `test_archive.py` | T0 | No | ☑ | 35 tests, archive core logic covered |
-| T13 | `test_baseline.py` | T0 | No | ☑ | 70 tests, baseline scaffold/suggest/calibrate/promote/schema |
-| T14 | `test_baseline_agent.py` | T0 | No | ☑ | 17 tests, evidence bundles and schema references |
-| T15 | `test_cli.py` | T0 | No | ☑ | 21 tests, CLI parsing + dispatch |
-| T16 | Run `pytest --cov` and verify >80% overall | T1–T15 | No | ☑ | **96.75%** (410 passed) |
+| T13 | `test_baseline.py` | T0 | No | ☑ | 71 tests, baseline scaffold/suggest/calibrate/promote/schema |
+| T14 | `test_baseline_agent.py` | T0 | No | ☑ | 19 tests, evidence bundles and schema references |
+| T15 | `test_cli.py` | T0 | No | ☑ | 45 tests, CLI parsing + dispatch |
+| T16 | `test_baseline_handoffs.py` | T0 | No | ☑ | 7 tests, report-only handoff audit |
+| T17 | `test_tool_wrapper.py` | T0 | No | ☑ | 1 test, wrapper import path |
+| T18 | Run `pytest --cov` and verify >80% overall | T1–T17 | No | ☑ | **95.91%** (424 passed) |
 
 ## 8. Open questions
 

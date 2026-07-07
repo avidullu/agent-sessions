@@ -147,7 +147,8 @@ illustrative proposal example until proposal validation is formalized in code.
 | Replay manifest | `baseline/replay/manifest.jsonl` | generated records | Deterministic selected session refs and exclusion reasons, no excerpts. |
 | Replay bundles | `baseline/replay/bundles/*` | generated egress | Gitignored packets that may contain excerpts after redaction preflight. |
 | Replay ledger | `baseline/replay/ledger.jsonl` | append-only generated records | Replay-result history after validated ingest. |
-| Calibration ledgers | `baseline/metacognition/*.jsonl` | append-only generated records | Prediction and feedback history. |
+| Prediction/feedback ledgers | `baseline/metacognition/*.jsonl` | append-only generated records | Prediction and feedback history. |
+| Calibration inputs/reports | `baseline/calibration/*.toml`, `baseline/calibration/*.md` | human + generated reports | Efficacy gates and calibration feedback. |
 
 ## 3. Ownership Rules
 

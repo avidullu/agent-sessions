@@ -27,10 +27,13 @@ curated, opinionated, and safe to inject into future projects.
 
 ```text
 baseline/
+  SCHEMA.md
   global/
     engineering-guardrails.md
     prompt-patterns.md
     repo-workflows.md
+  handoffs/
+    audit.md
   agents/
     codex/AGENTS.generated.md
     claude/CLAUDE.generated.md
@@ -63,6 +66,9 @@ baseline/
 - External/peer agents: `baseline bundle` can produce a bounded local evidence
   packet plus a proposal prompt for any explicitly authorized agent. Generated
   evidence packets are ignored by Git by default.
+- Handoff mining: `baseline handoffs audit` writes a report-only coverage and
+  freshness audit at `baseline/handoffs/audit.md`; persistent handoff indexes
+  and project/proposal feeds are later gated work.
 
 ## Guardrails
 

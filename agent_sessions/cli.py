@@ -163,6 +163,18 @@ def _handle_baseline_bundle(config: ArchiveConfig, args: argparse.Namespace) -> 
     )
 
 
+def _handle_baseline_handoffs_audit(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .baseline_handoffs import baseline_handoffs_audit
+
+    return baseline_handoffs_audit(
+        config,
+        output=args.output,
+        stale_days=args.stale_days,
+        max_archive_records=args.max_archive_records,
+        dry_run=args.dry_run,
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Export local coding-agent sessions.")
     parser.add_argument("--repo-root", type=Path, default=default_repo_root(), help="Archive repository root.")
@@ -286,6 +298,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_baseline_bundle.add_argument("--focus", action="append", help="Focus keyword or project slug. Can be repeated.")
     p_baseline_bundle.add_argument("--dry-run", action="store_true")
     p_baseline_bundle.set_defaults(func=_handle_baseline_bundle)
+
+    p_baseline_handoffs = baseline_sub.add_parser("handoffs", help="Audit or index session handoff artifacts.")
+    handoffs_sub = p_baseline_handoffs.add_subparsers(dest="handoffs_cmd", required=True)
+    p_handoffs_audit = handoffs_sub.add_parser(
+        "audit",
+        help="Write a report-only handoff coverage and freshness audit.",
+    )
+    p_handoffs_audit.add_argument("--output", type=Path, help="Audit Markdown output path.")
+    p_handoffs_audit.add_argument("--stale-days", type=int, default=90, help="Freshness threshold in days.")
+    p_handoffs_audit.add_argument(
+        "--max-archive-records",
+        type=int,
+        default=0,
+        help="Maximum archive records to scan; 0 scans all indexed records.",
+    )
+    p_handoffs_audit.add_argument("--dry-run", action="store_true")
+    p_handoffs_audit.set_defaults(func=_handle_baseline_handoffs_audit)
 
     return parser
 

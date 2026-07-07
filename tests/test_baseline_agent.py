@@ -223,6 +223,25 @@ class TestRenderAgentPrompt:
             "content": "# Local Schema\n\nUse markers.",
         }
 
+    def test_schema_contract_none_when_absent(self, tmp_path: Path) -> None:
+        config = ArchiveConfig(
+            repo_root=tmp_path,
+            archive_dir=tmp_path / "archive",
+            raw_dir=tmp_path / "raw",
+            sources=(),
+        )
+        assert baseline_schema_contract(config) is None
+
+    def test_prompt_omits_schema_section_when_absent(self) -> None:
+        bundle = {
+            "bundle_id": "test-bundle",
+            "access_level": "session-only",
+            "constraints": ["Do not promote."],
+            "proposal_schema": {"id": "string"},
+        }
+        prompt = render_agent_prompt(bundle)
+        assert "Baseline Schema Contract" not in prompt
+
 
 class TestBulletList:
     def test_renders(self) -> None:
