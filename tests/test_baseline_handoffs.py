@@ -156,6 +156,7 @@ class TestBuildHandoffAudit:
         )
         report = render_handoff_audit(audit)
         assert "MEMORY.md start-here pointer" in report
+        assert "Handoff-derived proposal generation is implemented" in report
 
     def test_scans_archive_handoff_candidates(self, repo_root: Path) -> None:
         archive_dir = repo_root / "archive"

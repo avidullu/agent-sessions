@@ -180,12 +180,23 @@ computers. For a step-by-step manual checklist, see
 3. Register it with `@register("<kind>")`.
 4. Run a dry export with `--source <kind> --limit 1 --dry-run`.
 
-## Baseline Loop Closure (Active Project)
+## Baseline Status And Follow-Ups
 
-Iteration is tracked in [docs/BASELINE_LOOP_CLOSURE.md](docs/BASELINE_LOOP_CLOSURE.md)
-using the standard [PROJECT_DOC_TEMPLATE](docs/PROJECT_DOC_TEMPLATE.md) pattern
-(identified from `badminton-highlight-indexer` archive evidence). Efficacy gates:
-[docs/CALIBRATION_EFFICACY.md](docs/CALIBRATION_EFFICACY.md).
+The original promote/publish/calibrate closure proof is documented in
+[docs/BASELINE_LOOP_CLOSURE.md](docs/BASELINE_LOOP_CLOSURE.md). The newer
+knowledge and replay tracker is complete in
+[docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md](docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md),
+with current health and follow-ups summarized in
+[docs/WORK_AUDIT_2026-07-08.md](docs/WORK_AUDIT_2026-07-08.md).
+
+Useful health checks:
+
+```powershell
+python .\tools\agent_archive.py baseline lint --dry-run
+python .\tools\agent_archive.py baseline eval --dry-run
+python .\tools\agent_archive.py baseline handoffs audit --dry-run
+python .\tools\agent_archive.py baseline replay select --dry-run
+```
 
 ## Engineering Baseline
 

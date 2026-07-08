@@ -52,14 +52,19 @@ The only pending signal is empirical, not code: `R3-signal`/`R4-value` stay
 `gated` until a real out-of-band replay result is ingested — replay execution is
 out-of-band by design (D4). The first real replay run will flip those.
 
+The 2026-07-08 audit is recorded in `docs/WORK_AUDIT_2026-07-08.md`; it marks
+the original baseline loop closure as historical/done and captures the current
+follow-up set.
+
 ## Next Steps / Open Threads
 
 - Optional: archive the tracker doc per its lifecycle once satisfied; run a real
   replay (hand a `baseline replay bundle` packet to a cross-lineage agent, then
   `baseline replay ingest` the result) to exercise R3/R4 with live data.
-- Optional follow-ups noted in PR self-audits: replay-select slug reuse of K6's
-  richer derivation; `baseline replay bundle` clearing a stale `<id>/` on rerun;
-  entropy-based redaction beyond the v0 denylist.
+- Follow-up issues: #60 collects replay/knowledge v1 polish (richer replay
+  slugs, clean bundle reruns, project-scoped replay proposals, stronger
+  precision/dedup gates); #59 tracks entropy/vendor/JWT redaction hardening; #32
+  remains archive backfill/regenerate; #19 remains broader trace/explain work.
 
 Known open boundaries:
 
@@ -73,6 +78,7 @@ Known open boundaries:
 ## Ramp-Up Kit
 
 - `docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md`
+- `docs/WORK_AUDIT_2026-07-08.md`
 - `baseline/SCHEMA.md`
 - `docs/ENGINEERING_BASELINE.md`
 - `docs/TEST_PLAN.md`

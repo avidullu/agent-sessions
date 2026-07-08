@@ -778,8 +778,8 @@ def render_gaps_section(audit: HandoffAudit) -> list[str]:
                 lines.append(f"- `{repo_file.path}`: {warning}.")
     lines.extend(
         [
-            "- K6 owns persistent normalized records in `baseline/handoffs/index.jsonl`.",
-            "- K7 will own handoff-derived proposal generation with structured trace records.",
+            "- Persistent normalized records live in `baseline/handoffs/index.jsonl`.",
+            "- Handoff-derived proposal generation is implemented by `baseline handoffs proposals` with structured trace records.",
             "",
         ]
     )
