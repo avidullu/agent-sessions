@@ -23,6 +23,7 @@ from .utils import now_utc, read_jsonl_dicts, slugify
 
 IMPORTED_AT_RE = re.compile(r"^- Imported at: `([^`]+)`$", re.MULTILINE)
 GENERATED_RE = re.compile(r"^Generated: `([^`]+)`$", re.MULTILINE)
+ROUTER_INDEX_FILENAME = ".router-index.jsonl"
 
 
 @dataclass(frozen=True)
@@ -187,6 +188,9 @@ def export_sources(
             break
 
     if not dry_run:
+        router_records = read_router_index_records(config)
+        if router_records:
+            records = merge_index_records(records, router_records)
         write_indexes(config, merge_index_records(existing_records, records))
     return ExportResult(exported=exported, pdf_missing=pdf_missing, skipped_sources=tuple(skipped_sources))
 
@@ -227,6 +231,25 @@ def read_existing_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
     if not index_path.exists():
         return []
     return read_jsonl_dicts(index_path, label="archive/index.jsonl")
+
+
+def read_router_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
+    """Read records produced by the agent-session-router VS Code extension.
+
+    The extension writes ``archive/.router-index.jsonl`` alongside its rendered
+    Markdown files. This function reads those records so they can be merged into
+    the main ``archive/index.jsonl`` without requiring a full re-extraction.
+
+    Returns an empty list if the file does not exist or is malformed.
+    """
+    router_index_path = config.archive_dir / ROUTER_INDEX_FILENAME
+    if not router_index_path.exists():
+        return []
+    try:
+        return read_jsonl_dicts(router_index_path, label=f"archive/{ROUTER_INDEX_FILENAME}")
+    except Exception:
+        print(f"warning: failed to read {router_index_path}; skipping router index records.", file=sys.stderr)
+        return []
 
 
 def merge_index_records(existing: list[dict[str, Any]], current: list[dict[str, Any]]) -> list[dict[str, Any]]:

@@ -82,3 +82,26 @@ roots = [
   "{wsl_vscode_server}/extensions/ltmoerdani.zai-copilot-chat-0.3.1",
 ]
 glob = "**/*"
+
+# ── Router-produced sessions (agent-session-router VS Code extension) ──
+# These sessions are discovered, extracted, and rendered by the VS Code
+# extension and written as Markdown to archive/{source}/ alongside a
+# .router-index.jsonl manifest. The Python tool ingests them via the
+# .router-index.jsonl file rather than by globbing for raw source files.
+# See: https://github.com/avidullu/agent-session-router
+
+[[sources]]
+name = "copilot-vscode-router"
+kind = "router_index"
+description = "Copilot Chat sessions routed by the agent-session-router VS Code extension. Ingested via archive/.router-index.jsonl."
+roots = ["{repo_root}/archive/copilot-vscode"]
+glob = "**/*.md"
+enabled = false  # Ingested via .router-index.jsonl, not file discovery
+
+[[sources]]
+name = "deepseek-vscode-router"
+kind = "router_index"
+description = "DeepSeek V4 sessions routed by the agent-session-router VS Code extension. Ingested via archive/.router-index.jsonl."
+roots = ["{repo_root}/archive/deepseek-vscode"]
+glob = "**/*.md"
+enabled = false  # Ingested via .router-index.jsonl, not file discovery
