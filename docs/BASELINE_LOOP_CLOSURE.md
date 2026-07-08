@@ -1,10 +1,10 @@
 # Baseline Loop Closure
 
-> **Status:** `IN PROGRESS` · **Owner:** avidullu · **Created:** 2026-07-05 · **Last updated:** 2026-07-07
+> **Status:** `DONE / HISTORICAL` - original closure proof complete; backlog rows split to follow-up issues/designs. **Owner:** avidullu. **Created:** 2026-07-05. **Last updated:** 2026-07-08
 > **Lifecycle:** `DRAFT → IN PROGRESS → DONE → archived`
-> **Tracking anchors:** §7 is source of truth; indexed in `docs/README.md`; `SESSION_HANDOFF.md` points here.
+> **Tracking anchors:** §7 records the original closure tracker; `docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md` and `docs/WORK_AUDIT_2026-07-08.md` carry current follow-up context.
 > **Relation to existing docs:** implements the differentiated path in `docs/COMPOSE_STACK.md`; closes PRs 5–7 in `docs/BASELINE_PLANNING.md`.
-> **Honesty note:** `[verified]` items checked against repo code; `[design]` items not implemented yet.
+> **Honesty note:** `[verified]` items checked against repo code; backlog items are intentionally not treated as active closure blockers.
 
 ---
 
@@ -18,12 +18,16 @@ and tool efficacy is measured in `docs/CALIBRATION_EFFICACY.md`.
 
 ## 1. Problem & goal
 
-**Problem:** Archive + `baseline suggest` exist, but `baseline/global/` is still
-empty and no agent-facing slices are published. Competitors search or capture
-sessions; none close the promote → publish → calibrate loop.
+**Problem:** Archive + `baseline suggest` originally existed, but
+`baseline/global/` was empty and no agent-facing slices were published.
+Competitors search or capture sessions; none close the promote -> publish ->
+calibrate loop.
 
 **Goal:** A measurable end-to-end proof that session history becomes durable
-engineering policy with human approval and provenance.
+engineering policy with human approval and provenance. That original proof is
+now complete: promoted guardrails exist, agent-facing generated slices exist,
+calibration feeds later suggestions, and `baseline eval --dry-run` reports E1-E6
+passing.
 
 **Good looks like:**
 
@@ -104,13 +108,13 @@ Reuse map:
 | P2 | `baseline publish` — generate `baseline/agents/*/ *.generated.md` | P1 | Yes | ☑ | #14 |
 | P3 | Calibration loop — `suggest` reads feedback + ledger; adjusts confidence | P0 | No | ☑ | #15 |
 | P4 | `baseline ingest` — structured proposals from `baseline/proposals/` | P0 | No | ☑ | #16 |
-| P10 | Watchlist tier + `baseline backlog` — promotability backlog for non-promoted predictions | P3 | No | ☐ | [design](BASELINE_WATCHLIST_TOMBSTONES.md) |
-| P11 | Rejection tombstones + deterministic dedup/redaction — block relearned rejects and support replay bundle safety (K9/K10) | P3 | No | ☐ | [design](BASELINE_WATCHLIST_TOMBSTONES.md), [consumer](BASELINE_KNOWLEDGE_REPLAY_PLAN.md) |
-| P5 | Cross-agent project correlation in `archive/index.jsonl` | P0 | No | ☐ | [consumer](BASELINE_KNOWLEDGE_REPLAY_PLAN.md) |
-| P6 | Contradiction detection vs promoted baseline; implemented by wiki-lint slice K4 | P1 | Yes | ☐ | [design](BASELINE_KNOWLEDGE_REPLAY_PLAN.md) |
+| P10 | Watchlist tier + `baseline backlog` - promotability backlog for non-promoted predictions | P3 | No | Backlog | [design](BASELINE_WATCHLIST_TOMBSTONES.md) |
+| P11 | Rejection tombstones + deterministic dedup/redaction - block relearned rejects and support replay bundle safety (K9/K10) | P3 | No | Backlog | [design](BASELINE_WATCHLIST_TOMBSTONES.md), [consumer](BASELINE_KNOWLEDGE_REPLAY_PLAN.md), issue #59 |
+| P5 | Cross-agent project correlation in `archive/index.jsonl` | P0 | No | Backlog | [consumer](BASELINE_KNOWLEDGE_REPLAY_PLAN.md), issues #19/#60 |
+| P6 | Contradiction detection vs promoted baseline; implemented by wiki-lint slice K4 | P1 | Yes | ☑ | #49 |
 | P7 | `baseline onboard --project <slug>` ramp-up packet | P1,P2 | No | ☐ | — |
-| P8 | Promote top 3 existing predictions (PR-only, regression gates, handoff) | P1 | Yes | ☐ | — |
-| P9 | Efficacy gate E1–E6 all `pass` in `efficacy.toml` | P1–P4,P8 | Yes | ☐ | — |
+| P8 | Promote top 3 existing predictions (PR-only, regression gates, handoff) | P1 | Yes | ☑ | #13 |
+| P9 | Efficacy gate E1–E6 all `pass` in `efficacy.toml` | P1–P4,P8 | Yes | ☑ | #57 |
 
 ## 8. Open questions — owner / external
 
@@ -120,12 +124,12 @@ Reuse map:
 
 ## 9. Definition of done
 
-- [ ] P1–P4 and P8 rows are ☑ with linked PRs.
-- [ ] `baseline/global/engineering-guardrails.md` contains promoted text (not placeholder).
-- [ ] `baseline/agents/claude/CLAUDE.generated.md` exists with ≥3 promoted rules.
-- [ ] `baseline calibrate` + `feedback.toml` measurably changes a subsequent `baseline suggest`.
-- [ ] `efficacy.toml` metrics E1–E6 marked `pass`.
-- [ ] `guardrail.tracked-project-docs` prediction accepted in calibration feedback.
+- [x] P1-P4 and P8 rows are complete with linked PRs.
+- [x] `baseline/global/engineering-guardrails.md` contains promoted text (not placeholder).
+- [x] `baseline/agents/claude/CLAUDE.generated.md` exists with at least three promoted rules.
+- [x] `baseline calibrate` + `feedback.toml` measurably changes a subsequent `baseline suggest`.
+- [x] E1-E6 pass in `baseline eval --dry-run`.
+- [x] `guardrail.tracked-project-docs` prediction accepted in calibration feedback.
 
 ## 10. References
 
@@ -140,3 +144,4 @@ Reuse map:
 - 2026-07-07 — Cross-linked P5/P6/P11 to the knowledge/replay design tracker so shared capabilities have one owner; updated links after K-row split.
 - 2026-07-06 — Added P10/P11 design reference (`BASELINE_WATCHLIST_TOMBSTONES.md`); marked P1–P4 ☑.
 - 2026-07-05 — Created tracked project; linked template provenance and archive hit counts.
+- 2026-07-08 — Marked the original closure proof historical/done; moved remaining work to backlog follow-ups and the 2026-07-08 audit.
