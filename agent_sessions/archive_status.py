@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .archive import index_record_key, iter_source_files, read_existing_index_records, sha256_file
+from .archive import index_record_key, iter_source_files, read_existing_index_records, read_router_index_records, sha256_file
 from .config import ArchiveConfig
 from .sources.registry import get_extractor
 
@@ -63,8 +63,33 @@ def classify_source_origin(path: str) -> SourceOrigin:
     return SourceOrigin("unknown", path[:80] or "<empty>")
 
 
+def _session_id_from_record(record: dict[str, Any]) -> str | None:
+    """Extract a stable session identifier from an index record."""
+    metadata = record.get("metadata")
+    if isinstance(metadata, dict):
+        sid = str(metadata.get("session_id", "")).strip()
+        if sid:
+            return sid
+    return None
+
+
 def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> StatusSummary:
     indexed = read_existing_index_records(config)
+    router_records = read_router_index_records(config)
+    if router_records:
+        # Merge router-produced records into the indexed view so status
+        # reflects sessions routed by the VS Code extension as well.
+        indexed_by_session: dict[str, dict[str, Any]] = {}
+        for record in indexed:
+            sid = _session_id_from_record(record)
+            if sid:
+                indexed_by_session[sid] = record
+        for rr in router_records:
+            sid = _session_id_from_record(rr)
+            if sid is not None and sid not in indexed_by_session:
+                indexed.append(rr)
+                indexed_by_session[sid] = rr
+
     indexed_by_key = {index_record_key(record): record for record in indexed}
     visible_by_key: dict[tuple[str, str], tuple[int, float, Path]] = {}
     skipped_sources: list[str] = []
@@ -86,15 +111,15 @@ def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> 
     new_files = 0
     changed_files = 0
     for key, (size, mtime, path) in visible_by_key.items():
-        record = indexed_by_key.get(key)
-        if record is None:
+        idx_record: dict[str, Any] | None = indexed_by_key.get(key)
+        if idx_record is None:
             new_files += 1
             continue
         # Skip the sha256 read when size+mtime match the indexed record; only
         # hash when they differ or are absent (records predating TD15).
-        if record.get("size") == size and record.get("mtime") == mtime:
+        if idx_record.get("size") == size and idx_record.get("mtime") == mtime:
             continue
-        if str(record.get("sha256", "")) != sha256_file(path):
+        if str(idx_record.get("sha256", "")) != sha256_file(path):
             changed_files += 1
 
     not_visible_records = sum(1 for key in indexed_by_key if key not in visible_by_key)
