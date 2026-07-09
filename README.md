@@ -22,6 +22,24 @@ present in known locations.
 Default sources live in `config/default_sources.toml`. Copy
 `sources.example.toml` to `sources.toml` for local machine overrides.
 
+## Ecosystem: hub + feeder tools
+
+This repo is the **hub** — it owns the archive format and the shared catalog.
+Around it sit **feeder tools** that reach agents the Python importers can't, and
+write archive artifacts in the hub's format so `export` can index them with no
+re-extraction:
+
+| Tool | Reaches | Kind |
+| --- | --- | --- |
+| [agent-session-router](https://github.com/avidullu/agent-session-router) | VS Code agents (Copilot Chat, DeepSeek, Continue, Cline, …) — the `inventory`-only sources noted above | VS Code extension |
+
+A feeder writes rendered Markdown plus an `archive/.router-index.jsonl` sidecar;
+the next `export` merges those records into `archive/index.jsonl` automatically
+(`read_router_index_records`). The on-disk format both sides must honor is
+specified in **[docs/OUTPUT_CONTRACT.md](docs/OUTPUT_CONTRACT.md)** (currently
+`format_version: 1`) and enforced by golden-fixture conformance tests in both
+repos, so the two implementations can't drift.
+
 ## Quick Start
 
 ```powershell
