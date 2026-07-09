@@ -23,6 +23,7 @@ def _export_summary_lines(
     result: ExportResult,
     *,
     write_pdfs: bool,
+    track_artifacts: bool,
     copy_raw_files: bool,
     dry_run: bool,
 ) -> list[str]:
@@ -40,13 +41,20 @@ def _export_summary_lines(
         lines.append("- Dry run only: no archive files were written.")
     else:
         lines.append("- Review `archive/INDEX.md` and `archive/index.jsonl`.")
+        if track_artifacts:
+            lines.append("- Rendered Markdown/PDF artifacts are configured as Git-tracked archive outputs.")
+        else:
+            lines.append("- Rendered Markdown/PDF artifacts are local-only; Git tracks only archive metadata.")
         if write_pdfs:
             lines.append("- PDFs are written beside Markdown files when `reportlab` is available.")
         else:
             lines.append("- Markdown files are under `archive/`; rerun with `--pdf` for optional PDFs.")
         if copy_raw_files:
             lines.append("- Raw backups, if written, are under ignored `raw/`.")
-        lines.append("- Check intended changes with `git status --short archive/ docs/DISCOVERY.md`.")
+        lines.append(
+            "- Check intended metadata changes with "
+            "`git status --short archive/index.jsonl archive/INDEX.md docs/DISCOVERY.md`."
+        )
         lines.append("- Stage explicit paths only; keep `sources.toml`, `raw/`, and unrelated files out.")
         lines.append("- For baseline review, run `python tools/agent_archive.py baseline scaffold` and `baseline suggest`.")
     return lines
@@ -69,6 +77,7 @@ def _handle_export(config: ArchiveConfig, args: argparse.Namespace) -> int:
             _export_summary_lines(
                 result,
                 write_pdfs=write_pdfs,
+                track_artifacts=config.track_artifacts,
                 copy_raw_files=args.copy_raw,
                 dry_run=args.dry_run,
             )

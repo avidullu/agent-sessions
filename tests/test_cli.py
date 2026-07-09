@@ -323,6 +323,7 @@ class TestExportSummaryLines:
         lines = _export_summary_lines(
             ExportResult(exported=0),
             write_pdfs=False,
+            track_artifacts=False,
             copy_raw_files=False,
             dry_run=True,
         )
@@ -334,14 +335,27 @@ class TestExportSummaryLines:
         lines = _export_summary_lines(
             ExportResult(exported=3),
             write_pdfs=True,
+            track_artifacts=True,
             copy_raw_files=True,
             dry_run=False,
         )
 
         assert "- Review `archive/INDEX.md` and `archive/index.jsonl`." in lines
+        assert any("Git-tracked archive outputs" in line for line in lines)
         assert "- PDFs are written beside Markdown files when `reportlab` is available." in lines
         assert "- Raw backups, if written, are under ignored `raw/`." in lines
         assert any("baseline scaffold" in line for line in lines)
+
+    def test_real_export_summary_notes_local_only_artifacts(self) -> None:
+        lines = _export_summary_lines(
+            ExportResult(exported=3),
+            write_pdfs=False,
+            track_artifacts=False,
+            copy_raw_files=False,
+            dry_run=False,
+        )
+
+        assert any("local-only" in line for line in lines)
 
     def test_skipped_inventory_and_missing_pdf_summary(self) -> None:
         lines = _export_summary_lines(
@@ -351,6 +365,7 @@ class TestExportSummaryLines:
                 skipped_sources=("copilot-vscode-windows-inventory (inventory)",),
             ),
             write_pdfs=True,
+            track_artifacts=False,
             copy_raw_files=False,
             dry_run=False,
         )

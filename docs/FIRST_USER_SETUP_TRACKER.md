@@ -85,7 +85,7 @@ Repo state checked on `origin/main` at `013170b`:
 | Inventory-only sources look like exporter failures. | Explain skipped inventory sources in README and setup checklist. |
 | PDF behavior looks inconsistent across machines. | Make `reportlab` optionality explicit and provide a verification command. |
 | Setup docs imply #32 backfill/regenerate exists. | Link #32 as future data-integrity work, not a setup step. |
-| A large export creates a noisy git status. | Add explicit `git status --short archive/ docs/DISCOVERY.md` and staging guidance. |
+| A large export creates a noisy git status. | Add explicit `git status --short archive/index.jsonl archive/INDEX.md docs/DISCOVERY.md` and staging guidance. |
 
 ## 6. Honest limits
 

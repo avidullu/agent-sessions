@@ -1,62 +1,63 @@
 # Session Handoff
 
-Updated: 2026-07-09 08:47 IST
+Updated: 2026-07-09 14:58 IST
 
 ## You Are Here
 
-The current workstream is incorporating the July 9 feedback from
-`agent-sessions-feedback.pdf` and `gemini-review.md` across the hub repo
-(`avidullu/agent-sessions`) and router repo (`avidullu/agent-session-router`).
-
-The feedback has been checked in as a project tracker:
+The July 9 feedback workstream is tracked in:
 
 - `docs/FEEDBACK_INCORPORATION_TRACKER_2026-07-09.md`
 - `docs/README.md` indexes the tracker.
 
-Two P0 draft PRs are open for owner review:
+The original P0 PRs are merged:
 
 - Hub PR #68: `Refresh archive and track feedback follow-ups`
 - Router PR #18: `Set stable Gemini session ids`
 
-Hub PR #68 also includes the post-refresh baseline insight run:
-`baseline/candidates/2026-07-09-extraction.md`, generated from all 5,231
-indexed sessions, plus its prediction sidecar and ledger entries.
+Current active branch in the hub repo:
+
+- `codex/local-only-archive-artifacts`
+
+This branch makes rendered transcript Markdown/PDF files local-only by default
+and keeps only portable archive metadata in Git.
 
 ## Next Steps / Open Threads
 
-- Review and merge PR #68 first if satisfied. It is intentionally a large
-  generated archive refresh plus the tracker and archive-index identity fix.
-- Review and merge router PR #18. It gives Gemini Antigravity exports stable
-  `metadata.session_id` values so the hub/router archive identity is reliable.
-- After both P0s land, move to the P1 rows in the tracker:
-  streaming router JSONL/hash processing, skipped-vs-failed accounting, and
-  refreshing router `PLAN.md`.
-- Keep P2 items in backlog unless they become blocking:
-  tail-hash idempotency and targeted generator APIs.
+- Finish, verify, and open the local-only artifact PR from
+  `codex/local-only-archive-artifacts`.
+- After that PR is reviewed or merged, start the P1 router queue in this order:
+  stream Gemini JSONL/hash processing, split skipped vs failed export
+  accounting, then refresh router `PLAN.md`.
+- Keep P2 rows in backlog unless they become blocking: tail-hash idempotency and
+  targeted generator APIs.
 
 ## Ramp-Up Kit
 
 - `docs/FEEDBACK_INCORPORATION_TRACKER_2026-07-09.md`
-- `baseline/candidates/2026-07-09-extraction.md`
-- `baseline/candidates/2026-07-09-extraction.predictions.json`
+- `docs/OUTPUT_CONTRACT.md`
 - `agent_sessions/archive.py`
-- `agent_sessions/archive_status.py`
+- `agent_sessions/cli.py`
+- `agent_sessions/config.py`
 - `tests/test_archive.py`
-- `tests/test_router_index.py`
-- Router PR #18 changes:
-  `C:\Users\avidu\Projects\Agentic-Coding\Tools-and-Extensions\agent-session-router\src\extractors\gemini.ts`
-  and
-  `C:\Users\avidu\Projects\Agentic-Coding\Tools-and-Extensions\agent-session-router\test\coverage-suite.js`
+- `tests/test_cli.py`
+- `tests/test_config.py`
+- `baseline/candidates/2026-07-09-extraction.md`
+- Router follow-up repo:
+  `C:\Users\avidu\Projects\Agentic-Coding\Tools-and-Extensions\agent-session-router`
 
 ## Key Decisions
 
-- Hub archive Markdown/PDF output under `archive/` remains checked in.
+- Rendered archive Markdown/PDF transcript bodies are local-only by default.
+- The shared repo tracks `archive/index.jsonl` and `archive/INDEX.md` as the
+  portable catalog; `[archive] track_artifacts = true` is the explicit escape
+  hatch for committing rendered transcript bodies again.
 - Local router diagnostics under `archive/.router/` are ignored and not part of
   the archive contract.
-- Hub archive merge identity now keeps distinct same-session-id records apart
-  when their payload hashes differ, preventing sibling/subagent archive collapse.
-- Gemini Antigravity router extracts should use the session directory in
+- Hub archive merge identity keeps distinct same-session-id records apart when
+  their payload hashes differ, preventing sibling/subagent archive collapse.
+- Gemini Antigravity router extracts use the session directory in
   `brain/<session>/.system_generated/logs/<file>` as `metadata.session_id`, with
   file-stem fallback only for unexpected loose paths.
-- The July 9 feedback tracker is the source of truth for prioritization; P0 is
-  in review, P1 is next, and P2 remains backlog.
+- The July 9 feedback tracker is the source of truth for prioritization: P0 is
+  finishing local-only artifact cleanup, P1 router hardening is next, and P2
+  remains backlog.

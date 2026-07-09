@@ -2,8 +2,8 @@
 
 This repo is the shared user-level archive. Each computer keeps its own local
 agent stores, exports the sessions it can see, and pushes Markdown archive
-artifacts back to the private GitHub repo. PDF artifacts are optional and off by
-default.
+metadata back to the private GitHub repo. Rendered Markdown/PDF transcript
+artifacts are local-only by default.
 
 ## How Machines Converge
 
@@ -16,11 +16,14 @@ For a practical bootstrap checklist, see
 3. Run `python tools/agent_archive.py status` to see what that computer can see
    and what is already indexed.
 4. Run `python tools/agent_archive.py export --all` from that computer.
-5. Commit and push only `archive/` changes.
+5. Commit and push only metadata changes, usually `archive/index.jsonl` and
+   `archive/INDEX.md`.
 
 Enable PDFs for one run with `--pdf`, or persist them per machine with
 `[archive] write_pdfs = true` in ignored `sources.toml`. Use `--no-pdf` to force
 Markdown-only export for one run even when the local config enables PDFs.
+Set `[archive] track_artifacts = true` only when you intentionally want rendered
+Markdown/PDF transcript files back in Git.
 
 The exporter now merges new local records into the existing `archive/index.jsonl`
 instead of replacing the index with only the current computer's visible files.
@@ -41,12 +44,13 @@ records; use the future backfill/regenerate path tracked in issue #32.
 
 ## Unified User View
 
-The unified view is built from committed archive artifacts:
+The unified view is built from committed archive metadata:
 
-- `archive/**/*.md` and optional PDFs are the durable session exports.
 - `archive/index.jsonl` is the merged catalog used by baseline and reporting
   commands.
 - `archive/INDEX.md` is the human-readable catalog.
+- `archive/**/*.md` and optional PDFs are local rendered artifacts; regenerate
+  them on any machine that has access to the matching source logs.
 - `python tools/agent_archive.py status` reports visible files, new files,
   changed files, records not visible from the current machine, and best-effort
   origin environments.

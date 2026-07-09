@@ -119,11 +119,12 @@ class TestLoadConfig:
         assert config.archive_dir.name == "archive"
         assert config.raw_dir.name == "raw"
         assert config.write_pdfs is False
+        assert config.track_artifacts is False
 
-    def test_archive_pdf_setting(self, repo_root: Path) -> None:
+    def test_archive_pdf_and_artifact_settings(self, repo_root: Path) -> None:
         path = repo_root / "sources.toml"
         path.write_text(
-            '[archive]\narchive_dir = "archive"\nraw_dir = "raw"\nwrite_pdfs = true\n\n'
+            '[archive]\narchive_dir = "archive"\nraw_dir = "raw"\nwrite_pdfs = true\ntrack_artifacts = true\n\n'
             '[[sources]]\nname = "test-claude"\nkind = "claude"\n'
             'roots = ["{home}/.claude/projects"]\nglob = "**/*.jsonl"\n',
             encoding="utf-8",
@@ -132,6 +133,7 @@ class TestLoadConfig:
         config = load_config(repo_root, path)
 
         assert config.write_pdfs is True
+        assert config.track_artifacts is True
 
 
 class TestArchiveConfig:
@@ -146,3 +148,4 @@ class TestArchiveConfig:
         assert config.repo_root == repo_root
         assert config.sources == sources
         assert config.write_pdfs is False
+        assert config.track_artifacts is False

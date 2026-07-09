@@ -11,8 +11,8 @@
 ## 1. Why this exists
 
 `agent-sessions` is the **hub**: a Python CLI (`tools/agent_archive.py`) that
-discovers agent session logs, extracts them, and renders a portable
-Markdown/PDF archive plus a shared catalog.
+discovers agent session logs, extracts them, and renders local Markdown/PDF
+archive artifacts plus a shared catalog.
 
 Some agents can't be reached by the Python importers — VS Code extensions such
 as Copilot Chat store sessions in `globalStorage`/`workspaceStorage` and are
@@ -24,12 +24,17 @@ The contract has two producer paths, both landing in the same `archive/`:
 
 | Producer | Writes | Indexed by |
 | --- | --- | --- |
-| `agent-sessions` (Python) | `archive/**/*.md` + `archive/index.jsonl` + `archive/INDEX.md` | itself, on `export` |
-| Feeder tool (e.g. router) | `archive/**/*.md` + `archive/.router-index.jsonl` | merged into `index.jsonl` on the next `export` |
+| `agent-sessions` (Python) | local `archive/**/*.md`/`.pdf` artifacts + tracked `archive/index.jsonl` + `archive/INDEX.md` | itself, on `export` |
+| Feeder tool (e.g. router) | local `archive/**/*.md` artifacts + `archive/.router-index.jsonl` sidecar | merged into `index.jsonl` on the next `export` |
 
 If a feeder's output diverges from this document, the archive silently
 fragments (duplicate files, mismatched catalog rows). The conformance tests in
 both repos exist to prevent that — see §8.
+
+By default, Git tracks archive metadata only. Rendered transcript bodies
+(`archive/**/*.md`, except `archive/INDEX.md`) and PDFs are local-only files on
+the user's machine. Set `[archive] track_artifacts = true` only for an explicit
+repo policy change that intentionally commits rendered transcript artifacts.
 
 ## 2. Archive Markdown format
 
@@ -155,6 +160,11 @@ archive/{source_name}/{stem}.md
 archive/{source_name}/{stem}.pdf        # optional
 ```
 
+Rendered Markdown/PDF files at these paths are local artifacts by default. Their
+repo-relative paths remain in the catalog so a machine that has the local files
+can open them, but Git ignores the rendered bodies unless
+`[archive] track_artifacts = true` is enabled.
+
 The **stem** (`agent_sessions/archive.py::export_sources`) is:
 
 ```
@@ -197,10 +207,12 @@ feeder.
 ### Merge identity
 
 `merge_index_records` dedupes by `index_identity_key`:
-`("session", metadata.session_id)` when a non-empty `session_id` exists, else
-`("path", source, source_file)`. **Later records supersede earlier ones** — so a
-feeder record and a Python record for the same `session_id` collapse to one
-catalog row (last writer wins).
+`("session", metadata.session_id, sha256)` when a non-empty `session_id` exists,
+else `("path", source, source_file)`. When two records point at the same source
+and rendered Markdown path, the newer record supersedes the older one. This
+keeps append-only/sibling sessions with the same agent session id distinct when
+their payload hashes differ, while still allowing a re-export of the same source
+file to update one catalog row.
 
 ## 7. Feeder contract: `archive/.router-index.jsonl`
 
@@ -218,7 +230,8 @@ fault-tolerant: a missing file yields no records, and malformed lines are
 skipped with a warning (never a crash).
 
 A feeder therefore produces, per session:
-1. `archive/{source_name}/{stem}.md` — §2 format, §5 naming.
+1. `archive/{source_name}/{stem}.md` — §2 format, §5 naming. In the hub repo
+   this rendered Markdown file is local-only by default.
 2. one line appended to `archive/.router-index.jsonl` — §6 schema, with
    `markdown` set to the repo-relative POSIX path of (1).
 
