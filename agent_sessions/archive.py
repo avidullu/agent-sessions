@@ -24,6 +24,7 @@ from .utils import now_utc, read_jsonl_dicts, slugify
 IMPORTED_AT_RE = re.compile(r"^- Imported at: `([^`]+)`$", re.MULTILINE)
 GENERATED_RE = re.compile(r"^Generated: `([^`]+)`$", re.MULTILINE)
 ROUTER_INDEX_FILENAME = ".router-index.jsonl"
+TAIL_HASH_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,17 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def tail_sha256_file(path: Path, max_bytes: int = TAIL_HASH_BYTES) -> str:
+    h = hashlib.sha256()
+    size = path.stat().st_size
+    bytes_to_read = min(size, max_bytes)
+    with path.open("rb") as f:
+        if bytes_to_read:
+            f.seek(size - bytes_to_read)
+            h.update(f.read(bytes_to_read))
+    return h.hexdigest()
+
+
 def copy_raw(config: ArchiveConfig, path: Path, source: Source, digest: str) -> Path:
     raw_target = config.raw_dir / source.name / f"{digest[:16]}-{path.name}.gz"
     raw_target.parent.mkdir(parents=True, exist_ok=True)
@@ -85,17 +97,19 @@ def _can_reuse_record(
     mtime: float,
     write_pdfs: bool,
     copy_raw_files: bool,
+    tail_sha256: str | None = None,
 ) -> bool:
     """Skip re-hashing/re-extracting a source file that is unchanged since the
     last export (matching size + mtime) as long as the outputs it would produce
     already exist on disk. Records written before TD15 lack size/mtime and never
     match, so they fall through to a full re-export.
 
-    Tradeoff: identity is (size, mtime), not a content hash — a same-size,
-    same-mtime in-place edit (unusual for append-only agent logs) would be
-    missed. Run `export` after touching a file, or `prune`/re-export, to force a
-    fresh hash if that ever matters."""
+    Newer records also carry a trailing-byte hash; when present, a same-size,
+    same-mtime file is reused only if its current tail still matches."""
     if prior is None or prior.get("size") != size or prior.get("mtime") != mtime:
+        return False
+    prior_tail = prior.get("tail_sha256")
+    if isinstance(prior_tail, str) and prior_tail and tail_sha256 != prior_tail:
         return False
     if not _index_path_exists(config, prior.get("markdown")):
         return False
@@ -141,7 +155,15 @@ def export_sources(
             stat_result = path.stat()
             size, mtime = stat_result.st_size, stat_result.st_mtime
             prior = prior_by_key.get((source.name, str(path)))
-            if _can_reuse_record(config, prior, size, mtime, write_pdfs, copy_raw_files):
+            tail_digest = None
+            if (
+                prior is not None
+                and prior.get("tail_sha256")
+                and prior.get("size") == size
+                and prior.get("mtime") == mtime
+            ):
+                tail_digest = tail_sha256_file(path)
+            if _can_reuse_record(config, prior, size, mtime, write_pdfs, copy_raw_files, tail_digest):
                 assert prior is not None  # _can_reuse_record returns False for None
                 records.append(prior)  # unchanged since last export: skip hashing/extraction/render
                 exported += 1
@@ -174,6 +196,7 @@ def export_sources(
                     "kind": source.kind,
                     "source_file": str(path),
                     "sha256": digest,
+                    "tail_sha256": tail_sha256_file(path),
                     "size": size,
                     "mtime": mtime,
                     "messages": len(session.messages),

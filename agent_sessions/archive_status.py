@@ -16,6 +16,7 @@ from .archive import (
     read_existing_index_records,
     read_router_index_records,
     sha256_file,
+    tail_sha256_file,
 )
 from .config import ArchiveConfig
 from .sources.registry import get_extractor
@@ -104,10 +105,10 @@ def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> 
         if idx_record is None:
             new_files += 1
             continue
-        # Skip the sha256 read when size+mtime match the indexed record; only
-        # hash when they differ or are absent (records predating TD15).
         if idx_record.get("size") == size and idx_record.get("mtime") == mtime:
-            continue
+            prior_tail = idx_record.get("tail_sha256")
+            if not prior_tail or prior_tail == tail_sha256_file(path):
+                continue
         if str(idx_record.get("sha256", "")) != sha256_file(path):
             changed_files += 1
 
