@@ -55,11 +55,12 @@ def _export_summary_lines(
 def _handle_export(config: ArchiveConfig, args: argparse.Namespace) -> int:
     if not args.all and not args.source:
         raise SystemExit("export requires --all or at least one --source")
+    write_pdfs = config.write_pdfs if args.pdf is None else args.pdf
     result = export_sources(
         config,
         selected=args.source,
         limit=args.limit,
-        write_pdfs=args.pdf,
+        write_pdfs=write_pdfs,
         copy_raw_files=args.copy_raw,
         dry_run=args.dry_run,
     )
@@ -67,7 +68,7 @@ def _handle_export(config: ArchiveConfig, args: argparse.Namespace) -> int:
         "\n".join(
             _export_summary_lines(
                 result,
-                write_pdfs=args.pdf,
+                write_pdfs=write_pdfs,
                 copy_raw_files=args.copy_raw,
                 dry_run=args.dry_run,
             )
@@ -269,10 +270,22 @@ def build_parser() -> argparse.ArgumentParser:
     p_export.add_argument("--all", action="store_true", help="Export all configured sources.")
     p_export.add_argument("--source", action="append", help="Source name or kind to export. Can be repeated.")
     p_export.add_argument("--limit", type=int, help="Maximum files to export, useful for tests.")
-    p_export.add_argument("--pdf", action="store_true", help="Also write simple PDFs when reportlab is installed.")
+    p_pdf_mode = p_export.add_mutually_exclusive_group()
+    p_pdf_mode.add_argument(
+        "--pdf",
+        dest="pdf",
+        action="store_true",
+        help="Write simple PDFs for this export, overriding archive.write_pdfs.",
+    )
+    p_pdf_mode.add_argument(
+        "--no-pdf",
+        dest="pdf",
+        action="store_false",
+        help="Skip PDFs for this export, overriding archive.write_pdfs.",
+    )
     p_export.add_argument("--copy-raw", action="store_true", help="Copy gzip-compressed raw source files to raw/.")
     p_export.add_argument("--dry-run", action="store_true")
-    p_export.set_defaults(func=_handle_export)
+    p_export.set_defaults(func=_handle_export, pdf=None)
 
     p_pdf = sub.add_parser("pdf", help="Generate PDFs from existing archive Markdown.")
     p_pdf.add_argument("--all", action="store_true", help="Generate PDFs for all indexed Markdown files.")

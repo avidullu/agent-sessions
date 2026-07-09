@@ -90,22 +90,41 @@ def test_merge_index_records_includes_router_entries(tmp_path: Path):
     assert "copilot-vscode" in sources
 
 
-def test_merge_index_records_deduplicates_by_session_id(tmp_path: Path):
-    """Router records don't duplicate existing records with the same session_id."""
+def test_merge_index_records_deduplicates_by_session_id_and_digest(tmp_path: Path):
+    """Router records don't duplicate existing records with the same session identity and content."""
     existing = [
         {"source": "copilot-vscode", "kind": "copilot_chat", "source_file": "/old/path.jsonl",
-         "sha256": "oldhash", "size": 1000, "mtime": 1.0, "messages": 42,
+         "sha256": "samehash", "size": 1000, "mtime": 1.0, "messages": 42,
          "markdown": "archive/copilot-vscode/session.md",
          "metadata": {"session_id": "same-session"}},
     ]
     router = [
         {"source": "copilot-vscode", "kind": "copilot_chat", "source_file": "/new/path.jsonl",
-         "sha256": "newhash", "size": 1000, "mtime": 2.0, "messages": 42,
+         "sha256": "samehash", "size": 1000, "mtime": 2.0, "messages": 42,
          "markdown": "archive/copilot-vscode/session.md",
          "metadata": {"session_id": "same-session"}},
     ]
     merged = merge_index_records(existing, router)
-    # merge_index_records uses index_identity_key which is session_id-based
+    # merge_index_records uses index_identity_key which is session_id+digest-based
     # When session_id matches, the later record supersedes
     assert len(merged) == 1
-    assert merged[0]["sha256"] == "newhash"  # Router record supersedes existing
+    assert merged[0]["mtime"] == 2.0  # Router record supersedes existing
+
+
+def test_merge_index_records_keeps_same_session_id_with_different_digest(tmp_path: Path):
+    """Distinct files can share a parent session_id without collapsing."""
+    existing = [
+        {"source": "copilot-vscode", "kind": "copilot_chat", "source_file": "/old/path.jsonl",
+         "sha256": "oldhash", "size": 1000, "mtime": 1.0, "messages": 42,
+         "markdown": "archive/copilot-vscode/old.md",
+         "metadata": {"session_id": "same-session"}},
+    ]
+    router = [
+        {"source": "copilot-vscode", "kind": "copilot_chat", "source_file": "/new/path.jsonl",
+         "sha256": "newhash", "size": 1000, "mtime": 2.0, "messages": 43,
+         "markdown": "archive/copilot-vscode/new.md",
+         "metadata": {"session_id": "same-session"}},
+    ]
+    merged = merge_index_records(existing, router)
+    assert len(merged) == 2
+    assert {record["sha256"] for record in merged} == {"oldhash", "newhash"}

@@ -12,7 +12,8 @@ The scheduled job should:
 1. `git pull --ff-only`
 2. Optionally run `python tools/agent_archive.py status`
 3. Run `python tools/agent_archive.py export --all`
-4. Optionally include `--pdf`
+4. Optionally include `--pdf`, or set `[archive] write_pdfs = true` in a
+   machine-local `sources.toml`
 5. Commit only when `archive/` changed
 6. Push only after a successful commit
 7. Exit cleanly when there is nothing new
@@ -73,6 +74,9 @@ machine remain in the unified catalog even when the current machine cannot see
 that other machine's local agent stores.
 
 PDF generation skips existing PDFs unless the Markdown changed.
+PDF generation is off by default. Enable it for a single run with `--pdf`, or
+persist it for one machine with `[archive] write_pdfs = true` in ignored
+`sources.toml`; use `--no-pdf` to force Markdown-only export for one run.
 
 ## Hook Shape
 
@@ -90,6 +94,7 @@ a session is still active.
 
 ## Schedule Choices
 
-Recommended starting point: daily morning on each active machine, with `--pdf`
-enabled only if the extra runtime is acceptable. A weekly baseline review can be
-added later after promotion and calibration workflows mature.
+Recommended starting point: daily morning on each active machine, Markdown-only
+by default. Enable PDFs only if the extra runtime and diff volume are acceptable.
+A weekly baseline review can be added later after promotion and calibration
+workflows mature.

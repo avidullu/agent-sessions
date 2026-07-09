@@ -1,8 +1,9 @@
 # Multi-Machine Archive Model
 
 This repo is the shared user-level archive. Each computer keeps its own local
-agent stores, exports the sessions it can see, and pushes Markdown/PDF archive
-artifacts back to the private GitHub repo.
+agent stores, exports the sessions it can see, and pushes Markdown archive
+artifacts back to the private GitHub repo. PDF artifacts are optional and off by
+default.
 
 ## How Machines Converge
 
@@ -14,8 +15,12 @@ For a practical bootstrap checklist, see
    enough. Keep `sources.toml` uncommitted.
 3. Run `python tools/agent_archive.py status` to see what that computer can see
    and what is already indexed.
-4. Run `python tools/agent_archive.py export --all --pdf` from that computer.
+4. Run `python tools/agent_archive.py export --all` from that computer.
 5. Commit and push only `archive/` changes.
+
+Enable PDFs for one run with `--pdf`, or persist them per machine with
+`[archive] write_pdfs = true` in ignored `sources.toml`. Use `--no-pdf` to force
+Markdown-only export for one run even when the local config enables PDFs.
 
 The exporter now merges new local records into the existing `archive/index.jsonl`
 instead of replacing the index with only the current computer's visible files.

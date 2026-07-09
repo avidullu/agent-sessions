@@ -20,6 +20,7 @@ class ArchiveConfig:
     archive_dir: Path
     raw_dir: Path
     sources: tuple[Source, ...]
+    write_pdfs: bool = False
 
 
 def load_config(repo_root: Path, config_path: Path | None = None) -> ArchiveConfig:
@@ -31,8 +32,15 @@ def load_config(repo_root: Path, config_path: Path | None = None) -> ArchiveConf
     archive_settings = data.get("archive", {})
     archive_dir = repo_path(repo_root, archive_settings.get("archive_dir", "archive"))
     raw_dir = repo_path(repo_root, archive_settings.get("raw_dir", "raw"))
+    write_pdfs = bool(archive_settings.get("write_pdfs", False))
     sources = tuple(load_source(item, templates) for item in data.get("sources", []) if item.get("enabled", True))
-    return ArchiveConfig(repo_root=repo_root, archive_dir=archive_dir, raw_dir=raw_dir, sources=sources)
+    return ArchiveConfig(
+        repo_root=repo_root,
+        archive_dir=archive_dir,
+        raw_dir=raw_dir,
+        sources=sources,
+        write_pdfs=write_pdfs,
+    )
 
 
 def read_toml(path: Path) -> dict[str, Any]:

@@ -9,7 +9,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .archive import index_record_key, iter_source_files, read_existing_index_records, read_router_index_records, sha256_file
+from .archive import (
+    index_record_key,
+    iter_source_files,
+    merge_index_records,
+    read_existing_index_records,
+    read_router_index_records,
+    sha256_file,
+)
 from .config import ArchiveConfig
 from .sources.registry import get_extractor
 
@@ -63,32 +70,14 @@ def classify_source_origin(path: str) -> SourceOrigin:
     return SourceOrigin("unknown", path[:80] or "<empty>")
 
 
-def _session_id_from_record(record: dict[str, Any]) -> str | None:
-    """Extract a stable session identifier from an index record."""
-    metadata = record.get("metadata")
-    if isinstance(metadata, dict):
-        sid = str(metadata.get("session_id", "")).strip()
-        if sid:
-            return sid
-    return None
-
-
 def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> StatusSummary:
     indexed = read_existing_index_records(config)
     router_records = read_router_index_records(config)
     if router_records:
-        # Merge router-produced records into the indexed view so status
-        # reflects sessions routed by the VS Code extension as well.
-        indexed_by_session: dict[str, dict[str, Any]] = {}
-        for record in indexed:
-            sid = _session_id_from_record(record)
-            if sid:
-                indexed_by_session[sid] = record
-        for rr in router_records:
-            sid = _session_id_from_record(rr)
-            if sid is not None and sid not in indexed_by_session:
-                indexed.append(rr)
-                indexed_by_session[sid] = rr
+        # Merge router-produced records into the indexed view so status reflects
+        # sessions routed by the VS Code extension with the same identity rules
+        # used by export/index writes.
+        indexed = merge_index_records(indexed, router_records)
 
     indexed_by_key = {index_record_key(record): record for record in indexed}
     visible_by_key: dict[tuple[str, str], tuple[int, float, Path]] = {}
