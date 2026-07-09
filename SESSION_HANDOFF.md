@@ -1,127 +1,56 @@
 # Session Handoff
 
-Updated: 2026-07-07 20:43 IST
+Updated: 2026-07-09 08:47 IST
 
 ## You Are Here
 
-`C:\Users\avidu\Projects\Agent Sessions` is a private GitHub-backed archive for
-agent coding sessions. The exporter is the `agent_sessions` package, with
-TOML-backed source definitions and per-agent extractors for Codex, Claude, Grok,
-DeepSeek, Gemini Antigravity, and known VS Code extension locations.
+The current workstream is incorporating the July 9 feedback from
+`agent-sessions-feedback.pdf` and `gemini-review.md` across the hub repo
+(`avidullu/agent-sessions`) and router repo (`avidullu/agent-session-router`).
 
-The active tracked project is `docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md`, covering
-issues #23, #25, and #26 as one safety-first sequence:
+The feedback has been checked in as a project tracker:
 
-1. schema and marker-owned knowledge pages;
-2. deterministic handoff mining as the first producer;
-3. replay selection, redaction, bundling, and ingest after provenance gates.
+- `docs/FEEDBACK_INCORPORATION_TRACKER_2026-07-09.md`
+- `docs/README.md` indexes the tracker.
 
-Today landed a long run of small PRs:
+Two P0 draft PRs are open for owner review:
 
-- #45 K0: design tracker for #23/#25/#26.
-- #46 K1: `baseline/SCHEMA.md` and scaffold/schema wiring.
-- #47 K2: report-only `baseline handoffs audit`.
-- #48 K3: shared project-page marker-block upsert helpers.
-- #49 K4: read-only `baseline lint` skeleton.
-- #50 K5: proposal trace propagation and archive-reference validation.
-- #51 K6: persistent `baseline/handoffs/index.jsonl` plus `handoffs.index`
-  project-page feeds for configured or existing project pages only.
-- #52 K7: `baseline handoffs proposals` deterministic proposal JSON generation
-  with a hand-written-proposal overwrite guard and the #51 stable generated-date
-  follow-up.
-- #53 K8: `baseline replay select` deterministic, excerpt-free replay manifest
-  excluding coding sessions (D5); idempotent for gate R2-dedup.
-- #54 K9: `baseline replay redact` deterministic fail-closed secret scanner and
-  valueless redaction report; egress remains gitignored.
-- #55 K10: `baseline replay bundle` writes gitignored redacted packets
-  (task + deliverable + rubric + report) only for sessions that pass the K9 gate.
-- #56 K11: `baseline replay ingest` validates external replay results into
-  `replay.*` proposals (K5-gated) + an append-only `baseline/replay/ledger.jsonl`.
-- #57 K12: efficacy gates (W1/W2, H1/H2, R1-R5, `G-no-autopromote`) wired into
-  `baseline eval` with a `gated` status; real-repo run 14 pass / 0 fail / 2 gated.
-
-## Status: knowledge + replay tracker COMPLETE (K0-K12)
-
-`docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md` is `DONE` — every K row landed via PRs
-#45-#57. The knowledge layer (SCHEMA, marker upserts, lint), handoff mining
-(audit -> index -> project feeds -> proposals), and the replay loop
-(select -> redact -> bundle -> ingest) are all implemented, deterministic, and
-human-gated. `baseline eval` now reports the E + W/H/R gate battery.
-
-The only pending signal is empirical, not code: `R3-signal`/`R4-value` stay
-`gated` until a real out-of-band replay result is ingested — replay execution is
-out-of-band by design (D4). The first real replay run will flip those.
-
-The 2026-07-08 audit is recorded in `docs/WORK_AUDIT_2026-07-08.md`; it marks
-the original baseline loop closure as historical/done and captures the current
-follow-up set.
+- Hub PR #68: `Refresh archive and track feedback follow-ups`
+- Router PR #18: `Set stable Gemini session ids`
 
 ## Next Steps / Open Threads
 
-- Optional: archive the tracker doc per its lifecycle once satisfied; run a real
-  replay (hand a `baseline replay bundle` packet to a cross-lineage agent, then
-  `baseline replay ingest` the result) to exercise R3/R4 with live data.
-- Follow-up issues: #60 collects replay/knowledge v1 polish (richer replay
-  slugs, clean bundle reruns, project-scoped replay proposals, stronger
-  precision/dedup gates); #59 tracks entropy/vendor/JWT redaction hardening; #32
-  remains archive backfill/regenerate; #19 remains broader trace/explain work.
-
-Known open boundaries:
-
-- #32 remains the right boundary for archive backfill/regenerate work and any
-  future `baseline/handoffs/index.jsonl --prune` semantics.
-- The two `baseline lint` orphan warnings for `baseline/projects/agent-sessions`
-  and `baseline/projects/avidullu` are known warnings, not PR blockers.
-- Replay execution stays out-of-band in v1. This repo selects and validates
-  packets/results; it does not autonomously run alternate agents.
+- Review and merge PR #68 first if satisfied. It is intentionally a large
+  generated archive refresh plus the tracker and archive-index identity fix.
+- Review and merge router PR #18. It gives Gemini Antigravity exports stable
+  `metadata.session_id` values so the hub/router archive identity is reliable.
+- After both P0s land, move to the P1 rows in the tracker:
+  streaming router JSONL/hash processing, skipped-vs-failed accounting, and
+  refreshing router `PLAN.md`.
+- Keep P2 items in backlog unless they become blocking:
+  tail-hash idempotency and targeted generator APIs.
 
 ## Ramp-Up Kit
 
-- `docs/BASELINE_KNOWLEDGE_REPLAY_PLAN.md`
-- `docs/WORK_AUDIT_2026-07-08.md`
-- `baseline/SCHEMA.md`
-- `docs/ENGINEERING_BASELINE.md`
-- `docs/TEST_PLAN.md`
-- `docs/BASELINE_LOOP_CLOSURE.md`
-- `docs/CALIBRATION_EFFICACY.md`
-- `docs/COMPOSE_STACK.md`
-- `baseline/handoffs/audit.md`
-- `baseline/handoffs/index.jsonl`
-- `baseline/proposals/handoff.*.handoff-signals.json`
-- `agent_sessions/baseline_handoffs.py`
-- `agent_sessions/baseline_ingest.py`
-- `agent_sessions/baseline_lint.py`
-- `agent_sessions/baseline_promote.py`
-- `agent_sessions/cli.py`
-- `tests/test_baseline_handoffs.py`
-- `tests/test_baseline_ingest.py`
-- `tests/test_baseline_lint.py`
-- `tests/test_cli.py`
+- `docs/FEEDBACK_INCORPORATION_TRACKER_2026-07-09.md`
+- `agent_sessions/archive.py`
+- `agent_sessions/archive_status.py`
+- `tests/test_archive.py`
+- `tests/test_router_index.py`
+- Router PR #18 changes:
+  `C:\Users\avidu\Projects\Agentic-Coding\Tools-and-Extensions\agent-session-router\src\extractors\gemini.ts`
+  and
+  `C:\Users\avidu\Projects\Agentic-Coding\Tools-and-Extensions\agent-session-router\test\coverage-suite.js`
 
 ## Key Decisions
 
-- Private GitHub repo: `https://github.com/avidullu/agent-sessions`
-- Raw source backups remain ignored by Git by default.
-- Exported Markdown/PDF files under `archive/` are committed and pushed.
-- Preserve transcript text as-is, even if generated Markdown contains trailing
-  whitespace from original session content.
-- Default source paths use template variables instead of user-specific hardcoded
-  Windows/WSL paths.
-- Knowledge/replay sequencing: schema and deterministic marker-block page
-  writes come before handoff mining or replay egress.
-- Handoff split: K2 audit is report-only; K6 owns persistent handoff index and
-  project-page feeds; K7 owns proposal generation.
-- Project-page producers reuse the shipped `baseline:begin/end` marker grammar;
-  there is no second marker family and no free-form page rewrite path.
-- Trace validation: human proposals may keep free-text evidence, but
-  `source_kind` of `replay`, `handoff`, or `repo-handoff` requires structured
-  trace and resolvable archive references before candidate sidecars are written.
-- K6 handoff index: persist every discovered handoff candidate in
-  `baseline/handoffs/index.jsonl`, but write project-page feeds only for
-  configured or already-existing pages.
-- K7 generated proposals: deterministic review inputs only, scoped to
-  configured/existing projects, with `generated_by = "baseline handoffs
-  proposals"` and `source_kind = "repo-handoff"`. They must pass
-  `baseline ingest --dry-run` and are never auto-promoted.
-- K7 stable-date follow-up: `handoffs.index` project-page feeds preserve the
-  existing `generated_at` value when generated content is unchanged.
+- Hub archive Markdown/PDF output under `archive/` remains checked in.
+- Local router diagnostics under `archive/.router/` are ignored and not part of
+  the archive contract.
+- Hub archive merge identity now keeps distinct same-session-id records apart
+  when their payload hashes differ, preventing sibling/subagent archive collapse.
+- Gemini Antigravity router extracts should use the session directory in
+  `brain/<session>/.system_generated/logs/<file>` as `metadata.session_id`, with
+  file-stem fallback only for unexpected loose paths.
+- The July 9 feedback tracker is the source of truth for prioritization; P0 is
+  in review, P1 is next, and P2 remains backlog.
