@@ -1,69 +1,61 @@
 # Session Handoff
 
-Updated: 2026-07-09 14:58 IST
+Updated: 2026-07-09 15:45 IST
 
 ## You Are Here
 
-The July 9 feedback workstream is tracked in:
+The July 9 feedback workstream is complete and archived:
 
-- `docs/FEEDBACK_INCORPORATION_TRACKER_2026-07-09.md`
-- `docs/README.md` indexes the tracker.
+- `docs/archives/FEEDBACK_INCORPORATION_TRACKER_2026-07-09.md`
+- `docs/README.md` points to the archived tracker.
 
-The original P0 PRs are merged:
+Merged hub PRs in this workstream:
 
-- Hub PR #68: `Refresh archive and track feedback follow-ups`
-- Router PR #18: `Set stable Gemini session ids`
+- #68 `Refresh archive and track feedback follow-ups`
+- #69 `Make rendered archive artifacts local-only`
+- #70 `Harden archive reuse with tail hashes`
 
-Current active branch in the hub repo:
+Merged router PRs in this workstream:
 
-- `codex/local-only-archive-artifacts`
-- Draft PR #69: `Make rendered archive artifacts local-only`
-
-Related router compatibility PR:
-
-- Router PR #19: `Align router index identity with hub catalog`
-
-This branch makes rendered transcript Markdown/PDF files local-only by default
-and keeps only portable archive metadata in Git.
+- #18 `Set stable Gemini session ids`
+- #19 `Align router index identity with hub catalog`
+- #20 `Stream Gemini parsing and file hashing`
+- #21 `Split router export outcomes`
+- #22 `Refresh router project plan`
+- #23 `Harden router cache reuse with tail hashes`
 
 ## Next Steps / Open Threads
 
-- Review and merge hub PR #69 if satisfied.
-- Review and merge router PR #19 if satisfied. It keeps router sidecar rows
-  distinct by `session_id + sha256`, matching the hub catalog identity.
-- After PR #69 is reviewed or merged, start the P1 router queue in this order:
-  stream Gemini JSONL/hash processing, split skipped vs failed export
-  accounting, then refresh router `PLAN.md`.
-- Keep P2 rows in backlog unless they become blocking: tail-hash idempotency and
-  targeted generator APIs.
+- No active feedback-tracker implementation PRs remain.
+- F8 is intentionally backlog: evaluate targeted generator APIs for baseline/index
+  scans only if profiling shows memory or latency pressure.
+- Routine archive refreshes should continue with local-only rendered Markdown/PDF
+  bodies and tracked catalog metadata.
 
 ## Ramp-Up Kit
 
-- `docs/FEEDBACK_INCORPORATION_TRACKER_2026-07-09.md`
+- `docs/archives/FEEDBACK_INCORPORATION_TRACKER_2026-07-09.md`
 - `docs/OUTPUT_CONTRACT.md`
 - `agent_sessions/archive.py`
-- `agent_sessions/cli.py`
+- `agent_sessions/archive_status.py`
 - `agent_sessions/config.py`
 - `tests/test_archive.py`
-- `tests/test_cli.py`
-- `tests/test_config.py`
-- `baseline/candidates/2026-07-09-extraction.md`
-- Router follow-up repo:
+- `tests/test_archive_status.py`
+- Router repo:
   `C:\Users\avidu\Projects\Agentic-Coding\Tools-and-Extensions\agent-session-router`
 
 ## Key Decisions
 
 - Rendered archive Markdown/PDF transcript bodies are local-only by default.
 - The shared repo tracks `archive/index.jsonl` and `archive/INDEX.md` as the
-  portable catalog; `[archive] track_artifacts = true` is the explicit escape
-  hatch for committing rendered transcript bodies again.
+  portable catalog; `[archive] track_artifacts = true` remains the opt-in escape
+  hatch for committing rendered transcript bodies.
 - Local router diagnostics under `archive/.router/` are ignored and not part of
   the archive contract.
-- Hub archive merge identity keeps distinct same-session-id records apart when
-  their payload hashes differ, preventing sibling/subagent archive collapse.
-- Gemini Antigravity router extracts use the session directory in
-  `brain/<session>/.system_generated/logs/<file>` as `metadata.session_id`, with
-  file-stem fallback only for unexpected loose paths.
-- The July 9 feedback tracker is the source of truth for prioritization: P0 is
-  finishing local-only artifact cleanup, P1 router hardening is next, and P2
-  remains backlog.
+- Hub and router catalog identity keeps distinct same-session-id records apart
+  by including `sha256`.
+- Hub and router reuse checks now use tail hashes to catch same-size/same-mtime
+  content changes when a newer record has a stored tail fingerprint.
+- Broad generator rewrites are deferred until profiling justifies them; source
+  extractors already stream JSONL and baseline/index commands currently benefit
+  from list-based summaries.
