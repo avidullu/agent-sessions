@@ -352,8 +352,38 @@ class TestWriteIndexes:
         content = index_path.read_text(encoding="utf-8")
         assert "# Agent Session Archive" in content
         assert "test-claude" in content
+        assert "`archive/test-claude/session.md`" in content
+        assert "[session.md]" not in content
 
     def test_writes_pdf_link(
+        self, repo_root: Path, archive_config: ArchiveConfig
+    ) -> None:
+        archive_config = ArchiveConfig(
+            repo_root=archive_config.repo_root,
+            archive_dir=archive_config.archive_dir,
+            raw_dir=archive_config.raw_dir,
+            sources=archive_config.sources,
+            track_artifacts=True,
+        )
+        records = [
+            {
+                "source": "test-claude",
+                "kind": "claude",
+                "source_file": "/fake/session.jsonl",
+                "sha256": "abc123",
+                "messages": 5,
+                "markdown": "archive/test-claude/session.md",
+                "pdf": "archive/test-claude/session.pdf",
+                "raw": None,
+                "metadata": {},
+            },
+        ]
+        write_indexes(archive_config, records)
+        index_path = archive_config.archive_dir / "INDEX.md"
+        content = index_path.read_text(encoding="utf-8")
+        assert "[PDF]" in content
+
+    def test_writes_pdf_path_when_artifacts_are_local_only(
         self, repo_root: Path, archive_config: ArchiveConfig
     ) -> None:
         records = [
@@ -372,7 +402,8 @@ class TestWriteIndexes:
         write_indexes(archive_config, records)
         index_path = archive_config.archive_dir / "INDEX.md"
         content = index_path.read_text(encoding="utf-8")
-        assert "[PDF]" in content
+        assert "`archive/test-claude/session.pdf`" in content
+        assert "[PDF]" not in content
 
 
 class TestLoadIndexRecords:
@@ -523,6 +554,13 @@ class TestPruneIndexRecords:
     def test_prunes_records_with_missing_markdown(self, repo_root: Path, archive_config: ArchiveConfig) -> None:
         from agent_sessions.archive import prune_index_records, read_existing_index_records, write_indexes
 
+        archive_config = ArchiveConfig(
+            repo_root=archive_config.repo_root,
+            archive_dir=archive_config.archive_dir,
+            raw_dir=archive_config.raw_dir,
+            sources=archive_config.sources,
+            track_artifacts=True,
+        )
         present = repo_root / "archive" / "s" / "present.md"
         present.parent.mkdir(parents=True, exist_ok=True)
         present.write_text("hi", encoding="utf-8")
@@ -542,6 +580,13 @@ class TestPruneIndexRecords:
     def test_dry_run_keeps_records(self, repo_root: Path, archive_config: ArchiveConfig) -> None:
         from agent_sessions.archive import prune_index_records, read_existing_index_records, write_indexes
 
+        archive_config = ArchiveConfig(
+            repo_root=archive_config.repo_root,
+            archive_dir=archive_config.archive_dir,
+            raw_dir=archive_config.raw_dir,
+            sources=archive_config.sources,
+            track_artifacts=True,
+        )
         write_indexes(
             archive_config,
             [{"source": "s", "kind": "claude", "source_file": "b", "sha256": "2",
@@ -549,6 +594,35 @@ class TestPruneIndexRecords:
         )
         prune_index_records(archive_config, dry_run=True)
         assert len(read_existing_index_records(archive_config)) == 1
+
+    def test_local_only_artifacts_keep_missing_markdown(
+        self,
+        archive_config: ArchiveConfig,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        from agent_sessions.archive import prune_index_records, read_existing_index_records, write_indexes
+
+        write_indexes(
+            archive_config,
+            [
+                {
+                    "source": "s",
+                    "kind": "claude",
+                    "source_file": "b",
+                    "sha256": "2",
+                    "messages": 1,
+                    "markdown": "archive/s/local-only.md",
+                    "pdf": None,
+                    "raw": None,
+                    "metadata": {},
+                }
+            ],
+        )
+
+        prune_index_records(archive_config)
+
+        assert len(read_existing_index_records(archive_config)) == 1
+        assert "local-only" in capsys.readouterr().out
 
     def test_export_preserves_records_from_other_machines(
         self, archive_config: ArchiveConfig

@@ -1,9 +1,9 @@
 # Automation
 
 This repo supports a local daily export job. The job is intentionally limited to
-exporting sessions into `archive/`, committing changed archive files, and
-pushing to the private GitHub repo. Search indexing and baseline suggestion runs
-stay separate.
+exporting sessions into local `archive/` artifacts, committing changed archive
+metadata files, and pushing to the private GitHub repo. Search indexing and
+baseline suggestion runs stay separate.
 
 ## Daily Export Contract
 
@@ -14,7 +14,8 @@ The scheduled job should:
 3. Run `python tools/agent_archive.py export --all`
 4. Optionally include `--pdf`, or set `[archive] write_pdfs = true` in a
    machine-local `sources.toml`
-5. Commit only when `archive/` changed
+5. Commit only when tracked metadata changed, usually `archive/index.jsonl` or
+   `archive/INDEX.md`
 6. Push only after a successful commit
 7. Exit cleanly when there is nothing new
 
@@ -24,7 +25,8 @@ It should not:
 - commit machine-local `sources.toml`
 - run cass indexing
 - run `baseline suggest` daily until promotion is safer
-- stage non-archive files
+- stage local-only Markdown/PDF transcript artifacts
+- stage non-archive metadata files
 
 ## Windows
 
@@ -69,6 +71,10 @@ The exporter preserves existing session import timestamps and `archive/INDEX.md`
 generated timestamps when the underlying content is unchanged. That keeps daily
 runs quiet when there are no new or changed source sessions.
 
+Rendered transcript artifacts (`archive/**/*.md`, `archive/**/*.pdf`) are
+local-only by default and ignored by Git. The portable repo state is
+`archive/index.jsonl` plus `archive/INDEX.md`.
+
 `archive/index.jsonl` is merge-aware: records already indexed from another
 machine remain in the unified catalog even when the current machine cannot see
 that other machine's local agent stores.
@@ -77,6 +83,8 @@ PDF generation skips existing PDFs unless the Markdown changed.
 PDF generation is off by default. Enable it for a single run with `--pdf`, or
 persist it for one machine with `[archive] write_pdfs = true` in ignored
 `sources.toml`; use `--no-pdf` to force Markdown-only export for one run.
+Only set `[archive] track_artifacts = true` if the repo should intentionally go
+back to committing rendered transcript files.
 
 ## Hook Shape
 

@@ -283,20 +283,25 @@ def write_indexes(config: ArchiveConfig, records: list[dict[str, Any]]) -> None:
         "",
         f"Generated: `{now_utc()}`",
         "",
-        "| Source | Kind | Messages | Markdown | PDF |",
+        "| Source | Kind | Messages | Markdown artifact | PDF artifact |",
         "| --- | --- | ---: | --- | --- |",
     ]
     for record in records:
         md = record["markdown"].replace("\\", "/")
-        link = os.path.relpath(config.repo_root / md, config.archive_dir).replace("\\", "/")
-        pdf_link = ""
+        markdown_cell = f"`{md}`"
+        if config.track_artifacts:
+            link = os.path.relpath(config.repo_root / md, config.archive_dir).replace("\\", "/")
+            markdown_cell = f"[{Path(md).name}]({link})"
+        pdf_cell = ""
         if record.get("pdf"):
             pdf_norm = record["pdf"].replace("\\", "/")
-            pdf_rel = os.path.relpath(config.repo_root / pdf_norm, config.archive_dir).replace("\\", "/")
-            pdf_link = f"[PDF]({pdf_rel})"
+            pdf_cell = f"`{pdf_norm}`"
+            if config.track_artifacts:
+                pdf_rel = os.path.relpath(config.repo_root / pdf_norm, config.archive_dir).replace("\\", "/")
+                pdf_cell = f"[PDF]({pdf_rel})"
         lines.append(
             f"| {record['source']} | {record['kind']} | {record['messages']} | "
-            f"[{Path(md).name}]({link}) | {pdf_link} |"
+            f"{markdown_cell} | {pdf_cell} |"
         )
     index_path = config.archive_dir / "INDEX.md"
     index_text = preserve_generated_at(index_path, "\n".join(lines) + "\n")
@@ -338,12 +343,20 @@ def load_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
 
 
 def prune_index_records(config: ArchiveConfig, dry_run: bool = False) -> int:
-    """Drop index records whose archive Markdown file no longer exists on disk.
+    """Drop index records whose tracked archive Markdown no longer exists.
 
-    Safe GC for entries orphaned when a source file's digest changed (a fresh
-    stem/record supersedes the old one) or an archive file was deleted. Records
-    from other machines stay put as long as their committed Markdown is present.
+    Safe GC for artifact-tracking exports where a source file's digest changed
+    (a fresh stem/record supersedes the old one) or an archive file was deleted.
+    When rendered artifacts are local-only, missing Markdown is not treated as a
+    stale record signal.
     """
+    if not config.track_artifacts:
+        print("prune: archive artifacts are local-only; missing Markdown files are not stale.")
+        print(
+            "prune: no index records pruned. "
+            "Set [archive] track_artifacts = true to prune by artifact presence."
+        )
+        return 0
     records = read_existing_index_records(config)
     kept: list[dict[str, Any]] = []
     dropped: list[dict[str, Any]] = []

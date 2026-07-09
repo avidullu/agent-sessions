@@ -2,6 +2,7 @@
 archive_dir = "archive"
 raw_dir = "raw"
 write_pdfs = false
+track_artifacts = false
 
 [[sources]]
 name = "codex-windows"

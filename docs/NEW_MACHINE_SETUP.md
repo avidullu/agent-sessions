@@ -113,12 +113,17 @@ PDF generation is off by default. To make PDFs the default on one machine, add
 `write_pdfs = true` under `[archive]` in ignored `sources.toml`; use
 `--no-pdf` to force Markdown-only export for one run.
 
+Rendered Markdown/PDF transcript files are local-only by default. Git tracks the
+catalog metadata (`archive/index.jsonl`, `archive/INDEX.md`) but ignores
+`archive/**/*.md` and `archive/**/*.pdf`. Set `[archive] track_artifacts = true`
+only for an intentional repo policy change back to committed transcript bodies.
+
 Expected changed paths:
 
-- `archive/**/*.md`
-- `archive/**/*.pdf`, only when PDF export is enabled and `reportlab` is installed
 - `archive/index.jsonl`
 - `archive/INDEX.md`
+- local-only `archive/**/*.md`
+- local-only `archive/**/*.pdf`, only when PDF export is enabled and `reportlab` is installed
 
 If `--copy-raw` is used, raw gzip backups land in `raw/`, which is ignored by
 Git by default.
@@ -127,7 +132,7 @@ Git by default.
 
 ```powershell
 python tools/agent_archive.py status
-git status --short archive/ docs/DISCOVERY.md
+git status --short archive/index.jsonl archive/INDEX.md docs/DISCOVERY.md
 ```
 
 For a first run on a new machine, it is normal to see:
@@ -179,5 +184,5 @@ See `docs/AUTOMATION.md` for the exact scripts and scheduler examples.
 | `discover` reports missing roots | Add machine-local overrides in ignored `sources.toml`, or ignore sources that do not exist on this computer. |
 | `export --all --pdf` says PDF support is missing | Install `reportlab`, or use Markdown-only export. |
 | Copilot/ZAI sources are skipped | They are inventory-only until transcript files are present in supported locations. |
-| `git status` is very large after export | Narrow the view with `git status --short archive/ docs/DISCOVERY.md`; stage explicit paths only. |
+| `git status` is very large after export | Narrow the view with `git status --short archive/index.jsonl archive/INDEX.md docs/DISCOVERY.md`; stage explicit paths only. |
 | Duplicate old archive records or stale filenames remain | One-time backfill and `regenerate` are tracked separately in issue #32. Do not hand-edit the archive index to solve this. |
