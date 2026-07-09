@@ -17,15 +17,15 @@ The original P0 PRs are merged:
 Current active branch in the hub repo:
 
 - `codex/local-only-archive-artifacts`
+- Draft PR #69: `Make rendered archive artifacts local-only`
 
 This branch makes rendered transcript Markdown/PDF files local-only by default
 and keeps only portable archive metadata in Git.
 
 ## Next Steps / Open Threads
 
-- Finish, verify, and open the local-only artifact PR from
-  `codex/local-only-archive-artifacts`.
-- After that PR is reviewed or merged, start the P1 router queue in this order:
+- Review and merge hub PR #69 if satisfied.
+- After PR #69 is reviewed or merged, start the P1 router queue in this order:
   stream Gemini JSONL/hash processing, split skipped vs failed export
   accounting, then refresh router `PLAN.md`.
 - Keep P2 rows in backlog unless they become blocking: tail-hash idempotency and

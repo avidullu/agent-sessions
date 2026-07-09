@@ -102,7 +102,7 @@ Legend: `Todo`, `In progress`, `Done`, `Backlog`. One small PR per row.
 | --- | --- | --- | --- | --- | --- |
 | F0 | P0 | `agent-sessions` | Check in this tracker and archive freshness sync; ignore local router diagnostics. | Done | #68 merged |
 | F1 | P0 | `agent-session-router` | Populate Gemini Antigravity `metadata.session_id` from the discovered session path and cover index identity. | Done | #18 merged |
-| F2 | P0 | `agent-sessions` | Make rendered archive Markdown/PDF files local-only by default; keep `archive/index.jsonl` and `archive/INDEX.md` as shared metadata. | In progress | local-only artifact PR |
+| F2 | P0 | `agent-sessions` | Make rendered archive Markdown/PDF files local-only by default; keep `archive/index.jsonl` and `archive/INDEX.md` as shared metadata. | In review | #69 |
 | F3 | P1 | `agent-session-router` | Stream Gemini JSONL parsing and file hashing instead of full-file `readFileSync`. | Next | - |
 | F4 | P1 | `agent-session-router` | Split skipped vs failed export accounting. | Next | - |
 | F5 | P1 | `agent-session-router` | Refresh `PLAN.md` to match shipped support and current next steps. | Next | - |
@@ -120,4 +120,4 @@ Legend: `Todo`, `In progress`, `Done`, `Backlog`. One small PR per row.
 ## 9. Changelog
 
 - 2026-07-09 - Created tracker from feedback review; started P0 archive sync and Gemini identity split.
-- 2026-07-09 - Merged hub PR #68 and router PR #18; started the local-only artifact follow-up before starting the P1 router queue.
+- 2026-07-09 - Merged hub PR #68 and router PR #18; opened hub PR #69 for the local-only artifact follow-up before starting the P1 router queue.
