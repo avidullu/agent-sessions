@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 from pathlib import Path
 
@@ -25,6 +26,7 @@ from agent_sessions.archive import (
     select_sources,
     sha256_file,
     source_modified_date,
+    tail_sha256_file,
     write_indexes,
     write_text_if_changed,
 )
@@ -114,6 +116,12 @@ class TestSha256File:
         # Empty file has known SHA-256
         assert h == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
+    def test_tail_hash_reads_trailing_bytes(self, tmp_path: Path) -> None:
+        path = tmp_path / "tail.txt"
+        path.write_text("prefix-abcdef", encoding="utf-8")
+        expected = hashlib.sha256(b"def").hexdigest()
+        assert tail_sha256_file(path, max_bytes=3) == expected
+
 
 class TestCopyRaw:
     def test_copies_and_gzips(
@@ -180,6 +188,18 @@ class TestCanReuseRecord:
 
         prior = self._record_with_markdown(tmp_path)
         assert _can_reuse_record(self._config(tmp_path), prior, 10, 100.0, False, False) is True
+
+    def test_matching_tail_hash_reusable(self, tmp_path: Path) -> None:
+        from agent_sessions.archive import _can_reuse_record
+
+        prior = self._record_with_markdown(tmp_path, tail_sha256="abc")
+        assert _can_reuse_record(self._config(tmp_path), prior, 10, 100.0, False, False, "abc") is True
+
+    def test_changed_tail_hash_not_reusable(self, tmp_path: Path) -> None:
+        from agent_sessions.archive import _can_reuse_record
+
+        prior = self._record_with_markdown(tmp_path, tail_sha256="abc")
+        assert _can_reuse_record(self._config(tmp_path), prior, 10, 100.0, False, False, "def") is False
 
     def test_changed_mtime_not_reusable(self, tmp_path: Path) -> None:
         from agent_sessions.archive import _can_reuse_record
@@ -708,6 +728,7 @@ class TestExportSources:
         result = export_sources(archive_config, limit=1)
         assert result.exported == 1
         assert any((archive_config.archive_dir / "test-claude").iterdir())
+        assert read_existing_index_records(archive_config)[0]["tail_sha256"]
 
     def test_skips_inventory_sources(
         self, repo_root: Path, multi_source_config: ArchiveConfig

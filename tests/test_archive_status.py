@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from agent_sessions.archive import sha256_file, write_indexes
+import os
+
+from agent_sessions.archive import sha256_file, tail_sha256_file, write_indexes
 from agent_sessions.archive_status import (
     archive_status,
     classify_source_origin,
@@ -121,6 +123,36 @@ class TestStatusSummary:
         assert summary.visible_files == 1
         assert summary.new_files == 0
         assert summary.changed_files == 0
+
+    def test_tail_hash_detects_same_size_mtime_change(self, archive_config: ArchiveConfig) -> None:
+        root = archive_config.sources[0].roots[0]
+        root.mkdir(parents=True)
+        changed = root / "changed.jsonl"
+        changed.write_text('{"sessionId":"a"}\n', encoding="utf-8")
+        stat_result = changed.stat()
+        write_indexes(
+            archive_config,
+            [
+                {
+                    "source": "test-claude",
+                    "kind": "claude",
+                    "source_file": str(changed),
+                    "sha256": sha256_file(changed),
+                    "tail_sha256": tail_sha256_file(changed),
+                    "size": stat_result.st_size,
+                    "mtime": stat_result.st_mtime,
+                    "messages": 0,
+                    "markdown": "archive/test-claude/changed.md",
+                    "metadata": {},
+                }
+            ],
+        )
+
+        changed.write_text('{"sessionId":"b"}\n', encoding="utf-8")
+        os.utime(changed, (stat_result.st_mtime, stat_result.st_mtime))
+
+        summary = status_summary(archive_config)
+        assert summary.changed_files == 1
 
     def test_render_status(self, archive_config: ArchiveConfig) -> None:
         write_indexes(
