@@ -42,6 +42,7 @@ class TestBuildParser:
         args = parser.parse_args(["export", "--all"])
         assert args.cmd == "export"
         assert args.all is True
+        assert args.pdf is None
 
     def test_export_with_source(self) -> None:
         parser = build_parser()
@@ -65,6 +66,11 @@ class TestBuildParser:
         assert args.pdf is True
         assert args.copy_raw is True
         assert args.dry_run is True
+
+    def test_export_no_pdf_override(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["export", "--all", "--no-pdf"])
+        assert args.pdf is False
 
     def test_pdf_requires_source_or_all(self) -> None:
         parser = build_parser()
@@ -426,6 +432,48 @@ class TestMain:
         assert "test-inventory (inventory)" in output
         assert "reportlab is not installed" in output
         assert "Inventory-only sources are expected" in output
+
+    def test_export_uses_config_pdf_default(
+        self,
+        repo_root: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        (repo_root / "config" / "default_sources.toml").parent.mkdir(
+            parents=True, exist_ok=True
+        )
+        (repo_root / "config" / "default_sources.toml").write_text(
+            '[archive]\narchive_dir = "archive"\nraw_dir = "raw"\nwrite_pdfs = true\n',
+            encoding="utf-8",
+        )
+
+        def fake_export_sources(*args: object, **kwargs: object) -> ExportResult:
+            assert kwargs["write_pdfs"] is True
+            return ExportResult(exported=1)
+
+        monkeypatch.setattr("agent_sessions.cli.export_sources", fake_export_sources)
+
+        assert main(["export", "--all"]) == 0
+
+    def test_export_no_pdf_overrides_config_default(
+        self,
+        repo_root: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        (repo_root / "config" / "default_sources.toml").parent.mkdir(
+            parents=True, exist_ok=True
+        )
+        (repo_root / "config" / "default_sources.toml").write_text(
+            '[archive]\narchive_dir = "archive"\nraw_dir = "raw"\nwrite_pdfs = true\n',
+            encoding="utf-8",
+        )
+
+        def fake_export_sources(*args: object, **kwargs: object) -> ExportResult:
+            assert kwargs["write_pdfs"] is False
+            return ExportResult(exported=1)
+
+        monkeypatch.setattr("agent_sessions.cli.export_sources", fake_export_sources)
+
+        assert main(["export", "--all", "--no-pdf"]) == 0
 
     def test_pdf_requires_source(self, repo_root: Path) -> None:
         (repo_root / "config" / "default_sources.toml").parent.mkdir(

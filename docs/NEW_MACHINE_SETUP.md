@@ -109,10 +109,14 @@ Markdown plus PDFs:
 python tools/agent_archive.py export --all --pdf
 ```
 
+PDF generation is off by default. To make PDFs the default on one machine, add
+`write_pdfs = true` under `[archive]` in ignored `sources.toml`; use
+`--no-pdf` to force Markdown-only export for one run.
+
 Expected changed paths:
 
 - `archive/**/*.md`
-- `archive/**/*.pdf`, only when `--pdf` is used and `reportlab` is installed
+- `archive/**/*.pdf`, only when PDF export is enabled and `reportlab` is installed
 - `archive/index.jsonl`
 - `archive/INDEX.md`
 
