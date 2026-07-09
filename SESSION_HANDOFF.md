@@ -18,6 +18,10 @@ Two P0 draft PRs are open for owner review:
 - Hub PR #68: `Refresh archive and track feedback follow-ups`
 - Router PR #18: `Set stable Gemini session ids`
 
+Hub PR #68 also includes the post-refresh baseline insight run:
+`baseline/candidates/2026-07-09-extraction.md`, generated from all 5,231
+indexed sessions, plus its prediction sidecar and ledger entries.
+
 ## Next Steps / Open Threads
 
 - Review and merge PR #68 first if satisfied. It is intentionally a large
@@ -33,6 +37,8 @@ Two P0 draft PRs are open for owner review:
 ## Ramp-Up Kit
 
 - `docs/FEEDBACK_INCORPORATION_TRACKER_2026-07-09.md`
+- `baseline/candidates/2026-07-09-extraction.md`
+- `baseline/candidates/2026-07-09-extraction.predictions.json`
 - `agent_sessions/archive.py`
 - `agent_sessions/archive_status.py`
 - `tests/test_archive.py`
