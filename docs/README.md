@@ -3,7 +3,7 @@
 | Doc | Purpose |
 | --- | --- |
 | [BASELINE_KNOWLEDGE_REPLAY_PLAN.md](BASELINE_KNOWLEDGE_REPLAY_PLAN.md) | **DONE** - compounding knowledge layer, handoff mining, and replay loop (#23, #25, #26); K0-K12 landed |
-| [FEEDBACK_INCORPORATION_TRACKER_2026-07-09.md](FEEDBACK_INCORPORATION_TRACKER_2026-07-09.md) | **IN PROGRESS** - July feedback review tracker and P0 archive/router follow-ups |
+| [archives/FEEDBACK_INCORPORATION_TRACKER_2026-07-09.md](archives/FEEDBACK_INCORPORATION_TRACKER_2026-07-09.md) | **DONE (archived)** - July feedback review tracker, P0/P1/P2 follow-ups, and F8 backlog decision |
 | [WORK_AUDIT_2026-07-08.md](WORK_AUDIT_2026-07-08.md) | **DONE** - repository health audit, prioritized debt, follow-ups, and docs freshness cleanup |
 | [FIRST_USER_SETUP_TRACKER.md](FIRST_USER_SETUP_TRACKER.md) | **DONE** - first-user and new-machine setup UX MVP (#42 + #18) |
 | [NEW_MACHINE_SETUP.md](NEW_MACHINE_SETUP.md) | Copy/paste setup and sync validation checklist for adding another computer |
