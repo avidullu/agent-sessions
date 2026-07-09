@@ -202,16 +202,17 @@ def index_record_key(record: dict[str, Any]) -> tuple[str, str]:
 
 
 def index_identity_key(record: dict[str, Any]) -> tuple[str, ...]:
-    # Merge identity: machine-independent so the same logical session exported
-    # from Windows and WSL (different absolute source_file paths) collapses to a
-    # single record, while a re-export of a changed file still supersedes the old
-    # record instead of accumulating. session_id is stable across both machines
-    # and content changes; fall back to (source, source_file) when it is absent.
+    # Merge identity: machine-independent for the same logical content exported
+    # from Windows and WSL (different absolute source_file paths), but not so
+    # broad that sibling/subagent files sharing a parent session id collapse into
+    # one record. The source path upsert in merge_index_records handles changed
+    # files from the same machine.
     metadata = record.get("metadata")
+    digest = str(record.get("sha256", "")).strip()
     if isinstance(metadata, dict):
         session_id = str(metadata.get("session_id", "")).strip()
-        if session_id:
-            return ("session", session_id)
+        if session_id and digest:
+            return ("session", session_id, digest)
     return ("path", str(record.get("source", "")), str(record.get("source_file", "")))
 
 
@@ -255,12 +256,20 @@ def read_router_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
 def merge_index_records(existing: list[dict[str, Any]], current: list[dict[str, Any]]) -> list[dict[str, Any]]:
     merged: dict[tuple[str, ...], dict[str, Any]] = {}
     order: list[tuple[str, ...]] = []
+    path_to_identity: dict[tuple[str, str], tuple[str, ...]] = {}
     for record in [*existing, *current]:
+        path_key = index_record_key(record)
         key = index_identity_key(record)
+        old_key_for_path = path_to_identity.get(path_key)
+        if old_key_for_path is not None and old_key_for_path != key:
+            # Same local source path changed content: supersede the old digest
+            # record instead of accumulating stale index entries.
+            merged.pop(old_key_for_path, None)
         if key not in merged:
             order.append(key)
         merged[key] = record
-    return [merged[key] for key in order]
+        path_to_identity[path_key] = key
+    return [merged[key] for key in order if key in merged]
 
 
 def write_indexes(config: ArchiveConfig, records: list[dict[str, Any]]) -> None:

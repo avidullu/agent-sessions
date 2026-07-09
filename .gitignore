@@ -12,6 +12,9 @@ tmp/
 # Use `git add -f raw/` only when you intentionally want raw backups in GitHub.
 raw/
 
+# Local diagnostics/state written by the VS Code feeder extension.
+archive/.router/
+
 # Local machine overrides.
 sources.toml
 

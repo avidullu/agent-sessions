@@ -438,7 +438,7 @@ class TestMergeIndexRecords:
 
     def test_same_session_across_machines_dedupes_by_session_id(self) -> None:
         # Same logical session exported from two machines: different absolute
-        # source_file paths, same session_id -> a single merged record.
+        # source_file paths, same session_id and digest -> a single merged record.
         windows = {
             "source": "claude-windows",
             "source_file": r"C:\Users\a\.claude\projects\p\sess.jsonl",
@@ -456,6 +456,45 @@ class TestMergeIndexRecords:
         merged = merge_index_records([windows], [wsl])
         assert len(merged) == 1
         assert merged[0]["metadata"]["session_id"] == "1111-2222"
+
+    def test_same_session_different_content_keeps_distinct_records(self) -> None:
+        first = {
+            "source": "claude-windows",
+            "source_file": r"C:\Users\a\.claude\projects\p\agent-a.jsonl",
+            "sha256": "aaa",
+            "markdown": "archive/claude-windows/agent-a.md",
+            "metadata": {"session_id": "1111-2222"},
+        }
+        second = {
+            "source": "claude-windows",
+            "source_file": r"C:\Users\a\.claude\projects\p\agent-b.jsonl",
+            "sha256": "bbb",
+            "markdown": "archive/claude-windows/agent-b.md",
+            "metadata": {"session_id": "1111-2222"},
+        }
+        merged = merge_index_records([first], [second])
+        assert len(merged) == 2
+        assert {record["sha256"] for record in merged} == {"aaa", "bbb"}
+
+    def test_same_source_path_changed_digest_supersedes_old_record(self) -> None:
+        old = {
+            "source": "claude-windows",
+            "source_file": r"C:\Users\a\.claude\projects\p\sess.jsonl",
+            "sha256": "aaa",
+            "markdown": "archive/claude-windows/old.md",
+            "metadata": {"session_id": "1111-2222"},
+        }
+        new = {
+            "source": "claude-windows",
+            "source_file": r"C:\Users\a\.claude\projects\p\sess.jsonl",
+            "sha256": "bbb",
+            "markdown": "archive/claude-windows/new.md",
+            "metadata": {"session_id": "1111-2222"},
+        }
+        merged = merge_index_records([old], [new])
+        assert len(merged) == 1
+        assert merged[0]["sha256"] == "bbb"
+        assert merged[0]["markdown"] == "archive/claude-windows/new.md"
 
     def test_write_indexes_normalizes_paths_to_posix(self, archive_config: ArchiveConfig) -> None:
         from agent_sessions.archive import read_existing_index_records, write_indexes
