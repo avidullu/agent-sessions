@@ -103,11 +103,12 @@ Legend: `Todo`, `In progress`, `Done`, `Backlog`. One small PR per row.
 | F0 | P0 | `agent-sessions` | Check in this tracker and archive freshness sync; ignore local router diagnostics. | Done | #68 merged |
 | F1 | P0 | `agent-session-router` | Populate Gemini Antigravity `metadata.session_id` from the discovered session path and cover index identity. | Done | #18 merged |
 | F2 | P0 | `agent-sessions` | Make rendered archive Markdown/PDF files local-only by default; keep `archive/index.jsonl` and `archive/INDEX.md` as shared metadata. | In review | #69 |
-| F3 | P1 | `agent-session-router` | Stream Gemini JSONL parsing and file hashing instead of full-file `readFileSync`. | Next | - |
-| F4 | P1 | `agent-session-router` | Split skipped vs failed export accounting. | Next | - |
-| F5 | P1 | `agent-session-router` | Refresh `PLAN.md` to match shipped support and current next steps. | Next | - |
-| F6 | P2 | both | Add tail-hash identity hardening for append-only logs. | Backlog | - |
-| F7 | P2 | `agent-sessions` | Evaluate targeted generator APIs for baseline/index scans. | Backlog | - |
+| F3 | P0 | `agent-session-router` | Align router sidecar identity with hub catalog identity (`session_id` + `sha256`) and document local-only Markdown impact. | In review | #19 |
+| F4 | P1 | `agent-session-router` | Stream Gemini JSONL parsing and file hashing instead of full-file `readFileSync`. | Next | - |
+| F5 | P1 | `agent-session-router` | Split skipped vs failed export accounting. | Next | - |
+| F6 | P1 | `agent-session-router` | Refresh `PLAN.md` to match shipped support and current next steps. | Next | - |
+| F7 | P2 | both | Add tail-hash identity hardening for append-only logs. | Backlog | - |
+| F8 | P2 | `agent-sessions` | Evaluate targeted generator APIs for baseline/index scans. | Backlog | - |
 
 ## 8. Definition Of Done
 
@@ -115,9 +116,11 @@ Legend: `Todo`, `In progress`, `Done`, `Backlog`. One small PR per row.
 - [x] P0 Gemini identity fix is reviewed and merged or explicitly rejected.
 - [x] Router and hub tests are green on the original P0 branches.
 - [ ] Local-only archive artifact follow-up is reviewed and merged or explicitly rejected.
+- [ ] Router compatibility follow-up is reviewed and merged or explicitly rejected.
 - [x] Next P1 rows are identified without blocking the P0 follow-up.
 
 ## 9. Changelog
 
 - 2026-07-09 - Created tracker from feedback review; started P0 archive sync and Gemini identity split.
 - 2026-07-09 - Merged hub PR #68 and router PR #18; opened hub PR #69 for the local-only artifact follow-up before starting the P1 router queue.
+- 2026-07-09 - Opened router PR #19 after impact verification found the router sidecar still deduped by `session_id` alone.

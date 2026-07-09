@@ -19,12 +19,18 @@ Current active branch in the hub repo:
 - `codex/local-only-archive-artifacts`
 - Draft PR #69: `Make rendered archive artifacts local-only`
 
+Related router compatibility PR:
+
+- Router PR #19: `Align router index identity with hub catalog`
+
 This branch makes rendered transcript Markdown/PDF files local-only by default
 and keeps only portable archive metadata in Git.
 
 ## Next Steps / Open Threads
 
 - Review and merge hub PR #69 if satisfied.
+- Review and merge router PR #19 if satisfied. It keeps router sidecar rows
+  distinct by `session_id + sha256`, matching the hub catalog identity.
 - After PR #69 is reviewed or merged, start the P1 router queue in this order:
   stream Gemini JSONL/hash processing, split skipped vs failed export
   accounting, then refresh router `PLAN.md`.
