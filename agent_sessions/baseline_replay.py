@@ -20,11 +20,13 @@ from __future__ import annotations
 import datetime as dt
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+from .baseline_handoffs import project_slug_for_raw
 from .baseline_settings import load_baseline_settings
+from .baseline_types import BaselineSettings
 from .config import ArchiveConfig
 from .utils import archive_markdown_path, read_jsonl_dicts, slugify
 
@@ -98,10 +100,20 @@ def normalized_markdown(markdown: str) -> str:
     return markdown.replace("\\", "/").strip()
 
 
-def project_slug_from_metadata(metadata: dict[str, Any]) -> str:
+def project_slug_from_metadata(metadata: dict[str, Any], settings: BaselineSettings | None = None) -> str:
+    """Derive a project slug from session metadata.
+
+    When ``settings`` is provided, delegates to the richer
+    :func:`~agent_sessions.baseline_handoffs.project_slug_for_raw` which
+    resolves pilot aliases and handles basename collisions with a digest.
+    Without settings, falls back to basename-only slugging for backwards
+    compatibility with simple callers (e.g. tests).
+    """
     raw = str(metadata.get("project") or metadata.get("cwd") or "").strip()
     if not raw:
         return "unknown-project"
+    if settings is not None and settings.pilots:
+        return project_slug_for_raw(settings, raw)
     from urllib.parse import unquote
 
     decoded = unquote(raw).replace("\\", "/").rstrip("/")
@@ -168,7 +180,9 @@ def score_candidate(*, messages: int, user_turns: int, first_prompt_chars: int, 
     return round(min(score, 1.0), 2)
 
 
-def evaluate_record(config: ArchiveConfig, record: dict[str, Any]) -> ReplayCandidate | None:
+def evaluate_record(
+    config: ArchiveConfig, record: dict[str, Any], settings: BaselineSettings | None = None
+) -> ReplayCandidate | None:
     """Turn one archive index record into a scored replay candidate.
 
     Returns ``None`` for records with no markdown path at all; a missing file on
@@ -182,7 +196,7 @@ def evaluate_record(config: ArchiveConfig, record: dict[str, Any]) -> ReplayCand
     sha256 = str(record.get("sha256", "")).strip()
     session_id = str(metadata.get("session_id") or metadata.get("id") or "").strip()
     source = str(record.get("source", "unknown"))
-    project_slug = project_slug_from_metadata(metadata)
+    project_slug = project_slug_from_metadata(metadata, settings)
     messages = int(record.get("messages", 0) or 0)
     candidate_id = f"replay.{(sha256 or session_id or markdown)[:12]}"
 
@@ -270,12 +284,15 @@ def select_replay_candidates(
     max_archive_records: int = 0,
     near_miss_limit: int | None = None,
 ) -> ReplaySelection:
+    settings = load_baseline_settings(config)
     index_path = config.archive_dir / "index.jsonl"
     records = read_jsonl_dicts(index_path, label="archive/index.jsonl") if index_path.exists() else []
     if max_archive_records > 0:
         records = records[:max_archive_records]
 
-    candidates = [candidate for record in records if (candidate := evaluate_record(config, record)) is not None]
+    candidates = [
+        candidate for record in records if (candidate := evaluate_record(config, record, settings)) is not None
+    ]
     eligible = [c for c in candidates if c.eligible]
     if kind:
         matching = [c for c in eligible if c.kind == kind]
@@ -309,41 +326,11 @@ def select_replay_candidates(
 
 
 def _with_flags(candidate: ReplayCandidate, *, selected: bool) -> ReplayCandidate:
-    return ReplayCandidate(
-        id=candidate.id,
-        sha256=candidate.sha256,
-        markdown_path=candidate.markdown_path,
-        session_id=candidate.session_id,
-        source=candidate.source,
-        project_slug=candidate.project_slug,
-        kind=candidate.kind,
-        messages=candidate.messages,
-        user_turns=candidate.user_turns,
-        transcript_chars=candidate.transcript_chars,
-        score=candidate.score,
-        eligible=candidate.eligible,
-        selected=selected,
-        exclusion_reasons=candidate.exclusion_reasons,
-    )
+    return replace(candidate, selected=selected)
 
 
 def _with_reason(candidate: ReplayCandidate, reason: str) -> ReplayCandidate:
-    return ReplayCandidate(
-        id=candidate.id,
-        sha256=candidate.sha256,
-        markdown_path=candidate.markdown_path,
-        session_id=candidate.session_id,
-        source=candidate.source,
-        project_slug=candidate.project_slug,
-        kind=candidate.kind,
-        messages=candidate.messages,
-        user_turns=candidate.user_turns,
-        transcript_chars=candidate.transcript_chars,
-        score=candidate.score,
-        eligible=candidate.eligible,
-        selected=False,
-        exclusion_reasons=candidate.exclusion_reasons + (reason,),
-    )
+    return replace(candidate, selected=False, exclusion_reasons=candidate.exclusion_reasons + (reason,))
 
 
 def candidate_to_dict(candidate: ReplayCandidate) -> dict[str, Any]:
@@ -509,6 +496,11 @@ def baseline_replay_bundle(
         md = archive_markdown_path(config.repo_root, markdown_path)
         text = md.read_text(encoding="utf-8", errors="replace") if md.exists() else ""
         task_raw, deliverable_raw = extract_task_and_deliverable(text)
+        # Skip sessions whose export format produced no extractable turns
+        # (e.g. non-standard role headers). Harmless but not worth bundling.
+        if not task_raw.strip() and not deliverable_raw.strip():
+            skipped.append(candidate_id)
+            continue
         task_res = redact_text(task_raw)
         deliverable_res = redact_text(deliverable_raw)
         blocked = task_res.blocked or deliverable_res.blocked
@@ -542,6 +534,12 @@ def baseline_replay_bundle(
 
 
 def _write_bundle(bundle_dir: Path, packet: dict[str, Any], report: dict[str, Any]) -> None:
+    # Clean-slate: clear then recreate so a rerun overwrites a stale
+    # packet.json rather than leaving both old + new artifacts.
+    if bundle_dir.exists():
+        import shutil
+
+        shutil.rmtree(bundle_dir)
     bundle_dir.mkdir(parents=True, exist_ok=True)
     (bundle_dir / "packet.json").write_text(
         json.dumps(packet, indent=2, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8", newline="\n"

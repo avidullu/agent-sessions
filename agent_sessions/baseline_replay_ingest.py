@@ -86,13 +86,19 @@ def validate_replay_result(data: dict[str, Any], session_ids: frozenset[str]) ->
     return errors
 
 
-def replay_result_to_proposal(data: dict[str, Any], markdown_for_session: dict[str, str]) -> dict[str, Any]:
+def replay_result_to_proposal(
+    data: dict[str, Any], markdown_for_session: dict[str, str], project_slug: str = ""
+) -> dict[str, Any]:
     replay_of = str(data["replay_of"]).strip()
     markdown = markdown_for_session.get(replay_of, "")
     claim = str(data["claim"]).strip()
     replayer = str(data.get("replayer", "")).strip()
     confidence = numeric_confidence(data.get("confidence")) or 0.5
     evidence = [str(item) for item in data.get("evidence", []) if str(item).strip()]
+    # Derive scope from the replayed session's project when available;
+    # fall back to global/metacognition for sessions with no project slug.
+    scope = f"project:{project_slug}" if project_slug else "global"
+    category = "project" if project_slug else "metacognition"
     trace = {
         "source": "replay",
         "session_id": replay_of,
@@ -104,8 +110,8 @@ def replay_result_to_proposal(data: dict[str, Any], markdown_for_session: dict[s
     return {
         "id": f"replay.{slugify(replay_of)[:24]}",
         "title": f"Replay improvement for session {replay_of}",
-        "scope": "global",
-        "category": "metacognition",
+        "scope": scope,
+        "category": category,
         "risk": "low",
         "confidence": round(confidence, 2),
         "approval_mode": "strict",
@@ -122,9 +128,7 @@ def replay_result_to_proposal(data: dict[str, Any], markdown_for_session: dict[s
 
 
 def stable_ledger_id(data: dict[str, Any]) -> str:
-    parts = "|".join(
-        str(data.get(field, "")) for field in ("replay_of", "replayer", "rubric_version", "claim")
-    )
+    parts = "|".join(str(data.get(field, "")) for field in ("replay_of", "replayer", "rubric_version", "claim"))
     return "replay-result." + hashlib.sha256(parts.encode("utf-8")).hexdigest()[:12]
 
 
@@ -186,6 +190,21 @@ def baseline_replay_ingest(
     records = read_jsonl_dicts(index_path, label="archive/index.jsonl") if index_path.exists() else []
     markdown_for_session = session_markdown_map(records)
 
+    # Build session_id → project_slug lookup from archive metadata so
+    # replay proposals carry the correct project scope.
+    session_project: dict[str, str] = {}
+    for record in records:
+        metadata = record.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        sid = str(metadata.get("session_id") or metadata.get("id") or "").strip()
+        if sid:
+            raw = str(metadata.get("project") or metadata.get("cwd") or "").strip()
+            if raw:
+                from .baseline_replay import project_slug_from_metadata
+
+                session_project[sid] = project_slug_from_metadata(metadata, settings)
+
     proposals_dir = output_dir or settings.root / "proposals"
     if not proposals_dir.is_absolute():
         proposals_dir = config.repo_root / proposals_dir
@@ -207,7 +226,8 @@ def baseline_replay_ingest(
             continue
         proposal_id = ""
         if action == "proposal":
-            proposal = replay_result_to_proposal(data, markdown_for_session)
+            project_slug = session_project.get(str(data.get("replay_of", "")).strip(), "")
+            proposal = replay_result_to_proposal(data, markdown_for_session, project_slug)
             proposal_errors = validate_proposal(proposal, refs)
             if proposal_errors:
                 rejected += 1
