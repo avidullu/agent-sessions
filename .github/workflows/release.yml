@@ -1,0 +1,55 @@
+# Tag-triggered release: build, verify, publish to PyPI via Trusted Publishing.
+#
+# This workflow runs no gates (ci.yml is the gate set local_ci.sh mirrors); it
+# only builds and publishes an already-green, tagged commit. Publishing uses
+# PyPI Trusted Publishing (OIDC) — no long-lived token is stored anywhere.
+# One-time setup on pypi.org: add a "pending publisher" for project
+# `agent-sessions`, owner `avidullu`, repository `agent-sessions`, workflow
+# `release.yml`, environment `pypi`.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install build twine
+          python -m build
+
+      - name: Twine metadata check (L4)
+        run: python -m twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1

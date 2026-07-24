@@ -1,0 +1,12 @@
+# Gitleaks configuration for external scanners (and our own release checks).
+#
+# tests/test_baseline_redaction.py deliberately embeds SYNTHETIC secrets
+# (fake API keys, base64 of plain sentences) as inputs for the redaction
+# engine's own tests. They are not credentials; allowlist the file so a
+# default `gitleaks` run over this repo reports real findings only.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic secrets used as redaction-test inputs"
+paths = ['''tests/test_baseline_redaction\.py''']

@@ -163,12 +163,14 @@ normalize_cmd() {
 [[ -f "$workflow" ]] || drift_fail "$workflow is missing." \
   "The gate set this script mirrors no longer exists."
 
-# D7: exactly one workflow file, executed by both GitHub and Forgejo. A second
-# one would be a gate set this script does not mirror and does not report on.
-workflow_count="$(find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) | wc -l)"
-if [[ "$workflow_count" -ne 1 ]]; then
-  drift_fail "found $workflow_count workflow files under .github/workflows/, expected exactly 1 (D7)." \
-    "This script only mirrors $workflow."
+# D7 (amended for launch): exactly the gate workflow (ci.yml) plus the
+# tag-triggered release workflow. release.yml publishes an already-green
+# tagged commit and runs no gates, so this script does not mirror it; any
+# OTHER workflow file is still a gate set this script would not report on.
+workflow_files="$(find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) | sed 's|.*/||' | sort | tr '\n' ' ')"
+if [[ "$workflow_files" != "ci.yml release.yml " ]]; then
+  drift_fail "unexpected workflow set under .github/workflows/: $workflow_files(expected exactly: ci.yml release.yml)." \
+    "This script only mirrors $workflow; release.yml is the tag-publish pipeline."
 fi
 if [[ -d .forgejo/workflows ]]; then
   drift_fail ".forgejo/workflows/ exists." \

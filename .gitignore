@@ -32,3 +32,6 @@ baseline/evidence/*.prompt.md
 
 # Replay bundles can contain full prompts/deliverables even after redaction review.
 baseline/replay/bundles/
+
+# wrangler local state (site/ deploys)
+site/.wrangler/
