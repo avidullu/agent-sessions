@@ -1,0 +1,66 @@
+{
+  "approval_mode": "strict",
+  "category": "docs",
+  "confidence": 0.85,
+  "evidence": [
+    "baseline/handoffs/index.jsonl contains 62 handoff candidate(s) for project `badminton-highlight-indexer`.",
+    "archive/claude-windows/20260606-55d47d77-6dbb-4afc-9ad0-315df54b08fd-55d47d77-6dbb-4afc-9ad0-315df54b08fd-2aa890e.md",
+    "archive/claude-windows/20260610-1c6eb3b4-ed47-4cb3-84e8-50b309c6495c-1c6eb3b4-ed47-4cb3-84e8-50b309c6495c-56bfe18.md",
+    "archive/claude-windows/20260610-2139f383-5578-4e22-831e-8859ad4f69f2-2139f383-5578-4e22-831e-8859ad4f69f2-2e1c23d.md",
+    "archive/claude-windows/20260613-d6979332-5869-49a6-bf7e-bd9f4da1954e-d6979332-5869-49a6-bf7e-bd9f4da1954e-560e614.md",
+    "archive/claude-windows/20260620-c47f0851-d75f-45b6-9126-e48544381426-c47f0851-d75f-45b6-9126-e48544381426-f7d33b2.md"
+  ],
+  "generated_by": "baseline handoffs proposals",
+  "id": "handoff.badminton-highlight-indexer.handoff-signals",
+  "open_questions": [
+    "Which linked handoffs contain durable project guidance rather than transient next steps?",
+    "55 indexed handoff candidate(s) lack standard headings; should they be normalized or ignored?"
+  ],
+  "risk": "low",
+  "scope": "project:badminton-highlight-indexer",
+  "source_kind": "repo-handoff",
+  "suggested_baseline_text": "Review the 62 indexed handoff candidate(s) for `badminton-highlight-indexer` before promoting durable project guidance. Prioritize repeated, still-current lessons from Next Steps / Open Threads, Ramp-Up Kit, You Are Here; use the linked evidence for next steps / open threads, ramp-up kit, session handoff, session-handoff, start here and leave transient next steps out of the baseline.",
+  "title": "Review handoff signals for badminton-highlight-indexer",
+  "trace": [
+    {
+      "markdown_path": "archive/claude-windows/20260606-55d47d77-6dbb-4afc-9ad0-315df54b08fd-55d47d77-6dbb-4afc-9ad0-315df54b08fd-2aa890e.md",
+      "project_slug": "badminton-highlight-indexer",
+      "session_id": "55d47d77-6dbb-4afc-9ad0-315df54b08fd",
+      "source": "claude-windows",
+      "source_file": "<claude-projects>/~-Projects-badminton-highlight-indexer\\55d47d77-6dbb-4afc-9ad0-315df54b08fd.jsonl",
+      "transform": "baseline handoffs proposals"
+    },
+    {
+      "markdown_path": "archive/claude-windows/20260610-1c6eb3b4-ed47-4cb3-84e8-50b309c6495c-1c6eb3b4-ed47-4cb3-84e8-50b309c6495c-56bfe18.md",
+      "project_slug": "badminton-highlight-indexer",
+      "session_id": "1c6eb3b4-ed47-4cb3-84e8-50b309c6495c",
+      "source": "claude-windows",
+      "source_file": "<claude-projects>/~-Projects-badminton-highlight-indexer\\1c6eb3b4-ed47-4cb3-84e8-50b309c6495c.jsonl",
+      "transform": "baseline handoffs proposals"
+    },
+    {
+      "markdown_path": "archive/claude-windows/20260610-2139f383-5578-4e22-831e-8859ad4f69f2-2139f383-5578-4e22-831e-8859ad4f69f2-2e1c23d.md",
+      "project_slug": "badminton-highlight-indexer",
+      "session_id": "2139f383-5578-4e22-831e-8859ad4f69f2",
+      "source": "claude-windows",
+      "source_file": "<claude-projects>/~-Projects-badminton-highlight-indexer\\2139f383-5578-4e22-831e-8859ad4f69f2.jsonl",
+      "transform": "baseline handoffs proposals"
+    },
+    {
+      "markdown_path": "archive/claude-windows/20260613-d6979332-5869-49a6-bf7e-bd9f4da1954e-d6979332-5869-49a6-bf7e-bd9f4da1954e-560e614.md",
+      "project_slug": "badminton-highlight-indexer",
+      "session_id": "d6979332-5869-49a6-bf7e-bd9f4da1954e",
+      "source": "claude-windows",
+      "source_file": "<claude-projects>/~-Projects-badminton-highlight-indexer\\d6979332-5869-49a6-bf7e-bd9f4da1954e.jsonl",
+      "transform": "baseline handoffs proposals"
+    },
+    {
+      "markdown_path": "archive/claude-windows/20260620-c47f0851-d75f-45b6-9126-e48544381426-c47f0851-d75f-45b6-9126-e48544381426-f7d33b2.md",
+      "project_slug": "badminton-highlight-indexer",
+      "session_id": "c47f0851-d75f-45b6-9126-e48544381426",
+      "source": "claude-windows",
+      "source_file": "<claude-projects>/~-Projects-badminton-highlight-indexer\\c47f0851-d75f-45b6-9126-e48544381426.jsonl",
+      "transform": "baseline handoffs proposals"
+    }
+  ]
+}

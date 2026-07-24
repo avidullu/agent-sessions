@@ -1,0 +1,30 @@
+{
+  "approval_mode": "strict",
+  "category": "docs",
+  "confidence": 0.48,
+  "evidence": [
+    "baseline/handoffs/index.jsonl contains 1 handoff candidate(s) for project `telegram`.",
+    "archive/codex-windows/20260704-019f2ad2-a3aa-7c53-816b-a75517c9130a-rollout-2026-07-04t07-21-19-019f2ad2-a3aa-7c.md"
+  ],
+  "generated_by": "baseline handoffs proposals",
+  "id": "handoff.telegram.handoff-signals",
+  "open_questions": [
+    "Which linked handoffs contain durable project guidance rather than transient next steps?",
+    "1 indexed handoff candidate(s) lack standard headings; should they be normalized or ignored?"
+  ],
+  "risk": "low",
+  "scope": "project:telegram",
+  "source_kind": "repo-handoff",
+  "suggested_baseline_text": "Review the 1 indexed handoff candidate(s) for `telegram` before promoting durable project guidance. Prioritize repeated, still-current lessons from handoff signals; use the linked evidence for next steps / open threads, ramp-up kit, session handoff, session-handoff, start here and leave transient next steps out of the baseline.",
+  "title": "Review handoff signals for telegram",
+  "trace": [
+    {
+      "markdown_path": "archive/codex-windows/20260704-019f2ad2-a3aa-7c53-816b-a75517c9130a-rollout-2026-07-04t07-21-19-019f2ad2-a3aa-7c.md",
+      "project_slug": "telegram",
+      "session_id": "019f2ad2-a3aa-7c53-816b-a75517c9130a",
+      "source": "codex-windows",
+      "source_file": "~\\.codex\\sessions\\2026\\07\\04\\rollout-2026-07-04T07-21-19-019f2ad2-a3aa-7c53-816b-a75517c9130a.jsonl",
+      "transform": "baseline handoffs proposals"
+    }
+  ]
+}

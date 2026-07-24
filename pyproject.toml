@@ -1,0 +1,115 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-sessions"
+version = "0.2.0"
+description = "Local-first multi-agent coding session archive tooling — discover, export, and baseline your AI coding sessions"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Version Control",
+    "Topic :: Utilities",
+]
+keywords = ["ai", "coding-agent", "session", "archive", "claude", "codex", "copilot", "deepseek", "gemini", "grok", "baseline", "export"]
+
+[project.urls]
+Homepage = "https://github.com/avidullu/agent-sessions"
+Repository = "https://github.com/avidullu/agent-sessions"
+Issues = "https://github.com/avidullu/agent-sessions/issues"
+Changelog = "https://github.com/avidullu/agent-sessions/blob/main/CHANGELOG.md"
+
+[project.scripts]
+agent-archive = "agent_sessions.cli:main"
+
+[tool.setuptools]
+packages = ["agent_sessions", "agent_sessions.sources"]
+
+[project.optional-dependencies]
+# Upper bounds are deliberate. These are gate tools, not libraries: a new major
+# of ruff or mypy changes what passes review, so an unbounded floor means the
+# verdict on a commit depends on the day it was checked. Bounds keep the next
+# major an explicit, reviewable bump.
+#
+# The bounds are a safety net; constraints-dev.txt is what CI actually resolves
+# to. Widen a bound and refresh the constraints file in the same PR.
+dev = [
+    "mypy>=1.10,<3",
+    "pytest>=7.0,<10",
+    "pytest-cov>=4.0,<8",
+    "reportlab>=4.0,<6",
+    "ruff>=0.6,<0.16",
+    "types-reportlab>=4.0,<6",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+# H4 (decision D3, "moderate ratchet"). Ruff's implicit default is E4,E7,E9,F —
+# naming any `select` replaces that default outright, so the defaults are
+# re-listed here explicitly. Dropping them would silently disable pyflakes.
+#
+# The four added families are the ones whose findings are mechanical or
+# genuinely bug-shaped:
+#   B  flake8-bugbear      — latent bugs (mutable defaults, loop-variable closures)
+#   I  isort               — import order, fully auto-fixable
+#   UP pyupgrade           — the floor is py311; stop writing py38 idioms
+#   C4 flake8-comprehensions — comprehension shape
+#
+# Deliberately NOT enabled yet: SIM and RUF. Together they add ~20 findings with
+# a much worse auto-fix ratio and several judgement calls, which belongs in the
+# aggressive-ratchet follow-up (D3), not in a mechanical-fixes-only PR.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "I", "UP", "C4"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+
+# H5 (decision D3, "moderate ratchet"). Applies to everything mypy is pointed
+# at — agent_sessions, tools, and (new in H5) tests. The production package was
+# already fully annotated, so this costs nothing there; what it buys is that the
+# *next* unannotated def is caught at review time instead of accumulating.
+#
+# Tests are in scope deliberately. An untyped test body is not type-checked at
+# all, so a test asserting against a function it calls wrongly still passes mypy
+# — which is precisely where a silent gap would hide.
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = ["-v", "--tb=short", "--strict-markers"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+
+[tool.coverage.run]
+source = ["agent_sessions"]
+omit = ["tests/*", "tools/*"]
+
+[tool.coverage.report]
+# H6: raised 80 -> 92. Measured coverage is 96.61% (643 tests, 3510 statements,
+# 119 uncovered), so 92 leaves ~162 statements of headroom — enough that an
+# unrelated one-line change cannot trip it, tight enough to actually have teeth.
+# 80 had 16 points of slack and gated nothing.
+#
+# Kept equal to --cov-fail-under=92 in .github/workflows/ci.yml. Change both.
+fail_under = 92
+show_missing = true
+skip_covered = false

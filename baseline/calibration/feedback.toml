@@ -1,0 +1,31 @@
+[feedback."profile.multi-agent-builder"]
+verdict = "accept"
+note = "Correct: uses Claude, DeepSeek, Codex, Grok, and Gemini as an active engineering workflow."
+
+[feedback."profile.local-first-private-compute"]
+verdict = "accept"
+note = "Accurate: all sources read from local disk; prefers owned compute."
+
+[feedback."profile.business-productivity-engineer"]
+verdict = "accept"
+note = "Matches: blends engineering with product/business across badminton-highlight-indexer, khelsutra, muneem, agent-sessions."
+
+[feedback."guardrail.pr-only-repo-writes"]
+verdict = "accept"
+note = "Accurate — this matches the AGENTS.md working agreement: branch from remote base, open PR, merge only after approval."
+
+[feedback."guardrail.verified-regression-gates"]
+verdict = "accept"
+note = "Accurate — matches established practice: run pytest, ruff, mypy, coverage before claiming readiness."
+
+[feedback."guardrail.handoff-and-resume"]
+verdict = "accept"
+note = "Accurate — SESSION_HANDOFF.md pattern is actively used across projects."
+
+[feedback."guardrail.tracked-project-docs"]
+verdict = "accept"
+note = "Accurate — PROJECT_DOC_TEMPLATE.md from badminton-highlight-indexer is the precedent."
+
+[feedback."harness.predict-then-calibrate"]
+verdict = "accept"
+note = "Accepting to see if the calibration loop sharpens future predictions."

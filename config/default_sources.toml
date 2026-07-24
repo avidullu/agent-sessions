@@ -1,0 +1,109 @@
+[archive]
+archive_dir = "archive"
+raw_dir = "raw"
+write_pdfs = false
+track_artifacts = false
+
+[[sources]]
+name = "codex-windows"
+kind = "codex"
+description = "Codex local and archived JSONL sessions on Windows."
+roots = [
+  "{home}/.codex/sessions",
+  "{home}/.codex/archived_sessions",
+]
+glob = "**/*.jsonl"
+
+[[sources]]
+name = "claude-windows"
+kind = "claude"
+description = "Claude Code project JSONL sessions on Windows."
+roots = ["{home}/.claude/projects"]
+glob = "**/*.jsonl"
+
+[[sources]]
+name = "claude-wsl-ubuntu"
+kind = "claude"
+description = "Claude Code project JSONL sessions in the default WSL distribution."
+roots = ["{wsl_home}/.claude/projects"]
+glob = "**/*.jsonl"
+
+[[sources]]
+name = "gemini-antigravity-windows"
+kind = "gemini_antigravity"
+description = "Gemini Antigravity transcript JSONL files on Windows."
+roots = ["{home}/.gemini/antigravity/brain"]
+glob = "**/transcript*.jsonl"
+
+[[sources]]
+name = "grok-wsl-ubuntu"
+kind = "grok"
+description = "Grok chat history files in the default WSL distribution."
+roots = ["{wsl_home}/.grok/sessions"]
+glob = "**/chat_history.jsonl"
+
+[[sources]]
+name = "deepseek-vscode-windows"
+kind = "deepseek_request_dump"
+description = "DeepSeek V4 VS Code request dump prompts on Windows."
+roots = [
+  "{appdata}/Code/User/globalStorage/vizards.deepseek-v4-for-copilot/request-dumps",
+]
+glob = "**/*.msg*.txt"
+
+[[sources]]
+name = "deepseek-vscode-wsl-ubuntu"
+kind = "deepseek_request_dump"
+description = "DeepSeek V4 VS Code request dump prompts in WSL VS Code Server."
+roots = [
+  "{wsl_vscode_server}/data/User/globalStorage/vizards.deepseek-v4-for-copilot/request-dumps",
+]
+glob = "**/*.msg*.txt"
+
+[[sources]]
+name = "copilot-vscode-windows-inventory"
+kind = "inventory"
+description = "VS Code Copilot Chat storage inventory. Exporter intentionally skips inventory-only sources."
+roots = ["{appdata}/Code/User/globalStorage/github.copilot-chat"]
+glob = "**/*"
+
+[[sources]]
+name = "copilot-vscode-wsl-ubuntu-inventory"
+kind = "inventory"
+description = "WSL VS Code Server Copilot Chat storage inventory. Exporter intentionally skips inventory-only sources."
+roots = [
+  "{wsl_vscode_server}/data/User/globalStorage/github.copilot-chat",
+]
+glob = "**/*"
+
+[[sources]]
+name = "zai-vscode-wsl-ubuntu-inventory"
+kind = "inventory"
+description = "ZAI VS Code extension inventory. Exporter intentionally skips inventory-only sources."
+roots = [
+  "{wsl_vscode_server}/extensions/ltmoerdani.zai-copilot-chat-0.3.1",
+]
+glob = "**/*"
+
+# ── Router-produced sessions (agent-session-router VS Code extension) ──
+# These sessions are discovered, extracted, and rendered by the VS Code
+# extension and written as Markdown to archive/{source}/ alongside a
+# .router-index.jsonl manifest. The Python tool ingests them via the
+# .router-index.jsonl file rather than by globbing for raw source files.
+# See: https://github.com/avidullu/agent-session-router
+
+[[sources]]
+name = "copilot-vscode-router"
+kind = "router_index"
+description = "Copilot Chat sessions routed by the agent-session-router VS Code extension. Ingested via archive/.router-index.jsonl."
+roots = ["{repo_root}/archive/copilot-vscode"]
+glob = "**/*.md"
+enabled = false  # Ingested via .router-index.jsonl, not file discovery
+
+[[sources]]
+name = "deepseek-vscode-router"
+kind = "router_index"
+description = "DeepSeek V4 sessions routed by the agent-session-router VS Code extension. Ingested via archive/.router-index.jsonl."
+roots = ["{repo_root}/archive/deepseek-vscode"]
+glob = "**/*.md"
+enabled = false  # Ingested via .router-index.jsonl, not file discovery

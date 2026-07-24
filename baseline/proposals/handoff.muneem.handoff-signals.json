@@ -1,0 +1,48 @@
+{
+  "approval_mode": "strict",
+  "category": "docs",
+  "confidence": 0.54,
+  "evidence": [
+    "baseline/handoffs/index.jsonl contains 3 handoff candidate(s) for project `muneem`.",
+    "archive/claude-windows/20260610-02b9e9c9-3806-45ca-9b24-2ecc35a81efd-02b9e9c9-3806-45ca-9b24-2ecc35a81efd-db84170.md",
+    "archive/claude-windows/20260701-d1586dfe-adae-4d40-a85d-ed0bb23738b8-d1586dfe-adae-4d40-a85d-ed0bb23738b8-e0c377a.md",
+    "archive/claude-windows/20260704-a9fd4426-f234-4e4a-bfb4-1f2c8255c661-a9fd4426-f234-4e4a-bfb4-1f2c8255c661-76c46d7.md"
+  ],
+  "generated_by": "baseline handoffs proposals",
+  "id": "handoff.muneem.handoff-signals",
+  "open_questions": [
+    "Which linked handoffs contain durable project guidance rather than transient next steps?",
+    "3 indexed handoff candidate(s) lack standard headings; should they be normalized or ignored?"
+  ],
+  "risk": "low",
+  "scope": "project:muneem",
+  "source_kind": "repo-handoff",
+  "suggested_baseline_text": "Review the 3 indexed handoff candidate(s) for `muneem` before promoting durable project guidance. Prioritize repeated, still-current lessons from handoff signals; use the linked evidence for next steps / open threads, ramp-up kit, session handoff, session-handoff, start here and leave transient next steps out of the baseline.",
+  "title": "Review handoff signals for muneem",
+  "trace": [
+    {
+      "markdown_path": "archive/claude-windows/20260610-02b9e9c9-3806-45ca-9b24-2ecc35a81efd-02b9e9c9-3806-45ca-9b24-2ecc35a81efd-db84170.md",
+      "project_slug": "muneem",
+      "session_id": "02b9e9c9-3806-45ca-9b24-2ecc35a81efd",
+      "source": "claude-windows",
+      "source_file": "<claude-projects>/~-Projects-muneem\\02b9e9c9-3806-45ca-9b24-2ecc35a81efd.jsonl",
+      "transform": "baseline handoffs proposals"
+    },
+    {
+      "markdown_path": "archive/claude-windows/20260701-d1586dfe-adae-4d40-a85d-ed0bb23738b8-d1586dfe-adae-4d40-a85d-ed0bb23738b8-e0c377a.md",
+      "project_slug": "muneem",
+      "session_id": "d1586dfe-adae-4d40-a85d-ed0bb23738b8",
+      "source": "claude-windows",
+      "source_file": "<claude-projects>/~-Projects-muneem\\d1586dfe-adae-4d40-a85d-ed0bb23738b8.jsonl",
+      "transform": "baseline handoffs proposals"
+    },
+    {
+      "markdown_path": "archive/claude-windows/20260704-a9fd4426-f234-4e4a-bfb4-1f2c8255c661-a9fd4426-f234-4e4a-bfb4-1f2c8255c661-76c46d7.md",
+      "project_slug": "muneem",
+      "session_id": "a9fd4426-f234-4e4a-bfb4-1f2c8255c661",
+      "source": "claude-windows",
+      "source_file": "<claude-projects>/~-Projects-muneem\\a9fd4426-f234-4e4a-bfb4-1f2c8255c661.jsonl",
+      "transform": "baseline handoffs proposals"
+    }
+  ]
+}
