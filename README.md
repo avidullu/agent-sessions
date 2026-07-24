@@ -15,8 +15,9 @@ DeepSeek, Grok, and VS Code agents (via the companion
 > [`avidullu.agent-session-router`](https://marketplace.visualstudio.com/items?itemName=avidullu.agent-session-router) on the Marketplace
 > (`code --install-extension avidullu.agent-session-router`).
 
-> **New here?** → [Getting Started](docs/GETTING_STARTED.md) (5-minute guide)
-> **Questions?** → [FAQ](docs/FAQ.md)
+> **New here?** → [Getting Started](docs/GETTING_STARTED.md) (5-minute guide)  
+> **Agent-assisted setup?** → [Agent-Assisted Setup](#agent-assisted-setup) (give any capable agent a prompt; it sets up the archive on a new machine)  
+> **Questions?** → [FAQ](docs/FAQ.md)  
 > **Want to contribute?** → [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Supported Agents
@@ -55,6 +56,8 @@ agent-archive status
 ```
 
 See [Getting Started](docs/GETTING_STARTED.md) for full setup including the VS Code extension, PDF export, and daily automation.
+
+**Prefer to let an agent do the setup?** See [Agent-Assisted Setup](#agent-assisted-setup) — a carefully written prompt that lets Codex, Claude, Gemini, Grok, or another capable agent clone, install, discover, validate, and produce a first archive + structured setup report on a new machine.
 
 Optional PDF output:
 
