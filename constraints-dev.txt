@@ -33,7 +33,7 @@ pytest==9.1.1
 pytest-cov==7.1.0
 reportlab==5.0.0
 ruff==0.15.22
-types-reportlab==4.5.1.20260712
+types-reportlab==4.5.1.20260724
 
 # Transitive pins for the same reason — coverage and pluggy affect gate output.
 coverage==7.15.2
