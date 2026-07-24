@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Sessions — own your AI coding history</title>
 <meta name="description" content="Local-first archive and catalog for AI coding sessions across Claude Code, Codex CLI, Gemini, Copilot Chat, and more. No cloud, no telemetry — plain Markdown and JSONL you own.">
+<meta property="og:title" content="Agent Sessions — own your AI coding history">
+<meta property="og:description" content="Local-first archive for AI pair-programming history. Plain Markdown + JSONL, contract-tested extractors, no cloud.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://agent-sessions.khelsutra.guru/">
 <style>
   :root {
     --bg: #fbfaf8;
@@ -63,9 +67,10 @@
   .btn.primary:hover { text-decoration: none; filter: brightness(1.08); }
   .btn.ghost { color: var(--fg); }
   .agents { color: var(--muted); font-size: 15px; margin-top: 22px; }
-  section { padding: 44px 0 8px; }
+  .trust { color: var(--muted); font-size: 13.5px; margin-top: 10px; opacity: 0.9; }
+  section { padding: 48px 0 12px; }
   section h2 {
-    font-size: 26px; letter-spacing: -0.01em; margin: 0 0 8px;
+    font-size: 26px; letter-spacing: -0.01em; margin: 0 0 10px;
   }
   section > .wrap > p.kicker {
     color: var(--accent); font-weight: 700; font-size: 13px;
@@ -91,9 +96,18 @@
   }
   .diagram pre { background: none; border: none; padding: 0; margin: 0; color: var(--muted); }
   .diagram .hl { color: var(--accent); font-weight: 600; }
-  table { width: 100%; border-collapse: collapse; font-size: 15.5px; margin: 20px 0; }
-  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: 600; font-size: 13.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .example {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 0; margin: 26px 0; overflow: hidden;
+  }
+  .example-header {
+    padding: 12px 18px; border-bottom: 1px solid var(--border);
+    font-size: 13.5px; color: var(--muted); font-family: var(--mono);
+  }
+  .example pre {
+    margin: 0; border: none; border-radius: 0; background: transparent;
+    font-size: 13.5px;
+  }
   .limits li { margin-bottom: 8px; color: var(--muted); }
   .limits strong { color: var(--fg); }
   blockquote {
@@ -126,8 +140,8 @@
     <p class="lede">
       Agent Sessions is a local-first archive for AI pair-programming history.
       It discovers sessions across your coding agents, exports them to plain
-      Markdown, and keeps one deduplicated, searchable catalog — on your disk,
-      under your rules.
+      Markdown, and keeps one deduplicated catalog you can <code>grep</code>,
+      diff, back up, and still read in twenty years.
     </p>
     <div class="cta">
       <a class="btn primary" href="https://github.com/avidullu/agent-sessions#quick-start">Get started</a>
@@ -136,6 +150,9 @@
     <p class="agents">
       Works with Claude Code · Codex CLI · Gemini · Grok · DeepSeek ·
       GitHub Copilot Chat · Continue · Cline · Cody · Aider · Tabby
+    </p>
+    <p class="trust">
+      Contract-tested extractors · tested on Windows, WSL &amp; Ubuntu · MIT · no telemetry
     </p>
   </div>
 </div>
@@ -224,6 +241,46 @@
 
 <section>
   <div class="wrap">
+    <p class="kicker">What you get</p>
+    <h2>A durable, greppable transcript</h2>
+    <p>
+      Every session becomes a plain Markdown file with stable metadata and a
+      clean transcript. Here is a realistic (redacted) example of the artifact:
+    </p>
+    <div class="example">
+      <div class="example-header">archive/codex-windows/2026-07-02-019f2174-…-15390945c8c4.md</div>
+      <pre><code># codex-windows / 019f2174-38b2-7d92-bff9-9b57ab7306e6
+
+## Metadata
+
+- Source: `codex-windows`
+- Kind: `codex`
+- Source file: `~/.codex/sessions/2026/07/02/rollout-….jsonl`
+- SHA-256: `15390945c8c4d53627b652eeac6761f25f5f547d8f2e08951bdc5e387c235d1e`
+- Source modified: `2026-07-02T06:11:32+00:00`
+- Imported at: `2026-07-05T16:48:15+00:00`
+- session_id: `019f2174-38b2-7d92-bff9-9b57ab7306e6`
+
+## Transcript
+
+### 1. user (2026-07-02T06:11:32.663Z)
+We need the gRPC smart-cache to stay correct under concurrent
+invalidation. Prefer simplicity over micro-optimizations.
+
+### 2. assistant (2026-07-02T06:11:48.201Z)
+Understood. I'll keep the invalidation path linear and avoid
+introducing a second index. Sketching the ownership rules first…</code></pre>
+    </div>
+    <p>
+      The same session is also recorded as one line in <code>archive/index.jsonl</code>.
+      Content-hash identity means the same conversation exported on two machines
+      collapses to a single catalog entry.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
     <p class="kicker">Quick start</p>
     <h2>Five minutes to your first archive</h2>
     <pre><code># Install the hub
@@ -251,15 +308,24 @@ agent-archive status</code></pre>
     <h2>From transcripts to institutional memory</h2>
     <p>
       Once sessions are catalogued, the <strong>baseline pipeline</strong> mines
-      them: it proposes handoff summaries and guardrails from what actually
+      them. It proposes handoff summaries and guardrails from what actually
       happened (<em>suggest</em>), lets you curate what deserves to persist
       (<em>promote</em>), and publishes the result as tracked, reviewable
-      Markdown (<em>publish</em>). An experimental rules-extraction track goes
-      further, distilling recurring corrections and preferences into candidate
-      standing rules for your agents — with an efficacy harness measuring recall
-      against real sessions, and echo-contamination controls so agents don't
-      launder their own boilerplate into "your preferences."
+      Markdown (<em>publish</em>).
     </p>
+    <p>
+      An experimental rules-extraction track goes further: it distills recurring
+      corrections and preferences into candidate standing rules for your agents.
+      An efficacy harness measures recall against real sessions, and
+      echo-contamination controls prevent agents from laundering their own
+      boilerplate into “your preferences.”
+    </p>
+    <p>
+      Example of a promoted preference that survived the loop:
+    </p>
+    <pre><code># Prefer linear invalidation paths in concurrent caches.
+# Reject secondary indexes unless the ownership model is proven first.
+# (Extracted from 3 sessions, calibrated 2026-07)</code></pre>
   </div>
 </section>
 
@@ -278,7 +344,7 @@ agent-archive status</code></pre>
 
 <footer>
   <div class="wrap">
-    <div>MIT licensed · built in the open</div>
+    <div>MIT licensed · local-first · built in the open</div>
     <div>
       <a href="https://github.com/avidullu/agent-sessions">agent-sessions</a> ·
       <a href="https://github.com/avidullu/agent-session-router">agent-session-router</a> ·
