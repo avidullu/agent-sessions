@@ -1,5 +1,8 @@
 # Landing page (L20)
 
+**Live: https://agent-sessions.khelsutra.guru** (also
+`https://agent-sessions-site.avi-dullu.workers.dev`).
+
 Static, single-file landing page for the agent-sessions + agent-session-router
 launch: motivation, design rationale, architecture, quick start, honest limits.
 

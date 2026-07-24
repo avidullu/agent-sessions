@@ -5,10 +5,18 @@
 #   cd site && npx wrangler deploy          # interactive OAuth once, then CLI
 # or connect this repo via Workers Builds (git) with project root = site/.
 #
-# The Worker serves at <name>.<account>.workers.dev until a custom domain or
-# route is attached in the dashboard.
+# The Worker serves at <name>.<account>.workers.dev and at the custom domain below.
 name = "agent-sessions-site"
 compatibility_date = "2026-07-01"
+# Keep the *.workers.dev URL live alongside the custom domain (docs link it).
+workers_dev = true
+
+# Serve on a subdomain of the owner's khelsutra.guru zone (same Cloudflare
+# account). custom_domain=true has Cloudflare create the proxied DNS record and
+# provision the edge TLS cert automatically; the *.workers.dev URL keeps working too.
+routes = [
+  { pattern = "agent-sessions.khelsutra.guru", custom_domain = true }
+]
 
 [assets]
 directory = "./public"
