@@ -1,0 +1,151 @@
+# Copy this file to sources.toml for machine-specific overrides.
+# sources.toml is ignored by Git.
+#
+# Uncomment the sections that match your OS and agents. Supported platforms:
+#   Windows, macOS, Linux, WSL (Windows Subsystem for Linux)
+#
+# Path variables:
+#   {home}              — User home directory (cross-platform)
+#   {appdata}           — Windows APPDATA
+#   {localappdata}      — Windows LOCALAPPDATA
+#   {wsl_home}          — \\wsl.localhost\<distro>\home\<user>
+#   {wsl_vscode_server} — {wsl_home}\.vscode-server
+#
+# Override WSL detection with environment variables:
+#   AGENT_ARCHIVE_WSL_DISTRO
+#   AGENT_ARCHIVE_WSL_USER
+
+[[sources]]
+name = "codex-windows"
+kind = "codex"
+roots = [
+  "{home}/.codex/sessions",
+  "{home}/.codex/archived_sessions",
+]
+glob = "**/*.jsonl"
+
+[[sources]]
+name = "claude-windows"
+kind = "claude"
+roots = ["{home}/.claude/projects"]
+glob = "**/*.jsonl"
+
+[[sources]]
+name = "claude-wsl-ubuntu"
+kind = "claude"
+roots = ["{wsl_home}/.claude/projects"]
+glob = "**/*.jsonl"
+
+[[sources]]
+name = "gemini-antigravity-windows"
+kind = "gemini_antigravity"
+roots = ["{home}/.gemini/antigravity/brain"]
+glob = "**/transcript*.jsonl"
+
+[[sources]]
+name = "grok-wsl-ubuntu"
+kind = "grok"
+roots = ["{wsl_home}/.grok/sessions"]
+glob = "**/chat_history.jsonl"
+
+[[sources]]
+name = "deepseek-vscode-windows"
+kind = "deepseek_request_dump"
+roots = [
+  "{appdata}/Code/User/globalStorage/vizards.deepseek-v4-for-copilot/request-dumps",
+]
+glob = "**/*.msg*.txt"
+
+[[sources]]
+name = "deepseek-vscode-wsl-ubuntu"
+kind = "deepseek_request_dump"
+roots = [
+  "{wsl_vscode_server}/data/User/globalStorage/vizards.deepseek-v4-for-copilot/request-dumps",
+]
+glob = "**/*.msg*.txt"
+
+[[sources]]
+name = "copilot-vscode-windows-inventory"
+kind = "inventory"
+roots = ["{appdata}/Code/User/globalStorage/github.copilot-chat"]
+
+# ── macOS ──────────────────────────────────────────────────────────
+# Uncomment and adjust for your macOS setup.
+
+# [[sources]]
+# name = "claude-macos"
+# kind = "claude"
+# roots = ["{home}/.claude/projects"]
+# glob = "**/*.jsonl"
+
+# [[sources]]
+# name = "codex-macos"
+# kind = "codex"
+# roots = [
+#   "{home}/.codex/sessions",
+#   "{home}/.codex/archived_sessions",
+# ]
+# glob = "**/*.jsonl"
+
+# [[sources]]
+# name = "gemini-antigravity-macos"
+# kind = "gemini_antigravity"
+# roots = ["{home}/.gemini/antigravity/brain"]
+# glob = "**/transcript*.jsonl"
+
+# [[sources]]
+# name = "deepseek-vscode-macos"
+# kind = "deepseek_request_dump"
+# roots = [
+#   "{home}/Library/Application Support/Code/User/globalStorage/vizards.deepseek-v4-for-copilot/request-dumps",
+# ]
+# glob = "**/*.msg*.txt"
+
+# ── Linux ──────────────────────────────────────────────────────────
+# Uncomment and adjust for your Linux setup.
+
+# [[sources]]
+# name = "claude-linux"
+# kind = "claude"
+# roots = ["{home}/.claude/projects"]
+# glob = "**/*.jsonl"
+
+# [[sources]]
+# name = "codex-linux"
+# kind = "codex"
+# roots = [
+#   "{home}/.codex/sessions",
+#   "{home}/.codex/archived_sessions",
+# ]
+# glob = "**/*.jsonl"
+
+# [[sources]]
+# name = "grok-linux"
+# kind = "grok"
+# roots = ["{home}/.grok/sessions"]
+# glob = "**/chat_history.jsonl"
+
+# [[sources]]
+# name = "deepseek-vscode-linux"
+# kind = "deepseek_request_dump"
+# roots = [
+#   "{home}/.config/Code/User/globalStorage/vizards.deepseek-v4-for-copilot/request-dumps",
+# ]
+# glob = "**/*.msg*.txt"
+glob = "**/*"
+
+[[sources]]
+name = "copilot-vscode-wsl-ubuntu-inventory"
+kind = "inventory"
+roots = [
+  "{wsl_vscode_server}/data/User/globalStorage/github.copilot-chat",
+]
+glob = "**/*"
+
+[[sources]]
+name = "zai-vscode-wsl-ubuntu-inventory"
+kind = "inventory"
+roots = [
+  "{wsl_vscode_server}/extensions/ltmoerdani.zai-copilot-chat-0.3.1",
+]
+glob = "**/*"

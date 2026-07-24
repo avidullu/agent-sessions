@@ -1,0 +1,15 @@
+# Dependabot: keep the pinned gate toolchain and workflow actions patched.
+# PRs land on the GitHub mirror; fold accepted bumps back through the primary
+# forge (constraints-dev.txt is the single pin source local_ci/CI consume).
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

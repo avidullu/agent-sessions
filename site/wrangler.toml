@@ -1,0 +1,14 @@
+# Cloudflare Worker serving the agent-sessions landing page as static assets.
+# Same pattern as the khelsutra.guru site Worker (assets-only, no code).
+#
+# One-time setup (owner, our Cloudflare account) — either:
+#   cd site && npx wrangler deploy          # interactive OAuth once, then CLI
+# or connect this repo via Workers Builds (git) with project root = site/.
+#
+# The Worker serves at <name>.<account>.workers.dev until a custom domain or
+# route is attached in the dashboard.
+name = "agent-sessions-site"
+compatibility_date = "2026-07-01"
+
+[assets]
+directory = "./public"

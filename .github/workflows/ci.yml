@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (py ${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+        # This is a Windows/WSL-first tool (native paths, VS Code storage), so
+        # verify Windows too, not just Linux — and on every supported
+        # interpreter, not just the oldest (H6).
+        #
+        # Keep `os:` before `python-version:` in each entry: the drift guard in
+        # scripts/local_ci.sh pairs them in that order and silently drops an
+        # entry written the other way round.
+        #
+        # D7/Windows: every registered Forgejo runner is Linux, so these legs
+        # execute on GitHub only. Forgejo review-time gating is Linux-only by
+        # design; see docs/LOCAL_CI.md.
+        include:
+          - os: windows-latest
+            python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.12"
+          - os: windows-latest
+            python-version: "3.13"
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        # -c pins the gate toolchain so the verdict on a commit does not depend
+        # on which day it was checked. See constraints-dev.txt.
+        run: python -m pip install -e ".[dev]" -c constraints-dev.txt
+
+      - name: Test with coverage
+        # --cov-fail-under is stated here as well as in pyproject.toml so the
+        # floor is visible in the gate itself. The two must stay numerically
+        # equal; the CLI value wins if they ever disagree.
+        run: python -m pytest --cov=agent_sessions --cov-report=term-missing --cov-fail-under=92
+
+  lint:
+    name: lint (ruff + mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        # -c pins the gate toolchain so the verdict on a commit does not depend
+        # on which day it was checked. See constraints-dev.txt.
+        run: python -m pip install -e ".[dev]" -c constraints-dev.txt
+
+      - name: Ruff
+        run: python -m ruff check .
+
+      - name: Mypy
+        run: python -m mypy agent_sessions tools tests
+
+  # Internal-link guard (tools/check_md_links.py): fails on a broken internal
+  # markdown link (missing file or dead #anchor) in a LIVE doc. docs/archives/**
+  # is excluded — frozen snapshots whose relative links are historical-by-design.
+  # Borrowed from badminton-highlight-indexer (Khelsutra).
+  link-check:
+    name: Markdown link check (live docs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check internal markdown links
+        run: python -m tools.check_md_links
+
+  # Privacy guard (tools/check_pii.py, L11): fails when a tracked file carries
+  # a real user home path (native, WSL, or encoded project-key form), a tailnet
+  # hostname, or a personal email. Placeholder usernames (example-user, test
+  # fakes) are the explicit allowlist inside the tool.
+  pii-check:
+    name: PII scan (tracked files)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Scan tracked files for private paths and identifiers
+        run: python -m tools.check_pii

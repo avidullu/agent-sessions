@@ -1,0 +1,42 @@
+# Pinned dev toolchain for reproducible gate results.
+#
+# Why this exists: the dev extra previously carried lower bounds only, so CI
+# silently resolved to whatever shipped that morning. During the 2026-07-22
+# audit it picked up mypy 2.3.0 against a >=1.10 floor and ruff 0.15.22 against
+# >=0.6 — several majors of drift. A lint or type release could therefore turn
+# review red with no commit behind it, and two runs of the same SHA a week apart
+# could disagree.
+#
+# Used by CI and by scripts/local_ci.sh (H3), so local and CI resolve to the
+# same toolchain. Install with:
+#
+#     python -m pip install -e ".[dev]" -c constraints-dev.txt
+#
+# Bumping: change the pin, run the full gate set, and land it as its own PR so
+# any new findings are attributable to the tool bump rather than hidden inside a
+# feature diff. Upper bounds in pyproject.toml are the backstop if this file is
+# bypassed.
+#
+# Scope, stated plainly: this file pins the direct gate tools plus the few
+# transitives whose behaviour is visible in gate output. It is NOT a full
+# dependency-closure lock — mypy_extensions, typing_extensions, pathspec,
+# pygments, pillow and friends still float, and pip itself is unpinned (venv
+# ensurepip locally, actions/setup-python in CI). "Local and CI use the same
+# toolchain" is therefore a bounded claim about the pinned set, not an absolute
+# one. Regenerate from a full `pip freeze` if that stops being good enough.
+#
+# Verified together on Python 3.12.3 via scripts/local_ci.sh: 643 passed, ruff
+# clean, mypy clean, coverage 96.61%.
+
+mypy==2.3.0
+pytest==9.1.1
+pytest-cov==7.1.0
+reportlab==5.0.0
+ruff==0.15.22
+types-reportlab==4.5.1.20260712
+
+# Transitive pins for the same reason — coverage and pluggy affect gate output.
+coverage==7.15.2
+iniconfig==2.3.0
+packaging==26.2
+pluggy==1.6.0

@@ -1,0 +1,30 @@
+# Copy to feedback.toml and mark predictions after reviewing a candidate file.
+
+[feedback."profile.multi-agent-builder"]
+verdict = "accept"
+note = "This matches the user's actual working style."
+
+[feedback."profile.local-first-private-compute"]
+verdict = "edit"
+note = "Keep the local-first point, but mention that cloud APIs are acceptable when explicitly authorized."
+
+[feedback."profile.business-productivity-engineer"]
+verdict = "reject"
+note = "Example of a rejected hypothesis."
+
+# Calibration anchor: standard tracked-project-doc pattern (E1/E6 gates).
+[feedback."guardrail.tracked-project-docs"]
+verdict = "accept"
+note = "Matches badminton-highlight-indexer PROJECT_DOC_TEMPLATE; use for substantial multi-PR work."
+
+[feedback."guardrail.pr-only-repo-writes"]
+verdict = "accept"
+note = "Promote first — high confidence, strong archive evidence."
+
+[feedback."guardrail.verified-regression-gates"]
+verdict = "accept"
+note = "Promote first — aligns with engine repo practice."
+
+[feedback."guardrail.handoff-and-resume"]
+verdict = "accept"
+note = "Promote first — matches SESSION_HANDOFF pattern across pilots."

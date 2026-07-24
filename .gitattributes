@@ -1,0 +1,12 @@
+.gitattributes text eol=lf
+.gitignore text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.ps1 text eol=crlf
+*.sh text eol=lf
+# Git hooks are shell scripts without a .sh suffix; CRLF here means "bad interpreter".
+scripts/pre-push text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
+*.pdf binary
