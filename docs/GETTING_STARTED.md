@@ -17,7 +17,7 @@ A 5-minute guide to archiving your AI coding sessions.
 ### Option A: pip (recommended)
 
 ```bash
-pip install agent-sessions
+pip install agent-session-hub
 ```
 
 ### Option B: from source

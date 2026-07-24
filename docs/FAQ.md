@@ -36,7 +36,7 @@ The tools have been **manually tested on Windows, WSL, and Ubuntu**. macOS shoul
 
 **Hub** (Python CLI):
 ```bash
-pip install agent-sessions
+pip install agent-session-hub
 ```
 
 **Router** (VS Code extension):
@@ -99,9 +99,19 @@ The hub applies **redaction-v1** to all exported text:
 
 Redaction is best-effort — always review exported transcripts before sharing. See [ENGINEERING_BASELINE.md](ENGINEERING_BASELINE.md) for details.
 
-## Why "agent-sessions" (plural) vs "agent-session-router" (singular)?
+## There are a few different names — which is which?
 
-A historical naming quirk — they started as separate projects before becoming a pair. The hub (`agent-sessions`, plural) archives sessions from multiple agents. The router (`agent-session-router`, singular) routes individual sessions. They're kept as-is to avoid breaking the PyPI package name, VS Code extension ID, and CLI entry point.
+The project spans a couple of registries, so it wears a few names:
+
+| Where | Name | How you use it |
+|-------|------|----------------|
+| GitHub repo / project | `agent-sessions` | browse the source |
+| PyPI package (the hub) | `agent-session-hub` | `pip install agent-session-hub` |
+| Command it installs | `agent-archive` | `agent-archive export --all` |
+| Python import | `agent_sessions` | `import agent_sessions` |
+| VS Code extension | `avidullu.agent-session-router` | `code --install-extension avidullu.agent-session-router` |
+
+The PyPI distribution is `agent-session-hub` (not `agent-sessions`) because the plain name was already taken on PyPI by an unrelated package. The command stays `agent-archive` and the import stays `agent_sessions`, so nothing about day-to-day use changes.
 
 ## How do I contribute?
 
