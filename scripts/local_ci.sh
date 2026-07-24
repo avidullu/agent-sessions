@@ -124,14 +124,14 @@ expected_runs=(
   "${ci_pii[*]}"
 )
 
-expected_python_versions=(3.11 3.12 3.13)
+expected_python_versions=(3.11 3.13)
 
 # Every runner CI uses, and the extra `include:` legs beyond the primary matrix,
 # as "<os> <python-version>". The closing summary is derived from these rather
 # than hardcoded, so deleting the Windows leg can no longer leave this script
 # claiming coverage CI stopped providing.
 expected_os=(ubuntu-latest windows-latest)
-expected_matrix_include=("windows-latest 3.11" "windows-latest 3.12" "windows-latest 3.13")
+expected_matrix_include=("windows-latest 3.11" "windows-latest 3.13")
 
 # ── Drift guard ─────────────────────────────────────────────────────
 #

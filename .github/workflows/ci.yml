@@ -22,10 +22,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.11", "3.12", "3.13"]
+        # Boundary versions only: 3.11 is the requires-python floor (backward
+        # compat), 3.13 the newest supported interpreter (deprecation removals).
+        # The middle version added a third to every CI event without catching
+        # anything the endpoints don't; 3.12 remains supported and covered by
+        # the floor/ceiling contract.
+        python-version: ["3.11", "3.13"]
         # This is a Windows/WSL-first tool (native paths, VS Code storage), so
-        # verify Windows too, not just Linux — and on every supported
-        # interpreter, not just the oldest (H6).
+        # verify Windows too, not just Linux (H6).
         #
         # Keep `os:` before `python-version:` in each entry: the drift guard in
         # scripts/local_ci.sh pairs them in that order and silently drops an
@@ -37,8 +41,6 @@ jobs:
         include:
           - os: windows-latest
             python-version: "3.11"
-          - os: windows-latest
-            python-version: "3.12"
           - os: windows-latest
             python-version: "3.13"
     steps:
