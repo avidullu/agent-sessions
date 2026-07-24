@@ -1,15 +1,33 @@
 # Session Handoff
 
-Updated: 2026-07-24 (launch sprint 2 — L19 executed, dataset excised, Windows CI green, site on custom domain; the public flip + two token setups are the only things left, all owner-only)
+Updated: 2026-07-24 (🚀 LAUNCHED — both repos public, PyPI + VS Code Marketplace live, site on custom domain)
 
 ## You Are Here
 
-**PUBLIC LAUNCH IS ONE FLIP AWAY.** Everything the owner delegated is done;
-what remains is intentionally owner-only. See the "LAUNCH — what's left for the
-owner" section below FIRST if resuming to finish the launch.
+**🚀 PUBLIC LAUNCH IS COMPLETE.** All channels are live and verified:
+- **GitHub:** [agent-sessions](https://github.com/avidullu/agent-sessions) +
+  [agent-session-router](https://github.com/avidullu/agent-session-router) —
+  PUBLIC, MIT, CI green, secret scanning + push protection on.
+- **PyPI:** [`agent-session-hub` 0.2.0](https://pypi.org/project/agent-session-hub/)
+  — verified: `pip install agent-session-hub` → `agent-archive` runs.
+- **VS Code Marketplace:** [`avidullu.agent-session-router`](https://marketplace.visualstudio.com/items?itemName=avidullu.agent-session-router)
+  — `code --install-extension avidullu.agent-session-router`.
+- **Site:** https://agent-sessions.khelsutra.guru (Cloudflare Worker, custom domain).
+- **Flyer:** `Agentic-Coding/agent-sessions-flyer.pdf` + `.png` (QR → site).
+
+Both release pipelines are wired for future versions: bump the version and tag
+`v*` on the **forge** (never GitHub) → mirror → `release.yml` (PyPI, OIDC
+trusted publishing, no token) / `publish.yml` (Marketplace, `VSCE_PAT` secret).
+
+**Tiny cosmetic leftovers (non-blocking):** (1) enable GitHub CodeQL default
+setup in Settings → Code security (the CLI token lacks `security_events`);
+(2) the Marketplace listing shows the pre-publish README until the next version
+tag refreshes it. Housekeeping: rotate the `DIGITALOCEAN_ACCESS_TOKEN` in the
+Windows user env; move `PyPI-Recovery-Codes-*.txt` out of `Agentic-Coding/`.
 
 **Foundation Hardening is DONE** — H0–H11 all merged. Rules project (R2a
-onward) is unblocked and parked at the owner's request until after launch.
+onward) is unblocked and parked at the owner's request; **now clear to resume
+post-launch** (see below).
 
 **Public launch — where it actually stands (2026-07-24, end of sprint 2):**
 - GitHub `avidullu/agent-sessions` and `avidullu/agent-session-router` are
@@ -37,28 +55,31 @@ onward) is unblocked and parked at the owner's request until after launch.
 - Local checkouts are Forgejo-primary (origin=forge, github=backup, never push
   to github). All work this session went forge→PR→merge→mirror.
 
-## LAUNCH — what's left for the owner (do in this order)
+## LAUNCH — done. Notes for future releases & operations
 
-1. **Manual PII scan** of the two private GitHub repos (they're one commit each;
-   focus on `baseline/*/README.md` structure, `*.example.*`, docs prose).
-2. **PyPI pending publisher** (2 min, no token): pypi.org → your account →
-   Publishing → add pending publisher: project `agent-sessions`, owner
-   `avidullu`, repo `agent-sessions`, workflow `release.yml`, environment `pypi`.
-3. **Marketplace publisher** `avidullu` — **verified to exist** (2026-07-24) and
-   matches `package.json`. Nothing to do unless you deleted it.
-4. **Flip both GitHub repos to Public** (Settings → Danger Zone), or ask the
-   next session to flip via `gh`/API.
-5. **After the flip**, the next session should: enable GitHub secret scanning +
-   push protection + CodeQL default setup (API), then **tag `v0.1.0`** on the
-   forge for both repos — the mirror carries the tag to GitHub and the release
-   pipelines fire (PyPI + Marketplace; Open VSX skipped unless `OVSX_PAT` set).
-   DO NOT tag before the flip (publishing would leak the code pre-public).
+- **Cutting a new release:** bump `version` in `pyproject.toml` (hub) or
+  `package.json` (router), commit via a forge PR, then
+  `git tag -a vX.Y.Z <sha> && git push origin vX.Y.Z` on the **forge** and
+  trigger a mirror sync. The tag reaches GitHub and the release pipeline fires.
+  Never tag on GitHub; never merge on GitHub — the mirror overwrites it.
+- **PyPI** uses OIDC trusted publishing (pending-publisher registered for
+  `agent-session-hub` / repo `agent-sessions` / `release.yml` / env `pypi`) —
+  no token. If a publish fails on a Sigstore/Rekor 5xx (attestation step), it's
+  transient: `gh run rerun <id> --failed` (that's what happened for 0.2.0).
+- **Marketplace** uses the `VSCE_PAT` repo secret; Open VSX is optional
+  (`OVSX_PAT`, currently unset → skipped cleanly).
+- **Forge write API flakiness:** the tailnet HTTPS ingress intermittently drops
+  POST/PATCH (GETs fine). Workaround used all session: run writes from the forge
+  host, `ssh avidullu@avis-pbook … curl http://127.0.0.1:3000/api/v1/…`.
+- **CI gotcha (fixed):** `secrets` context is invalid in a step `if:` — map to
+  job `env` first (this bit the publish workflow; see router `publish.yml`).
+- **Windows self-hosted runner:** see `avis-agents-xdsync/ops/forgejo-runner-fleet/WINDOWS-RUNNER.md`.
 
-**Known flags:** a `DIGITALOCEAN_ACCESS_TOKEN` in the owner's Windows user env is
-inherited by CI jobs on the self-hosted runner — rotate/relocate it. The
-tailnet HTTPS ingress to the forge intermittently drops POST/PATCH (GETs fine);
-workaround is to run write API calls from the forge host via
-`ssh avidullu@avis-pbook … curl http://127.0.0.1:3000/api/v1/…`.
+## Next up (post-launch, owner's call)
+
+Rules project resumes at **R2a — role-privileged scoring** (precision-hardening,
+D23). See the rules section below. Also worth a small PR: document the
+"merge on Forgejo, mirror to GitHub" convention in CONTRIBUTING (owner idea).
 
 ## Windows CI runner — fixed, hardened, documented
 
