@@ -3,13 +3,17 @@
 [![CI](https://github.com/avidullu/agent-sessions/actions/workflows/ci.yml/badge.svg)](https://github.com/avidullu/agent-sessions/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)](https://python.org)
-![Tests](https://img.shields.io/badge/tests-713%20passed-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-96.8%25-brightgreen)
+[![PyPI](https://img.shields.io/pypi/v/agent-session-hub?label=PyPI)](https://pypi.org/project/agent-session-hub/)
+[![VS Code extension](https://img.shields.io/visual-studio-marketplace/v/avidullu.agent-session-router?label=VS%20Code%20extension)](https://marketplace.visualstudio.com/items?itemName=avidullu.agent-session-router)
 
 **Local-first, multi-agent coding session archive.** Discover, export, and
 baseline your AI coding sessions across Claude Code, Codex CLI, Gemini,
 DeepSeek, Grok, and VS Code agents (via the companion
-[router extension](https://github.com/avidullu/agent-session-router)).
+[router extension](https://marketplace.visualstudio.com/items?itemName=avidullu.agent-session-router)).
+
+> The Python hub installs as [`agent-session-hub`](https://pypi.org/project/agent-session-hub/) on PyPI; the VS Code companion is
+> [`avidullu.agent-session-router`](https://marketplace.visualstudio.com/items?itemName=avidullu.agent-session-router) on the Marketplace
+> (`code --install-extension avidullu.agent-session-router`).
 
 > **New here?** → [Getting Started](docs/GETTING_STARTED.md) (5-minute guide)
 > **Questions?** → [FAQ](docs/FAQ.md)
@@ -29,8 +33,8 @@ DeepSeek, Grok, and VS Code agents (via the companion
 | Gemini Antigravity | Windows, macOS | Direct Python importer |
 | Grok | WSL, Linux | Direct Python importer |
 | DeepSeek V4 | VS Code (all platforms) | Direct Python importer |
-| GitHub Copilot Chat | VS Code (all platforms) | [Router extension](https://github.com/avidullu/agent-session-router) |
-| Continue, Cline, Cody, Aider, Tabby | VS Code (all platforms) | [Router extension](https://github.com/avidullu/agent-session-router) |
+| GitHub Copilot Chat | VS Code (all platforms) | [Router extension](https://marketplace.visualstudio.com/items?itemName=avidullu.agent-session-router) |
+| Continue, Cline, Cody, Aider, Tabby | VS Code (all platforms) | [Router extension](https://marketplace.visualstudio.com/items?itemName=avidullu.agent-session-router) |
 
 Configure sources in `sources.toml` (copy from `sources.example.toml`). Platform-specific examples included for Windows, macOS, Linux, and WSL.
 
@@ -38,7 +42,7 @@ Configure sources in `sources.toml` (copy from `sources.example.toml`). Platform
 
 ```bash
 # Install
-pip install agent-sessions
+pip install agent-session-hub
 
 # Discover sessions
 agent-archive discover --write docs/DISCOVERY.md
