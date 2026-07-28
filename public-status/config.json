@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "project": {
+    "title": "agent-sessions public launch",
+    "summary": "MIT public launch of agent-sessions hub and agent-session-router with clean install paths.",
+    "dashboard_title": "agent-sessions public launch delivery tracker",
+    "footer": "Derived from the public launch tracker. Private paths and tokens excluded."
+  },
+  "groups": [
+    {
+      "id": "blocker",
+      "label": "Launch blockers"
+    },
+    {
+      "id": "high",
+      "label": "High priority"
+    },
+    {
+      "id": "medium",
+      "label": "Medium priority"
+    },
+    {
+      "id": "later",
+      "label": "Later"
+    }
+  ],
+  "rows": [
+    {
+      "id": "l0",
+      "label": "MIT license on hub",
+      "description": "Add MIT license metadata for the hub package.",
+      "group_id": "blocker"
+    },
+    {
+      "id": "l1",
+      "label": "Privacy scrub (hub)",
+      "description": "Remove personal paths from tracked baseline/archive artifacts.",
+      "group_id": "blocker"
+    },
+    {
+      "id": "l2",
+      "label": "Privacy scrub (router)",
+      "description": "Clear private flag and fixture usernames in the router.",
+      "group_id": "blocker"
+    },
+    {
+      "id": "l3",
+      "label": "Cross-platform README",
+      "description": "Bash and PowerShell quick start plus install path.",
+      "group_id": "high"
+    },
+    {
+      "id": "l4",
+      "label": "PyPI packaging",
+      "description": "Publishable package metadata and first release path.",
+      "group_id": "high"
+    },
+    {
+      "id": "l5",
+      "label": "Getting started guide",
+      "description": "Unified install-to-export guide for hub and router.",
+      "group_id": "high"
+    },
+    {
+      "id": "l6",
+      "label": "Cross-platform sources example",
+      "description": "macOS and Linux source path examples.",
+      "group_id": "high"
+    },
+    {
+      "id": "l7",
+      "label": "Marketplace publishing pipeline",
+      "description": "vsce/ovsx publish workflow for the router.",
+      "group_id": "medium"
+    },
+    {
+      "id": "l8",
+      "label": "Prettier drift fix",
+      "description": "Format router sources so contributor CI is clean.",
+      "group_id": "medium"
+    },
+    {
+      "id": "l9",
+      "label": "Contributing guides",
+      "description": "Contributor setup and extractor PR conventions.",
+      "group_id": "medium"
+    },
+    {
+      "id": "l10",
+      "label": "Handoff path cleanup",
+      "description": "Remove personal paths from session handoffs.",
+      "group_id": "medium"
+    },
+    {
+      "id": "l11",
+      "label": "CI PII gate",
+      "description": "Fail CI on personal home-directory paths in tracked data.",
+      "group_id": "medium"
+    },
+    {
+      "id": "l12",
+      "label": "Changelog",
+      "description": "Public changelog for the hub package.",
+      "group_id": "medium"
+    },
+    {
+      "id": "l13",
+      "label": "Router install script cleanup",
+      "description": "Human-first install docs for the router.",
+      "group_id": "medium"
+    },
+    {
+      "id": "l14",
+      "label": "Public FAQ",
+      "description": "Shared FAQ covering hub and router.",
+      "group_id": "medium"
+    },
+    {
+      "id": "l15",
+      "label": "WSL and Linux CI",
+      "description": "WSL path tests and multi-OS CI lanes.",
+      "group_id": "later"
+    },
+    {
+      "id": "l16",
+      "label": "Demo and screenshots",
+      "description": "Short install-to-export demo assets.",
+      "group_id": "later"
+    },
+    {
+      "id": "l17",
+      "label": "Baseline user guide",
+      "description": "User-facing baseline suggest/promote guide.",
+      "group_id": "later"
+    },
+    {
+      "id": "l18",
+      "label": "Contract versioning doc",
+      "description": "Output contract compatibility notes.",
+      "group_id": "later"
+    },
+    {
+      "id": "l19",
+      "label": "Public mirror history scrub",
+      "description": "Replace public mirror history with sanitized snapshot.",
+      "group_id": "later"
+    }
+  ],
+  "metrics": [
+    {
+      "id": "all-rows",
+      "label": "Items complete",
+      "kind": "row_completion",
+      "row_ids": [
+        "l0",
+        "l1",
+        "l2",
+        "l3",
+        "l4",
+        "l5",
+        "l6",
+        "l7",
+        "l8",
+        "l9",
+        "l10",
+        "l11",
+        "l12",
+        "l13",
+        "l14",
+        "l15",
+        "l16",
+        "l17",
+        "l18",
+        "l19"
+      ]
+    }
+  ],
+  "tracker": {
+    "heading": "Delivery tracker",
+    "heading_level": 2,
+    "header": [
+      "ID",
+      "Work item",
+      "State",
+      "Done",
+      "Total",
+      "Updated (UTC)",
+      "Private note"
+    ],
+    "id_column": "ID",
+    "status_column": "State",
+    "status_map": {
+      "Not started": "todo",
+      "In progress": "active",
+      "Blocked": "blocked",
+      "Complete": "done"
+    },
+    "counts": {
+      "mode": "columns",
+      "done_column": "Done",
+      "total_column": "Total"
+    },
+    "timestamps": {
+      "mode": "column",
+      "column": "Updated (UTC)"
+    }
+  }
+}
