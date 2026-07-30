@@ -33,7 +33,7 @@ pip install -e .
 If you use VS Code agents (Copilot Chat, DeepSeek, Continue, Cline, etc.), install the companion extension:
 
 ```bash
-code --install-extension agent-session-router
+code --install-extension avidullu.agent-session-router
 ```
 
 Or download the `.vsix` from [Releases](https://github.com/avidullu/agent-session-router/releases).

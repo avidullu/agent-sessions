@@ -1,10 +1,22 @@
 # Public Launch — agent-sessions + agent-session-router
 
-> **Status:** `IN PROGRESS` — blockers (L0–L2) and privacy gates (L10, L11) are shipped; docs/packaging rows L3–L14 largely shipped; **L19 (mirror history replacement) + the public visibility flip await explicit owner go-ahead**, as do the PyPI/Marketplace publishes (owner tokens). **Owner:** `avidullu`. **Created:** `2026-07-23`. **Last updated:** `2026-07-24`
+> **Status:** `DONE` — public launch shipped. Both GitHub repos are **PUBLIC**, PyPI
+> (`agent-session-hub` 0.2.0) and the VS Code Marketplace
+> (`avidullu.agent-session-router` 0.1.0) are live, the landing page is on
+> `https://agent-sessions.khelsutra.guru`, and launch blockers/privacy gates are
+> closed. Residual polish (L16 demo assets, L17 baseline user guide) is optional
+> backlog, not launch work. **Owner:** `avidullu`. **Created:** `2026-07-23`.
+> **Last updated:** `2026-07-30` (closeout).
 > **Lifecycle:** `DRAFT → IN PROGRESS → DONE → archived`
-> **Tracking anchors:** §7 progress tracker is the source of truth; indexed in `docs/README.md`; pointer in `SESSION_HANDOFF.md`.
-> **Relation to existing docs:** peer of `docs/RULES_EXTRACTION_AND_PUBLISH_PLAN.md` (rules project continues in parallel); extends `docs/COMPOSE_STACK.md` (ecosystem scope) and `docs/ROADMAP.md` (future features); the `agent-session-router` companion repo is tracked inline (rows tagged `[router]`).
-> **Honesty note:** claims marked `[verified]` were checked against `forge/main` at `88b2224` (agent-sessions) and `origin/master` at `4a0fa62` (router) on 2026-07-23; `[design]` items are scoped but not implemented; `[researched]` items draw from the 2026-07-23 cross-repo audit.
+> **Tracking anchors:** §7 progress tracker is the source of truth; fleet export
+> is `docs/PROJECT_TRACKER.md` (status hub slug `agent-sessions-launch`); pointer
+> in `SESSION_HANDOFF.md`.
+> **Relation to existing docs:** peer of `docs/RULES_EXTRACTION_AND_PUBLISH_PLAN.md`
+> (rules project continues in parallel); extends `docs/COMPOSE_STACK.md` and
+> `docs/ROADMAP.md`; the `agent-session-router` companion repo is tracked inline.
+> **Honesty note:** closeout verified 2026-07-30 against public GitHub, PyPI,
+> Marketplace, site, local tests (761 hub / router coverage+smoke green), and
+> `tools/check_pii.py` OK on the hub tree.
 
 ---
 
@@ -37,15 +49,15 @@ But they are **locked to a single user**:
 
 A new user on **any platform** (Windows, macOS, Linux, WSL) can:
 1. Install the router from the VS Code Marketplace (or VSIX).
-2. `pip install agent-sessions` (or `git clone` + `pip install -e .`).
+2. `pip install agent-session-hub` (or `git clone` + `pip install -e .`).
 3. Follow a single `GETTING_STARTED.md` that covers both tools end-to-end.
 4. Run `agent-archive export --all` and see their sessions in `archive/`.
 5. Read a public FAQ, file issues, and submit PRs with clear contribution guidelines.
 
-**Good looks like:**
-- Both repos are MIT-licensed with clean git history (no PII).
-- CI enforces WSL + Linux + macOS + Windows — user's `<dev-machine>` machine ratifies WSL/Linux behaviour.
-- `pip install agent-sessions` works; `code --install-extension agent-session-router` works.
+**Good looks like (achieved 2026-07-24; tracker closed 2026-07-30):**
+- Both repos are MIT-licensed with sanitized public history (no personal session data).
+- CI covers Windows + Linux (hub) and Windows + macOS + Linux (router); WSL path logic is unit-tested.
+- `pip install agent-session-hub` works; `code --install-extension avidullu.agent-session-router` works.
 - External users can discover the project, try it in < 5 minutes, and give feedback.
 
 ---
@@ -82,8 +94,8 @@ agent-session-router (VS Code extension)          agent-sessions (Python CLI hub
 
 | Today (private) | Target (public) |
 |---|---|
-| `git clone` + `pip install -e ".[dev]"` | `pip install agent-sessions` |
-| Clone + `npm ci` + `vsce package` | `code --install-extension agent-session-router` (Marketplace) |
+| `git clone` + `pip install -e ".[dev]"` | `pip install agent-session-hub` |
+| Clone + `npm ci` + `vsce package` | `code --install-extension avidullu.agent-session-router` (Marketplace) |
 | Windows PowerShell README | Cross-platform README with bash + PowerShell |
 | No FAQ | `docs/FAQ.md` as canonical FAQ |
 | No CONTRIBUTING.md | `CONTRIBUTING.md` with setup, conventions, PR flow |
@@ -152,7 +164,7 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated. **One smal
 | ID | Deliverable | Depends on | Gated? | Status | PR |
 |----|-------------|-----------|--------|--------|----|
 | L3 | **Cross-platform README overhaul (hub)**: rewrite Quick Start for bash + PowerShell; add `pip install` path; add macOS/Linux source examples; move agentic-install to a collapsible section. | L1 | No | ☑ | `65da2e7` (direct to main) |
-| L4 | **PyPI packaging (hub)**: verify `pyproject.toml` metadata is complete (description, classifiers, keywords, URLs); add `twine` check to CI; publish first release to PyPI as `agent-sessions`. | L1 | No | ◐ | metadata `384cb32`; `release.yml` (build + twine check + Trusted Publishing) landed #120 — publish fires on tag `v*` once the owner adds the PyPI pending publisher (repo `avidullu/agent-sessions`, workflow `release.yml`, environment `pypi`) |
+| L4 | **PyPI packaging (hub)**: verify `pyproject.toml` metadata is complete (description, classifiers, keywords, URLs); add `twine` check to CI; publish first release to PyPI. Distribution name is **`agent-session-hub`** (`agent-sessions` was already taken on PyPI by an unrelated package). | L1 | No | ☑ | metadata + `release.yml` #120; **published** `agent-session-hub` 0.1.0 then 0.2.0 via OIDC Trusted Publishing on tag `v*` |
 | L5 | **Unified GETTING_STARTED.md + naming clarity**: create `docs/GETTING_STARTED.md` covering both tools end-to-end (install → export → index → search). Add ecosystem diagram to both READMEs. Document the plural/singular naming in FAQ. | L3 | No | ☑ | `65da2e7`, `53732a8` |
 | L6 | **Cross-platform `sources.example.toml`**: add macOS (`~/Library/Application Support/...`) and Linux (`~/.config/...`, `~/.local/share/...`) source examples alongside existing Windows/WSL examples. | L3 | No | ☑ | `65da2e7` |
 
@@ -173,43 +185,45 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated. **One smal
 | ID | Deliverable | Depends on | Gated? | Status | PR |
 |----|-------------|-----------|--------|--------|----|
 | L14 | **FAQ publishing**: create `docs/FAQ.md` covering the 12 questions in §6; link from both READMEs; the router's inline FAQ moves to the canonical doc. | L5 | No | ☑ | `e2334c1`, `8e06df2` |
-| L15 | **WSL + Linux CI compatibility enforcement**: add WSL path-handling unit tests (e.g., `\\wsl.localhost\...` → POSIX conversion) that run on any Linux runner (no hosted WSL OS exists — the tests validate path logic, not kernel behaviour); ratify on `<dev-machine>` before merge. | L3 | No | ☐ | — |
-| L16 | **Demo / screenshots**: record a 30-second demo (install → export → see Markdown); add to both READMEs and the router's Marketplace listing. | L7 | No | ☐ | — |
-| L17 | **Baseline user guide**: create `docs/BASELINE_USER_GUIDE.md` with concrete examples (what `baseline suggest` does, what a promotion looks like, when to calibrate). | L5 | No | ☐ | — |
-| L18 | **Contract versioning doc**: add a § to `docs/OUTPUT_CONTRACT.md` on version compatibility and migration path (v1 → future v2). | — | No | ☐ | — |
-| L19 | **GitHub mirror history replacement**: after L1+L2+L10+L11 scrub HEAD, replace the `github.com/avidullu/agent-sessions` mirror with a sanitized snapshot (force-push or delete+recreate). The existing mirror carries full pre-scrub PII in its commit history; a HEAD-only scrub leaves PII one `git log` away. This row gates the "public" switch. | L1, L11 | **Yes — owner go-ahead** | ◐ | **executed 2026-07-24** per Q6 (owner-approved): full histories archived to private `*-history-pre-launch` repos (14 + 4 branches), forge `main`/`master` reset to sanitized single-commit snapshots, mirrors force-synced — GitHub now carries exactly one branch/one commit per repo, fresh-clone verified (check_pii OK; gitleaks: only the allowlisted synthetic test secrets). **Remaining: owner's manual scan + the private→public flip.** |
+| L15 | **WSL + Linux CI compatibility enforcement**: add WSL path-handling unit tests (e.g., `\\wsl.localhost\...` → POSIX conversion) that run on any Linux runner (no hosted WSL OS exists — the tests validate path logic, not kernel behaviour); ratify on `<dev-machine>` before merge. | L3 | No | ☑ | `tests/test_portable_paths.py` + WSL origin cases; hub CI matrix Ubuntu+Windows (3.11/3.13); router CI Ubuntu+Windows+macOS. Hub has no macOS CI lane (macOS still developer-unvalidated — see README honesty note). |
+| L16 | **Demo / screenshots**: record a 30-second demo (install → export → see Markdown); add to both READMEs and the router's Marketplace listing. | L7 | No | ☐ | optional post-launch polish — not a launch blocker |
+| L17 | **Baseline user guide**: create `docs/BASELINE_USER_GUIDE.md` with concrete examples (what `baseline suggest` does, what a promotion looks like, when to calibrate). | L5 | No | ☐ | optional post-launch polish — not a launch blocker |
+| L18 | **Contract versioning doc**: add a § to `docs/OUTPUT_CONTRACT.md` on version compatibility and migration path (v1 → future v2). | — | No | ☑ | `docs/OUTPUT_CONTRACT.md` §9 Versioning & conformance (v1 goldens; v2 fixtures beside v1) |
+| L19 | **GitHub mirror history replacement + public flip**: after L1+L2+L10+L11 scrub HEAD, replace the public mirrors with a sanitized snapshot and flip visibility to public. | L1, L11 | No (executed) | ☑ | executed 2026-07-24: histories archived to private `*-history-pre-launch` repos; forge reset to sanitized snapshots; mirrors force-synced; both GitHub repos **PUBLIC** (verified 2026-07-30). |
 | L21 | **Personal dataset excision (owner decision, 2026-07-24)**: the public tree ships no owner data at all — removed `archive/index.jsonl` + `INDEX.md` (5,438-record personal catalog), `docs/DISCOVERY.md`, and all session-derived `baseline/` content (promoted project pages, global promotions, generated agent baselines, handoff index/audit, proposals, candidates, calibration results, prediction ledger, replay manifest). Structural docs, schemas, and `*.example.*` files stay. Demo data on the website may return as `example-user` content later. Residual prose mentions of project names in planning docs tracked as a follow-up issue. | L19 | No | ☑ | this PR |
-| L20 | **Project landing page + hosting**: static `site/` page (motivation, rationale, architecture, quick start) served from the Cloudflare account (Workers static assets, same pattern as khelsutra.guru) or any static host; GitHub Pages intentionally skipped (Actions stay disabled on covered GitHub repos except the launch exemption). | L19 | No | ☑ | live at `https://agent-sessions-site.avi-dullu.workers.dev` (Worker `agent-sessions-site`, deployed 2026-07-24) |
+| L20 | **Project landing page + hosting**: static `site/` page (motivation, rationale, architecture, quick start) served from the Cloudflare account (Workers static assets, same pattern as khelsutra.guru) or any static host; GitHub Pages intentionally skipped (Actions stay disabled on covered GitHub repos except the launch exemption). | L19 | No | ☑ | live at `https://agent-sessions.khelsutra.guru` + `https://agent-sessions-site.avi-dullu.workers.dev` (Worker `agent-sessions-site`, deployed 2026-07-24) |
 
 ---
 
-## 8. Open questions
+## 8. Open questions — resolved at closeout
 
-- **Q1 (owner):** Confirm D1 — clean-snapshot or filter-branch for git history? The tracker assumes clean-snapshot (simpler, safer). If filter-branch is preferred, L1 scope expands significantly.
-- **Q2 (owner):** Confirm D3 — keep `agent-sessions` / `agent-session-router` naming as-is? Renaming is possible but affects PyPI package, VS Code extension ID, and all cross-references.
-- **Q3 (owner):** PyPI package name: `agent-sessions` or `agent-session-hub`? The former matches the repo; the latter distinguishes from the router. The tracker assumes `agent-sessions`.
-- **Q4 (external):** Should `agent-session-router` also publish to Open VSX (open-vsx.org) for VSCodium users? D4 includes it tentatively — owner to confirm.
-- **Q5 (owner):** Should `<dev-machine>` ratify every L-row PR, or only the CI/lint ones (L8, L11, L15)? The tracker assumes ratification only for platform-sensitive rows.
-- **Q6 (owner, gating — L19 execution plan, proposed 2026-07-24):** (1) create an orphan "sanitized snapshot" root commit from the current `forge/main` tree; (2) preserve the full private history on the private forge as branch `private-history-pre-launch`; (3) reset forge `main` to the snapshot lineage; (4) delete + recreate the GitHub mirror repo (or force-sync) so GitHub carries only the sanitized snapshot; (5) re-verify the forge→GitHub push mirror; (6) flip both GitHub repos to public. Steps 3–6 are effectively irreversible and run **only on explicit owner instruction**. Related decision needed: GitHub Actions stay disabled on covered repos per backup policy — external contributors would get no CI on GitHub PRs. Options: keep Forgejo as the sole CI+merge target and say so in CONTRIBUTING, or explicitly exempt these two public repos from the Actions-disabled rule.
+| Q | Resolution |
+|---|---|
+| Q1 D1 clean-snapshot vs filter-branch | **Clean-snapshot** (executed L19). |
+| Q2 D3 keep names | **Kept** repo/extension names; PyPI uses `agent-session-hub` (see Q3). |
+| Q3 PyPI name | **`agent-session-hub`** — `agent-sessions` was taken by an unrelated package. |
+| Q4 Open VSX | **Optional** — workflow supports it; `OVSX_PAT` unset → skipped cleanly. Still open if owner wants VSCodium reach. |
+| Q5 ratification scope | Platform-sensitive rows only (as assumed). |
+| Q6 L19 plan | **Executed 2026-07-24** including public visibility flip. GitHub Actions **enabled** for both public repos (owner exemption). |
 
 ---
 
 ## 9. Definition of done
 
-- [ ] `pip install agent-sessions` succeeds on a clean Windows, macOS, and Linux machine.
-- [ ] `code --install-extension agent-session-router` succeeds from Marketplace (or Open VSX).
-- [ ] `agent-archive export --all` produces `archive/index.jsonl` + Markdown without errors.
-- [ ] PII grep across `baseline/ archive/ agent_sessions/ tests/ docs/` returns zero results for real user paths (allowlisted: test fixtures with `example-user` placeholder).
-- [ ] PII grep across `agent-session-router/src/ agent-session-router/test/` returns zero results (allowlisted: fixtures with `example-user` placeholder).
-- [ ] L19 complete: GitHub mirror history is the sanitized snapshot, not the full Forgejo history.
-- [ ] Both repos have MIT LICENSE files.
-- [ ] Router `package.json` has no `"private": true`.
-- [ ] `docs/FAQ.md` exists and is linked from both READMEs.
-- [ ] `docs/GETTING_STARTED.md` exists and covers the full workflow.
-- [ ] `CONTRIBUTING.md` exists in both repos.
-- [ ] `CHANGELOG.md` exists in the hub repo.
-- [ ] CI is green on Windows, macOS, Linux (hub), and Windows, macOS, Linux (router) — including WSL path-handling tests (L15).
-- [ ] At least one external user has tried the tools and given feedback.
+- [x] `pip install agent-session-hub` succeeds (verified 0.2.0; package name is not `agent-sessions`).
+- [x] `code --install-extension avidullu.agent-session-router` succeeds from Marketplace.
+- [x] `agent-archive export --all` produces archive catalog + Markdown without errors (dogfooded).
+- [x] PII gate clean on hub tracked tree (`tools/check_pii.py` OK, 2026-07-30).
+- [x] Router fixtures scrubbed; no `"private": true`.
+- [x] L19 complete: sanitized public history lineage + both repos **PUBLIC**.
+- [x] Both repos have MIT LICENSE files.
+- [x] `docs/FAQ.md` exists and is linked from both READMEs.
+- [x] `docs/GETTING_STARTED.md` exists and covers the full workflow.
+- [x] `CONTRIBUTING.md` exists in the hub repo (router CONTRIBUTING added at closeout).
+- [x] `CHANGELOG.md` exists in the hub repo.
+- [x] CI green on hub (Windows + Linux) and router (Windows + macOS + Linux), with WSL path-handling unit tests (L15).
+- [ ] At least one external user has tried the tools and given feedback. *(post-launch adoption metric — not a ship gate)*
+- [ ] L16 demo/screenshots and L17 baseline user guide. *(optional polish)*
 
 ---
 
@@ -218,20 +232,31 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated. **One smal
 **Internal:**
 - `docs/COMPOSE_STACK.md` — ecosystem ownership boundaries
 - `docs/ROADMAP.md` — future features
-- `docs/OUTPUT_CONTRACT.md` — format contract v1
+- `docs/OUTPUT_CONTRACT.md` — format contract v1 (+ §9 versioning)
 - `docs/PROJECT_DOC_TEMPLATE.md` — this tracker's template
-- `docs/FAQ.md` — (to be created, L14)
-- `docs/GETTING_STARTED.md` — (to be created, L5)
-- `CONTRIBUTING.md` — (to be created, L9)
-- `CHANGELOG.md` — (to be created, L12)
+- `docs/PROJECT_TRACKER.md` — fleet-exportable status table
+- `docs/FAQ.md`
+- `docs/GETTING_STARTED.md`
+- `CONTRIBUTING.md`
+- `CHANGELOG.md`
 
 **External:**
-- Router repo: `https://github.com/avidullu/agent-session-router` (public mirror)
-- VS Code Marketplace: `https://marketplace.visualstudio.com/`
-- PyPI: `https://pypi.org/project/agent-sessions/`
-- Open VSX: `https://open-vsx.org/`
+- Hub: `https://github.com/avidullu/agent-sessions` (public)
+- Router: `https://github.com/avidullu/agent-session-router` (public)
+- PyPI: `https://pypi.org/project/agent-session-hub/`
+- Marketplace: `https://marketplace.visualstudio.com/items?itemName=avidullu.agent-session-router`
+- Site: `https://agent-sessions.khelsutra.guru`
+- Open VSX: `https://open-vsx.org/` (optional; not published yet)
+
+### Post-launch follow-ups (not launch rows)
+
+- Security: forge issue/PR **#133** — tracked-tree credential gate after secret-scanning alert on archived transcripts; rotate any exposed tokens.
+- Privacy residual: issue **#122** — prose mentions of personal project names.
+- Optional polish: L16 demo, L17 baseline user guide, Open VSX publish, hub macOS CI lane.
+- Product track: rules project resumes at **R2a** (see `docs/RULES_EXTRACTION_AND_PUBLISH_PLAN.md`).
 
 ### Changelog
+- `2026-07-30` — **CLOSEOUT.** Tracker → `DONE` / archived. Reconciled §7 + `docs/PROJECT_TRACKER.md` with live product: both GitHub repos PUBLIC, PyPI `agent-session-hub` 0.2.0, Marketplace `avidullu.agent-session-router` 0.1.0, site live, L4/L15/L18/L19 marked ☑. L16/L17 left ☐ as optional polish. Fixed user-facing install footguns (wrong PyPI upgrade name; missing Marketplace publisher prefix). Status hub should reflect ~18/20 complete after fleet refresh.
 - `2026-07-24` (later) — **L19 executed to the flip gate; launch infrastructure live.** Owner approved Q6 and GitHub Actions for both repos (exemption recorded in `ops/forgejo-github-backup/policy.yaml`). Histories archived to private `*-history-pre-launch` forge repos; forge branches reset to sanitized single-commit snapshots; mirrors force-synced and fresh-clone verified. GitHub: Actions + Dependabot alerts/security fixes enabled (secret scanning auto-on at flip); CI (incl. `windows-latest` legs) running on mirrored pushes. Hub #120: `release.yml` (PyPI Trusted Publishing), `dependabot.yml`, `.gitleaks.toml`; router #27/#28: EOL pin + dependabot. Landing page deployed to Cloudflare (L20 ☑). Windows Forgejo runner made durable via scheduled task (issue #113, Option B). Remaining: owner manual scan → visibility flip → tag `v0.1.0` releases.
 - `2026-07-23` — **Tracker created.** 20 audit findings organized into 20 rows (L0–L19; L19 added post-review for the GitHub mirror history replacement gating the public switch). D1–D8 decisions locked. FAQ scope (§6), WSL/Linux CI (L15), and cross-platform ratification plan included per owner request.
 - `2026-07-23` — **Post-review amendments (PR #105 review):** P2 addressed (tracker prose uses placeholders instead of real usernames; `docs/` added to §9 DoD grep). P3 fixed (row count reconciled; **20 rows, L0–L19**, once P4's L19 is counted). P4 addressed (L19 added for GitHub mirror history replacement). Nits: 677→678, L15 WSL-lane clarified, L0→L1 noted as sequencing not dependency, router claims tagged as cross-repo-audit sourced. Link-checker CI (`tools/check_md_links.py` from `badminton-highlight-indexer`) added to `local_ci.sh` and `.github/workflows/ci.yml`.

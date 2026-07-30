@@ -20,7 +20,8 @@
 | [ENGINEERING_BASELINE.md](ENGINEERING_BASELINE.md) | Baseline architecture |
 | [BASELINE_PLANNING.md](BASELINE_PLANNING.md) | PR-sized implementation plan |
 | [ROADMAP.md](ROADMAP.md) | Future importers and features |
-| [PUBLIC_LAUNCH_TRACKER.md](PUBLIC_LAUNCH_TRACKER.md) | **IN PROGRESS** — make both repos public-ready: license, PII scrub, cross-platform docs, PyPI + Marketplace publish, FAQ, WSL/Linux CI |
-| [GETTING_STARTED.md](GETTING_STARTED.md) | **NEW** — 5-minute setup guide covering hub + router end-to-end |
-| [FAQ.md](FAQ.md) | **NEW** — frequently asked questions (both repos) |
+| [PUBLIC_LAUNCH_TRACKER.md](PUBLIC_LAUNCH_TRACKER.md) | **DONE (archived 2026-07-30)** — public launch shipped (MIT, privacy scrub, PyPI `agent-session-hub`, Marketplace router, site). Residual L16/L17 optional polish |
+| [PROJECT_TRACKER.md](PROJECT_TRACKER.md) | **Fleet export** for status hub slug `agent-sessions-launch` — keep in sync with PUBLIC_LAUNCH_TRACKER |
+| [GETTING_STARTED.md](GETTING_STARTED.md) | 5-minute setup guide covering hub + router end-to-end |
+| [FAQ.md](FAQ.md) | Frequently asked questions (both repos) |
 | `DISCOVERY.md` | Local source inventory report — generated per machine by `agent-archive discover --write docs/DISCOVERY.md`; not tracked |

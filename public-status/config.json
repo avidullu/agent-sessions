@@ -2,9 +2,9 @@
   "schema_version": 1,
   "project": {
     "title": "agent-sessions public launch",
-    "summary": "MIT public launch of agent-sessions hub and agent-session-router with clean install paths.",
+    "summary": "LAUNCHED — MIT public release of agent-sessions hub + agent-session-router (PyPI, Marketplace, site). Tracker archived; residual polish optional.",
     "dashboard_title": "agent-sessions public launch delivery tracker",
-    "footer": "Derived from the public launch tracker. Private paths and tokens excluded."
+    "footer": "Derived from the public launch tracker (DONE/archived). Private paths and tokens excluded."
   },
   "groups": [
     {
