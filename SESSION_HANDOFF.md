@@ -1,12 +1,13 @@
 # Session Handoff
 
-Updated: 2026-07-30 10:53 IST (🚀 LAUNCHED — tracker archived under `docs/archives/`)
+Updated: 2026-07-30 11:05 IST (🚀 LAUNCHED — tracker archived; L16/L17 honestly Deferred)
 
 ## You Are Here
 
 **🚀 PUBLIC LAUNCH IS COMPLETE** and the launch tracker is **DONE / HISTORICAL**
 (`docs/archives/PUBLIC_LAUNCH_TRACKER.md`; fleet table `docs/PROJECT_TRACKER.md`
-frozen at **20/20**).
+at **18/20 Complete + 2 Deferred** — L16 demo + L17 baseline guide are **not
+done**, only deferred to forge **#136** / **#137**).
 
 All channels are live and verified (re-checked 2026-07-30):
 - **GitHub:** [agent-sessions](https://github.com/avidullu/agent-sessions) +
@@ -26,9 +27,9 @@ Both release pipelines are wired for future versions: bump the version and tag
 `v*` on the **forge** (never GitHub) → mirror → `release.yml` (PyPI, OIDC
 trusted publishing, no token) / `publish.yml` (Marketplace, `VSCE_PAT` secret).
 
-**Launch leftovers (optional polish, not ship gates):** forge **#136** (L16 demo
-/screenshots), forge **#137** (L17 baseline user guide), Open VSX (`OVSX_PAT`),
-hub macOS CI lane, external-user feedback metric.
+**Launch leftovers (Deferred, not done):** forge **#136** (L16 demo/screenshots),
+forge **#137** (L17 baseline user guide). Also optional later: Open VSX
+(`OVSX_PAT`), hub macOS CI lane, external-user feedback metric.
 
 **Security follow-up (priority):** forge **#133** — tracked-tree secret gate
 after a secret-scanning alert on archived transcripts; ensure any exposed tokens
@@ -126,9 +127,9 @@ over user preferences — reprioritizing precision-hardening **R2a–R2c ahead o
 
 ## Next Steps / Open Threads
 
-**Public launch — CLOSED / archived** (2026-07-30 10:53 IST). Optional polish:
-**#136** (demo), **#137** (baseline guide), Open VSX. Priority security
-follow-up: **#133** (tracked-tree secret gate). Residual privacy prose: **#122**.
+**Public launch — CLOSED / archived** (2026-07-30 IST). L16/L17 **Deferred not
+done**: **#136** (demo), **#137** (baseline guide). Open VSX optional. Priority
+security follow-up: **#133**. Residual privacy prose: **#122**.
 
 **Rules project (continuing) — precision-hardening first (D23):**
 1. **R2a — role-privileged scoring** (`rule_clusterer`): weight user-authored

@@ -20,8 +20,8 @@
 | [ENGINEERING_BASELINE.md](ENGINEERING_BASELINE.md) | Baseline architecture |
 | [BASELINE_PLANNING.md](BASELINE_PLANNING.md) | PR-sized implementation plan |
 | [ROADMAP.md](ROADMAP.md) | Future importers and features |
-| [archives/PUBLIC_LAUNCH_TRACKER.md](archives/PUBLIC_LAUNCH_TRACKER.md) | **DONE (archived 2026-07-30 10:53 IST)** — public launch shipped; L16→#136, L17→#137 |
-| [PROJECT_TRACKER.md](PROJECT_TRACKER.md) | **Fleet export** (slug `agent-sessions-launch`) — frozen **20/20 Complete**; historical dashboard only |
+| [archives/PUBLIC_LAUNCH_TRACKER.md](archives/PUBLIC_LAUNCH_TRACKER.md) | **DONE (archived 2026-07-30 IST)** — launch shipped; L16/L17 **Deferred** → #136 / #137 (not done) |
+| [PROJECT_TRACKER.md](PROJECT_TRACKER.md) | **Fleet export** (slug `agent-sessions-launch`) — **18/20 Complete**, 2 Deferred; historical dashboard |
 | [GETTING_STARTED.md](GETTING_STARTED.md) | 5-minute setup guide covering hub + router end-to-end |
 | [FAQ.md](FAQ.md) | Frequently asked questions (both repos) |
 | `DISCOVERY.md` | Local source inventory report — generated per machine by `agent-archive discover --write docs/DISCOVERY.md`; not tracked |

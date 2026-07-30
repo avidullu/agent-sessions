@@ -2,9 +2,9 @@
   "schema_version": 1,
   "project": {
     "title": "agent-sessions public launch",
-    "summary": "DONE / HISTORICAL (archived 2026-07-30 10:53 IST). Launch shipped. Residual polish: forge #136 demo, #137 baseline guide.",
+    "summary": "DONE / HISTORICAL (archived 2026-07-30 IST). Launch shipped. L16 demo + L17 baseline guide are Deferred (forge #136 / #137) — not done.",
     "dashboard_title": "agent-sessions public launch delivery tracker",
-    "footer": "Historical dashboard — tracker archived under docs/archives/. Private paths and tokens excluded."
+    "footer": "Historical dashboard — tracker under docs/archives/. L16/L17 deferred, not complete. Private paths and tokens excluded."
   },
   "groups": [
     {
@@ -123,14 +123,14 @@
     },
     {
       "id": "l16",
-      "label": "Demo and screenshots",
-      "description": "Short install-to-export demo assets.",
+      "label": "Demo and screenshots (deferred)",
+      "description": "Deferred to forge #136 — optional polish, not done.",
       "group_id": "later"
     },
     {
       "id": "l17",
-      "label": "Baseline user guide",
-      "description": "User-facing baseline suggest/promote guide.",
+      "label": "Baseline user guide (deferred)",
+      "description": "Deferred to forge #137 — optional polish, not done.",
       "group_id": "later"
     },
     {
@@ -192,7 +192,7 @@
     "status_map": {
       "Not started": "todo",
       "In progress": "active",
-      "Blocked": "blocked",
+      "Deferred": "blocked",
       "Complete": "done"
     },
     "counts": {
