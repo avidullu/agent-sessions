@@ -3,7 +3,7 @@
 Tracked catalogs (``archive/index.jsonl``, ``baseline/handoffs/index.jsonl``,
 ``baseline/proposals/*.json``) are committed to the repository, so they must
 never carry a real user home directory or username (public-launch DoD,
-``docs/PUBLIC_LAUNCH_TRACKER.md`` L1/§9). Paths are stored home-relative
+``docs/archives/PUBLIC_LAUNCH_TRACKER.md`` L1/§9). Paths are stored home-relative
 (``~``-prefixed) and the origin environment is captured separately —
 username-free — at write time via :func:`portable_origin`.
 

@@ -2,9 +2,9 @@
   "schema_version": 1,
   "project": {
     "title": "agent-sessions public launch",
-    "summary": "LAUNCHED — MIT public release of agent-sessions hub + agent-session-router (PyPI, Marketplace, site). Tracker archived; residual polish optional.",
+    "summary": "DONE / HISTORICAL (archived 2026-07-30 10:53 IST). Launch shipped. Residual polish: forge #136 demo, #137 baseline guide.",
     "dashboard_title": "agent-sessions public launch delivery tracker",
-    "footer": "Derived from the public launch tracker (DONE/archived). Private paths and tokens excluded."
+    "footer": "Historical dashboard — tracker archived under docs/archives/. Private paths and tokens excluded."
   },
   "groups": [
     {
