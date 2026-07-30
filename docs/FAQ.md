@@ -41,16 +41,12 @@ pip install agent-session-hub
 
 **Router** (VS Code extension):
 ```bash
-code --install-extension agent-session-router
+code --install-extension avidullu.agent-session-router
 ```
 
 Or download the `.vsix` from [Releases](https://github.com/avidullu/agent-session-router/releases).
 
 See [Getting Started](GETTING_STARTED.md) for detailed setup.
-
-## What platforms are supported?
-
-The tools have been **manually tested on Windows, WSL, and Ubuntu**. macOS should work through the same code paths but hasn't been validated — the developer (humorously) doesn't own a Mac device. If you hit macOS-specific issues, please file a bug. PRs welcome!
 
 ## Where are my exported sessions saved?
 
@@ -72,17 +68,25 @@ Yes. The router writes standalone Markdown files — you can read them directly.
 
 **Hub:**
 ```bash
-pip install --upgrade agent-sessions
+pip install --upgrade agent-session-hub
 ```
 
+Do **not** run `pip install --upgrade agent-sessions` — that installs an
+unrelated third-party package with the same informal name. The hub's PyPI
+distribution is **`agent-session-hub`**.
+
 **Router:**
+```bash
+code --install-extension avidullu.agent-session-router --force
+```
+
+Marketplace-installed extensions also auto-update. From a source checkout:
+
 ```bash
 git pull origin master && npm ci && npm run compile
 npx @vscode/vsce package -o agent-session-router.vsix
 code --install-extension agent-session-router.vsix --force
 ```
-
-Or wait for Marketplace auto-updates once published.
 
 ## The router watcher isn't working. What do I check?
 

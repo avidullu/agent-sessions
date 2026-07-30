@@ -1,59 +1,51 @@
 # Session Handoff
 
-Updated: 2026-07-24 (🚀 LAUNCHED — both repos public, PyPI + VS Code Marketplace live, site on custom domain)
+Updated: 2026-07-30 (🚀 LAUNCHED + tracker closeout — status hub reconciled)
 
 ## You Are Here
 
-**🚀 PUBLIC LAUNCH IS COMPLETE.** All channels are live and verified:
+**🚀 PUBLIC LAUNCH IS COMPLETE** and the launch tracker is **DONE / archived**
+(`docs/PUBLIC_LAUNCH_TRACKER.md`, fleet table `docs/PROJECT_TRACKER.md`).
+
+All channels are live and verified (re-checked 2026-07-30):
 - **GitHub:** [agent-sessions](https://github.com/avidullu/agent-sessions) +
   [agent-session-router](https://github.com/avidullu/agent-session-router) —
-  PUBLIC, MIT, CI green, secret scanning + push protection on.
+  **PUBLIC**, MIT, CI green, secret scanning + push protection on.
 - **PyPI:** [`agent-session-hub` 0.2.0](https://pypi.org/project/agent-session-hub/)
-  — verified: `pip install agent-session-hub` → `agent-archive` runs.
+  — `pip install agent-session-hub` → `agent-archive` (note: plain
+  `agent-sessions` on PyPI is a *different* package owned by someone else).
 - **VS Code Marketplace:** [`avidullu.agent-session-router`](https://marketplace.visualstudio.com/items?itemName=avidullu.agent-session-router)
   — `code --install-extension avidullu.agent-session-router`.
 - **Site:** https://agent-sessions.khelsutra.guru (Cloudflare Worker, custom domain).
 - **Flyer:** `Agentic-Coding/agent-sessions-flyer.pdf` + `.png` (QR → site).
+- **Status hub:** private forge status fleet slug `agent-sessions-launch`
+  (source: `docs/PROJECT_TRACKER.md`; refresh after merge via fleet timer).
 
 Both release pipelines are wired for future versions: bump the version and tag
 `v*` on the **forge** (never GitHub) → mirror → `release.yml` (PyPI, OIDC
 trusted publishing, no token) / `publish.yml` (Marketplace, `VSCE_PAT` secret).
 
-**Tiny cosmetic leftovers (non-blocking):** (1) enable GitHub CodeQL default
-setup in Settings → Code security (the CLI token lacks `security_events`);
-(2) the Marketplace listing shows the pre-publish README until the next version
-tag refreshes it. Housekeeping: rotate the `DIGITALOCEAN_ACCESS_TOKEN` in the
-Windows user env; move `PyPI-Recovery-Codes-*.txt` out of `Agentic-Coding/`.
+**Launch leftovers (optional polish, not ship gates):** L16 demo/screenshots,
+L17 baseline user guide, Open VSX (`OVSX_PAT`), hub macOS CI lane, external-user
+feedback metric.
+
+**Security follow-up (priority):** forge **#133** — tracked-tree secret gate
+after a secret-scanning alert on archived transcripts; ensure any exposed tokens
+were rotated. Residual prose project names: issue **#122**.
 
 **Foundation Hardening is DONE** — H0–H11 all merged. Rules project (R2a
-onward) is unblocked and parked at the owner's request; **now clear to resume
-post-launch** (see below).
+onward) is the active product track when the owner resumes it (see below).
 
-**Public launch — where it actually stands (2026-07-24, end of sprint 2):**
-- GitHub `avidullu/agent-sessions` and `avidullu/agent-session-router` are
-  **sanitized single-commit snapshots, still PRIVATE**. Full pre-launch history
-  is preserved on the private forge as `*-history-pre-launch` repos. (L19 done.)
-- **The public tree ships ZERO owner data** (L21, #123 + re-snapshot): removed
-  `archive/index.jsonl`/`INDEX.md` (5,438 records), `docs/DISCOVERY.md`, and all
-  session-derived `baseline/` content. Only structural docs/schemas/`*.example.*`
-  remain. Residual project-name prose mentions tracked in issue #122 (owner
-  accepted the "someone digs history" risk).
-- **Privacy is CI-enforced**: `tools/check_pii.py` gate fails on any real home
-  path / tailnet host / personal email in tracked files. Portable `~` catalog
-  paths (#116) mean the scrub can't regress on future exports.
-- **GitHub Actions ON** for both (owner-approved exemption in
-  `avis-agents-xdsync/ops/forgejo-github-backup/policy.yaml`); Dependabot alerts +
-  security fixes on; CI (incl. `windows-latest`) green on both forges.
-- **Windows CI fully fixed & hardened** — see the Windows runner section below.
-- **CI matrix trimmed** to boundary Pythons 3.11 + 3.13 (#125); 6→4 test legs.
-- **Landing page LIVE**: https://agent-sessions.khelsutra.guru (Cloudflare Worker
-  `agent-sessions-site`, custom domain on the khelsutra.guru zone) + the
-  `*.workers.dev` URL. (L20 done.)
-- **Release pipelines in place**: hub `release.yml` = PyPI Trusted Publishing on
-  tag `v*` (OIDC, no stored token); router `publish.yml` = Marketplace on tag,
-  `VSCE_PAT` secret **already set** (2026-07-24), Open VSX now optional (#29).
-- Local checkouts are Forgejo-primary (origin=forge, github=backup, never push
-  to github). All work this session went forge→PR→merge→mirror.
+**Public-tree invariants (still true):**
+- Pre-launch history lives on private forge `*-history-pre-launch` repos; public
+  mirrors carry the sanitized post-L19 lineage (plus normal post-launch commits).
+- Public tree ships **no owner session data** (L21): no personal archive catalog
+  or session-derived baseline content — structural docs/schemas/`*.example.*` only.
+- **Privacy is CI-enforced** via `tools/check_pii.py` (home paths, tailnet hosts,
+  personal emails). Portable `~` catalog paths (#116) prevent scrub regression.
+- GitHub Actions ON for both repos (owner exemption in forgejo-github-backup
+  policy). Hub CI matrix: Ubuntu + Windows × Python 3.11/3.13. Local checkouts
+  are Forgejo-primary (never push to GitHub; mirror overwrites).
 
 ## LAUNCH — done. Notes for future releases & operations
 
@@ -133,6 +125,10 @@ over user preferences — reprioritizing precision-hardening **R2a–R2c ahead o
 
 ## Next Steps / Open Threads
 
+**Public launch — CLOSED.** Tracker archived. Optional polish: L16/L17, Open VSX.
+Priority security follow-up: **#133** (tracked-tree secret gate). Residual
+privacy prose: **#122**.
+
 **Rules project (continuing) — precision-hardening first (D23):**
 1. **R2a — role-privileged scoring** (`rule_clusterer`): weight user-authored
    evidence far above system/developer/request-prompt/assistant roles — the
@@ -146,8 +142,6 @@ over user preferences — reprioritizing precision-hardening **R2a–R2c ahead o
 3. Backlog unchanged: issues #32, #19; follow-ups #92 (aggressive ratchet),
    #93 (history purge + catalog redaction), #94 (extractor de-dup),
    #95 (complexity refactor).
-
-**Public launch — see the "LAUNCH — what's left for the owner" section above.**
 The launch is not a parallel track anymore; it's the near-complete main thread,
 blocked only on owner-only steps (scan → flip → tags). Full 21-row detail in
 `docs/PUBLIC_LAUNCH_TRACKER.md` §7 (reconciled 2026-07-24, changelog current).
