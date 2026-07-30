@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `rule_ledger.py` — tracked, merge-aware, redaction-gated evidence ledger (D17)
   - `rule_clusterer.py` — polarity+topic clustering with contradiction pairs (D19)
 - **Markdown link checker** (`tools/check_md_links.py`) — CI guard against broken internal links
-- **Public launch tracker** (`docs/PUBLIC_LAUNCH_TRACKER.md`) — 19-row plan for open-sourcing
+- **Public launch tracker** (`docs/archives/PUBLIC_LAUNCH_TRACKER.md`) — open-sourcing plan (DONE / archived 2026-07-30 IST)
 
 ### Changed
 - Foundation hardening complete (H0–H11): ruff/mypy ratchets, CI matrix, coverage 92→92,

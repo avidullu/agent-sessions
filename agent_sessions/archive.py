@@ -197,7 +197,7 @@ def export_sources(
                     "kind": source.kind,
                     # Tracked catalogs must stay PII-free: the home prefix is
                     # rewritten to "~" and the origin environment is captured
-                    # separately, username-free (docs/PUBLIC_LAUNCH_TRACKER.md L1).
+                    # separately, username-free (docs/archives/PUBLIC_LAUNCH_TRACKER.md L1).
                     "source_file": portable_path(str(path)),
                     "source_origin": portable_origin(str(path)),
                     "sha256": digest,

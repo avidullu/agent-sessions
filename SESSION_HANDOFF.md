@@ -1,11 +1,12 @@
 # Session Handoff
 
-Updated: 2026-07-30 (🚀 LAUNCHED + tracker closeout — status hub reconciled)
+Updated: 2026-07-30 10:53 IST (🚀 LAUNCHED — tracker archived under `docs/archives/`)
 
 ## You Are Here
 
-**🚀 PUBLIC LAUNCH IS COMPLETE** and the launch tracker is **DONE / archived**
-(`docs/PUBLIC_LAUNCH_TRACKER.md`, fleet table `docs/PROJECT_TRACKER.md`).
+**🚀 PUBLIC LAUNCH IS COMPLETE** and the launch tracker is **DONE / HISTORICAL**
+(`docs/archives/PUBLIC_LAUNCH_TRACKER.md`; fleet table `docs/PROJECT_TRACKER.md`
+frozen at **20/20**).
 
 All channels are live and verified (re-checked 2026-07-30):
 - **GitHub:** [agent-sessions](https://github.com/avidullu/agent-sessions) +
@@ -25,9 +26,9 @@ Both release pipelines are wired for future versions: bump the version and tag
 `v*` on the **forge** (never GitHub) → mirror → `release.yml` (PyPI, OIDC
 trusted publishing, no token) / `publish.yml` (Marketplace, `VSCE_PAT` secret).
 
-**Launch leftovers (optional polish, not ship gates):** L16 demo/screenshots,
-L17 baseline user guide, Open VSX (`OVSX_PAT`), hub macOS CI lane, external-user
-feedback metric.
+**Launch leftovers (optional polish, not ship gates):** forge **#136** (L16 demo
+/screenshots), forge **#137** (L17 baseline user guide), Open VSX (`OVSX_PAT`),
+hub macOS CI lane, external-user feedback metric.
 
 **Security follow-up (priority):** forge **#133** — tracked-tree secret gate
 after a secret-scanning alert on archived transcripts; ensure any exposed tokens
@@ -125,9 +126,9 @@ over user preferences — reprioritizing precision-hardening **R2a–R2c ahead o
 
 ## Next Steps / Open Threads
 
-**Public launch — CLOSED.** Tracker archived. Optional polish: L16/L17, Open VSX.
-Priority security follow-up: **#133** (tracked-tree secret gate). Residual
-privacy prose: **#122**.
+**Public launch — CLOSED / archived** (2026-07-30 10:53 IST). Optional polish:
+**#136** (demo), **#137** (baseline guide), Open VSX. Priority security
+follow-up: **#133** (tracked-tree secret gate). Residual privacy prose: **#122**.
 
 **Rules project (continuing) — precision-hardening first (D23):**
 1. **R2a — role-privileged scoring** (`rule_clusterer`): weight user-authored
@@ -142,16 +143,13 @@ privacy prose: **#122**.
 3. Backlog unchanged: issues #32, #19; follow-ups #92 (aggressive ratchet),
    #93 (history purge + catalog redaction), #94 (extractor de-dup),
    #95 (complexity refactor).
-The launch is not a parallel track anymore; it's the near-complete main thread,
-blocked only on owner-only steps (scan → flip → tags). Full 21-row detail in
-`docs/PUBLIC_LAUNCH_TRACKER.md` §7 (reconciled 2026-07-24, changelog current).
-
 ## Ramp-Up Kit
 
 - `docs/RULES_EXTRACTION_AND_PUBLISH_PLAN.md` — the active tracked project (rules)
 - `docs/EFFICACY_CHECK_2026-07-23.md` — mid-project efficacy baseline (metrics to beat)
 - `tools/rules_demo.py` — reproducible efficacy harness (real modules, real sessions)
-- `docs/PUBLIC_LAUNCH_TRACKER.md` — public launch tracker (L0–L19, active in parallel)
+- `docs/archives/PUBLIC_LAUNCH_TRACKER.md` — **DONE / HISTORICAL** public launch (L0–L19)
+- forge issues **#136** / **#137** — optional launch polish (demo, baseline guide)
 - issue #99 — 2026-07-22 review findings (evidence with file:line)
 - `docs/FOUNDATION_HARDENING_PLAN.md` — DONE; §7 shows what the foundation
   now guarantees

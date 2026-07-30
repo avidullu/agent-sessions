@@ -1,22 +1,22 @@
 # Public Launch — agent-sessions + agent-session-router
 
-> **Status:** `DONE` — public launch shipped. Both GitHub repos are **PUBLIC**, PyPI
-> (`agent-session-hub` 0.2.0) and the VS Code Marketplace
-> (`avidullu.agent-session-router` 0.1.0) are live, the landing page is on
-> `https://agent-sessions.khelsutra.guru`, and launch blockers/privacy gates are
-> closed. Residual polish (L16 demo assets, L17 baseline user guide) is optional
-> backlog, not launch work. **Owner:** `avidullu`. **Created:** `2026-07-23`.
-> **Last updated:** `2026-07-30` (closeout).
+> **Status:** `DONE / HISTORICAL` — public launch shipped and this tracker is
+> **archived**. Both GitHub repos are **PUBLIC**, PyPI (`agent-session-hub` 0.2.0)
+> and the VS Code Marketplace (`avidullu.agent-session-router` 0.1.0) are live,
+> site at `https://agent-sessions.khelsutra.guru`. Residual polish split to forge
+> issues **#136** (L16 demo) and **#137** (L17 baseline guide). **Owner:**
+> `avidullu`. **Created:** `2026-07-23`. **Last updated:** `2026-07-30 10:53 IST`
+> (final archive).
 > **Lifecycle:** `DRAFT → IN PROGRESS → DONE → archived`
-> **Tracking anchors:** §7 progress tracker is the source of truth; fleet export
-> is `docs/PROJECT_TRACKER.md` (status hub slug `agent-sessions-launch`); pointer
-> in `SESSION_HANDOFF.md`.
+> **Tracking anchors:** §7 was the source of truth while active; fleet export
+> remains `docs/PROJECT_TRACKER.md` (status hub slug `agent-sessions-launch`,
+> frozen at 20/20 Complete). Indexed under `docs/archives/` in `docs/README.md`.
 > **Relation to existing docs:** peer of `docs/RULES_EXTRACTION_AND_PUBLISH_PLAN.md`
-> (rules project continues in parallel); extends `docs/COMPOSE_STACK.md` and
-> `docs/ROADMAP.md`; the `agent-session-router` companion repo is tracked inline.
-> **Honesty note:** closeout verified 2026-07-30 against public GitHub, PyPI,
+> (rules project continues); extends `docs/COMPOSE_STACK.md` and `docs/ROADMAP.md`.
+> **Honesty note:** closeout verified 2026-07-30 (IST) against public GitHub, PyPI,
 > Marketplace, site, local tests (761 hub / router coverage+smoke green), and
-> `tools/check_pii.py` OK on the hub tree.
+> `tools/check_pii.py` OK on the hub tree. Timestamps in this narrative use **IST**;
+> the fleet table’s `Updated (UTC)` column stays ISO-8601 `…Z` (statuskit contract).
 
 ---
 
@@ -186,8 +186,8 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated. **One smal
 |----|-------------|-----------|--------|--------|----|
 | L14 | **FAQ publishing**: create `docs/FAQ.md` covering the 12 questions in §6; link from both READMEs; the router's inline FAQ moves to the canonical doc. | L5 | No | ☑ | `e2334c1`, `8e06df2` |
 | L15 | **WSL + Linux CI compatibility enforcement**: add WSL path-handling unit tests (e.g., `\\wsl.localhost\...` → POSIX conversion) that run on any Linux runner (no hosted WSL OS exists — the tests validate path logic, not kernel behaviour); ratify on `<dev-machine>` before merge. | L3 | No | ☑ | `tests/test_portable_paths.py` + WSL origin cases; hub CI matrix Ubuntu+Windows (3.11/3.13); router CI Ubuntu+Windows+macOS. Hub has no macOS CI lane (macOS still developer-unvalidated — see README honesty note). |
-| L16 | **Demo / screenshots**: record a 30-second demo (install → export → see Markdown); add to both READMEs and the router's Marketplace listing. | L7 | No | ☐ | optional post-launch polish — not a launch blocker |
-| L17 | **Baseline user guide**: create `docs/BASELINE_USER_GUIDE.md` with concrete examples (what `baseline suggest` does, what a promotion looks like, when to calibrate). | L5 | No | ☐ | optional post-launch polish — not a launch blocker |
+| L16 | **Demo / screenshots**: record a 30-second demo (install → export → see Markdown); add to both READMEs and the router's Marketplace listing. | L7 | No | ☑ | **Closed out of tracker** 2026-07-30 10:53 IST — filed forge issue **#136** (optional polish; not a launch blocker) |
+| L17 | **Baseline user guide**: create `docs/BASELINE_USER_GUIDE.md` with concrete examples (what `baseline suggest` does, what a promotion looks like, when to calibrate). | L5 | No | ☑ | **Closed out of tracker** 2026-07-30 10:53 IST — filed forge issue **#137** (optional polish; not a launch blocker) |
 | L18 | **Contract versioning doc**: add a § to `docs/OUTPUT_CONTRACT.md` on version compatibility and migration path (v1 → future v2). | — | No | ☑ | `docs/OUTPUT_CONTRACT.md` §9 Versioning & conformance (v1 goldens; v2 fixtures beside v1) |
 | L19 | **GitHub mirror history replacement + public flip**: after L1+L2+L10+L11 scrub HEAD, replace the public mirrors with a sanitized snapshot and flip visibility to public. | L1, L11 | No (executed) | ☑ | executed 2026-07-24: histories archived to private `*-history-pre-launch` repos; forge reset to sanitized snapshots; mirrors force-synced; both GitHub repos **PUBLIC** (verified 2026-07-30). |
 | L21 | **Personal dataset excision (owner decision, 2026-07-24)**: the public tree ships no owner data at all — removed `archive/index.jsonl` + `INDEX.md` (5,438-record personal catalog), `docs/DISCOVERY.md`, and all session-derived `baseline/` content (promoted project pages, global promotions, generated agent baselines, handoff index/audit, proposals, candidates, calibration results, prediction ledger, replay manifest). Structural docs, schemas, and `*.example.*` files stay. Demo data on the website may return as `example-user` content later. Residual prose mentions of project names in planning docs tracked as a follow-up issue. | L19 | No | ☑ | this PR |
@@ -222,8 +222,8 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated. **One smal
 - [x] `CONTRIBUTING.md` exists in the hub repo (router CONTRIBUTING added at closeout).
 - [x] `CHANGELOG.md` exists in the hub repo.
 - [x] CI green on hub (Windows + Linux) and router (Windows + macOS + Linux), with WSL path-handling unit tests (L15).
-- [ ] At least one external user has tried the tools and given feedback. *(post-launch adoption metric — not a ship gate)*
-- [ ] L16 demo/screenshots and L17 baseline user guide. *(optional polish)*
+- [x] L16/L17 removed from active tracker scope — filed as forge **#136** / **#137** (optional polish).
+- [ ] At least one external user has tried the tools and given feedback. *(adoption metric — not a ship gate; not tracked here)*
 
 ---
 
@@ -234,7 +234,7 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated. **One smal
 - `docs/ROADMAP.md` — future features
 - `docs/OUTPUT_CONTRACT.md` — format contract v1 (+ §9 versioning)
 - `docs/PROJECT_DOC_TEMPLATE.md` — this tracker's template
-- `docs/PROJECT_TRACKER.md` — fleet-exportable status table
+- `docs/PROJECT_TRACKER.md` — fleet-exportable status table (frozen 20/20)
 - `docs/FAQ.md`
 - `docs/GETTING_STARTED.md`
 - `CONTRIBUTING.md`
@@ -248,15 +248,18 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated. **One smal
 - Site: `https://agent-sessions.khelsutra.guru`
 - Open VSX: `https://open-vsx.org/` (optional; not published yet)
 
-### Post-launch follow-ups (not launch rows)
+### Post-launch follow-ups (tracker closed — work lives in issues)
 
-- Security: forge issue/PR **#133** — tracked-tree credential gate after secret-scanning alert on archived transcripts; rotate any exposed tokens.
-- Privacy residual: issue **#122** — prose mentions of personal project names.
-- Optional polish: L16 demo, L17 baseline user guide, Open VSX publish, hub macOS CI lane.
-- Product track: rules project resumes at **R2a** (see `docs/RULES_EXTRACTION_AND_PUBLISH_PLAN.md`).
+- **#136** — L16 demo / screenshots (optional polish)
+- **#137** — L17 baseline user guide (optional polish)
+- Security: forge issue/PR **#133** — tracked-tree credential gate
+- Privacy residual: issue **#122** — prose mentions of personal project names
+- Optional later: Open VSX publish, hub macOS CI lane
+- Product track: rules project resumes at **R2a** (see `docs/RULES_EXTRACTION_AND_PUBLISH_PLAN.md`)
 
 ### Changelog
-- `2026-07-30` — **CLOSEOUT.** Tracker → `DONE` / archived. Reconciled §7 + `docs/PROJECT_TRACKER.md` with live product: both GitHub repos PUBLIC, PyPI `agent-session-hub` 0.2.0, Marketplace `avidullu.agent-session-router` 0.1.0, site live, L4/L15/L18/L19 marked ☑. L16/L17 left ☐ as optional polish. Fixed user-facing install footguns (wrong PyPI upgrade name; missing Marketplace publisher prefix). Status hub should reflect ~18/20 complete after fleet refresh.
+- `2026-07-30 10:53 IST` — **FINAL ARCHIVE.** Moved this file to `docs/archives/`. L16 → forge **#136**, L17 → forge **#137**; all §7 rows ☑. Fleet table frozen at **20/20 Complete**. Status hub slug `agent-sessions-launch` remains as a historical dashboard.
+- `2026-07-30 ~10:20 IST` — **CLOSEOUT.** Tracker → `DONE`. Reconciled §7 + `docs/PROJECT_TRACKER.md` with live product (public repos, PyPI, Marketplace, site). L4/L15/L18/L19 marked ☑; L16/L17 still open polish at that moment. Fixed FAQ/GETTING_STARTED install footguns.
 - `2026-07-24` (later) — **L19 executed to the flip gate; launch infrastructure live.** Owner approved Q6 and GitHub Actions for both repos (exemption recorded in `ops/forgejo-github-backup/policy.yaml`). Histories archived to private `*-history-pre-launch` forge repos; forge branches reset to sanitized single-commit snapshots; mirrors force-synced and fresh-clone verified. GitHub: Actions + Dependabot alerts/security fixes enabled (secret scanning auto-on at flip); CI (incl. `windows-latest` legs) running on mirrored pushes. Hub #120: `release.yml` (PyPI Trusted Publishing), `dependabot.yml`, `.gitleaks.toml`; router #27/#28: EOL pin + dependabot. Landing page deployed to Cloudflare (L20 ☑). Windows Forgejo runner made durable via scheduled task (issue #113, Option B). Remaining: owner manual scan → visibility flip → tag `v0.1.0` releases.
 - `2026-07-23` — **Tracker created.** 20 audit findings organized into 20 rows (L0–L19; L19 added post-review for the GitHub mirror history replacement gating the public switch). D1–D8 decisions locked. FAQ scope (§6), WSL/Linux CI (L15), and cross-platform ratification plan included per owner request.
 - `2026-07-23` — **Post-review amendments (PR #105 review):** P2 addressed (tracker prose uses placeholders instead of real usernames; `docs/` added to §9 DoD grep). P3 fixed (row count reconciled; **20 rows, L0–L19**, once P4's L19 is counted). P4 addressed (L19 added for GitHub mirror history replacement). Nits: 677→678, L15 WSL-lane clarified, L0→L1 noted as sequencing not dependency, router claims tagged as cross-repo-audit sourced. Link-checker CI (`tools/check_md_links.py` from `badminton-highlight-indexer`) added to `local_ci.sh` and `.github/workflows/ci.yml`.
