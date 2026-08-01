@@ -1,6 +1,6 @@
 # Session Collector, Non-Code Archive Extension, and Session-Intel
 
-> **Status:** `IN PROGRESS` — design on PR #142; all review findings incorporated in doc; implementation not started · **Owner:** `avidullu` · **Created:** `2026-08-01` · **Last updated:** `2026-08-01`
+> **Status:** `IN PROGRESS` — design on PR #142 (D0); final review #351 incorporated; ready for owner merge · **Owner:** `avidullu` · **Created:** `2026-08-01` · **Last updated:** `2026-08-01`
 > **Lifecycle:** `DRAFT → IN PROGRESS → DONE → ARCHIVED` (archive to `docs/archives/` when DONE)
 > **Tracking anchors:** § Progress tracker is the **source of truth**; indexed in `docs/README.md`; pointer in avis-agents-xdsync `memory/agent-sessions/session-handoff.md`.
 > **Relation to existing docs:** extends `OUTPUT_CONTRACT.md`, `MULTI_MACHINE.md`, `AUTOMATION.md`, `COMPOSE_STACK.md`, `ENGINEERING_BASELINE.md`; peer of engineering baseline (does not replace it).
@@ -195,8 +195,8 @@ Skill proposals that include excerpts are **inherently machine-local**; git-trac
 | **KD14** | **Crash-atomic catalog publication:** temp + fsync + `os.replace` per file; **`index.jsonl` is source of truth**; `INDEX.md` is derived. **Fail-closed on corrupt jsonl** (KD18)—no silent git restore. | Always-on collect increases write frequency. |
 | **KD12** | **session-intel body locality:** fleet-wide miners are **catalog-only**; body-dependent miners run only where local Markdown (or regenerable sources) exist. No body sync in this design (NG5). | Matches OUTPUT_CONTRACT / AUTOMATION local-only policy. |
 | **KD13** | **Restamp-on-reuse is in P0 scope:** when `_can_reuse_record` returns true, shallow-copy prior and `setdefault`/union additive fields without changing sha256/markdown/imported_at. Union current machine into **`observed_on`**. | Continuous collect converges tags. |
-| **KD15** | **Multi-writer convergence (required before fleet push):** **per-machine catalog shards** `archive/shards/{machine_id}.jsonl` + deterministic `merge_shards → index.jsonl`. Not “backoff + manual resolve” (NG8 rejected as steady state). Two-clone concurrent-push acceptance test required before multi-machine `push=true`. Single-publisher is interim only for one-machine P0. | Prevents permanently wedged collectors after non-ff push races. |
-| **KD16** | **Merge algebra for same identity:** when two records share `index_identity_key`, content fields follow existing supersede rules, but **`observed_on` = sorted unique union** of both sides’ machine ids (and legacy scalar `machine_id` if present). Never wholesale-drop foreign observations. | Scalar `machine_id` alone is lossy under session+sha256 merge. |
+| **KD15** | **Multi-writer convergence (required before fleet push):** per-machine shards + **deterministic** `merge_shards` **plus** an explicit **git reconciliation state machine** (snapshot own shard → fetch → re-merge → CAS push). Shards alone do **not** make concurrent branch tips fast-forward—Git rejects the second tip regardless of disjoint paths. Two-clone test must force a push rejection and prove recovery. Single-publisher interim for P0. | Prevents permanently wedged collectors. |
+| **KD16** | **Merge algebra for same identity:** content supersede rules + **`observed_on` = sorted unique union**. In **derived** `index.jsonl` / `INDEX.md`, scalar `machine_id` is **deprecated for merge output** or set **only** to `min(observed_on)` (lexicographic)—**never** the executor’s current machine. Local **shard** rows may still stamp their owning machine. Byte-identical merge under shuffled shards + two current machine ids. | Stops oscillating `index.jsonl` under multi-writer. |
 | **KD17** | **Daemon runs only from a dedicated collector checkout** (separate clone/worktree per runtime), not a human dev tree. Versioned entrypoint or restart-on-update; isolated config/state; doctor enforces. | Avoids WIP halt and code changing under a long-lived process. |
 | **KD18** | **Corrupt `index.jsonl` → fail closed.** Preserve final + temp bytes; hard health error; stop. Git restore only via explicit `doctor --repair-index --from-git` (dry-run/diff/confirm). Auto path may only rebuild **INDEX.md** from a **valid** jsonl. | Dirty catalog may be valid uncommitted work—must not clobber. |
 | **KD19** | **Export ZIPs are untrusted.** Streaming validation; reject path escape/links; size/count/ratio caps; clean temp always. SC-6 fixtures for traversal/link/bomb. | “Unzip to temp” is not a security boundary. |
@@ -311,7 +311,7 @@ inbox/                       # entire tree — see Gitignore
 
 ### Shared archive write lock (KD11)
 
-**Lock file path (canonical):** `{repo_root}/.collector/collect.lock`  
+**Lock file path (canonical):** `{repo_root}/.collector/collect.lock`
 **Legacy path (transition):** `{repo_root}/.daily-export.lock`
 
 #### Atomic acquisition (required — not check-then-write)
@@ -337,25 +337,40 @@ Check-then-write is a TOCTOU race: two processes can both observe “no fresh lo
   "pid": 12345,
   "process_start": "<boot_id or process create time token>",
   "started_at": "2026-08-01T12:00:00+00:00",
+  "expires_at": "2026-08-01T12:05:00+00:00",
   "owner": "collect|export|prune"
 }
 ```
 
-**Owner token (KD11 / #3940):**
+**Owner token (KD11 / #3940 / #3974):**
 
 - On acquire, generate a fresh random `owner_token` and remember it in process memory (contextvar).
-- **Release:** re-read lock file; **unlink only if** `owner_token` still matches the caller. If another process reclaimed and rewrote the lock, **do not unlink** (prevents late `finally` of a reclaimed owner from killing the successor).
+- **Release:** re-read lock file; **unlink only if** `owner_token` still matches the caller. If another process reclaimed and rewrote the lock, **do not unlink**.
 - Never release by path alone.
+
+**Renewable lease (not a fixed wall-clock steal):**
+
+A fixed `started_at + lock_timeout_seconds` reclaim is **unsafe**: a valid foreign-runtime export longer than the timeout can be stolen mid-critical-section, after which two writers run concurrently (token only stops the old owner’s `finally`, not dual writers).
+
+| Rule | Spec |
+| --- | --- |
+| Payload | Write `expires_at = now + lease_ttl` (default `lease_ttl = lock_timeout_seconds`, e.g. 300s). |
+| Heartbeat | While holding the lock, **renew** under the same token: rewrite payload with a later `expires_at` (atomic replace of lock file content or O_TRUNC rewrite of payload only while holding exclusive ownership). Renew at ≤ `lease_ttl / 3`. |
+| Same-runtime reclaim | Allowed only if PID dead **and** `process_start` proves reuse **or** `expires_at` is in the past **and** no successful renewal (missed heartbeats). |
+| **Foreign-runtime reclaim** | **Default: never auto-reclaim** based on age alone. Wait until `expires_at` is past **and** heartbeat renewals have stopped (same rule: reclaim only if `now > expires_at`). Prefer: if `runtime_id` differs, require **`doctor --break-lock`** (explicit, logged) instead of auto-steal for P0 if implementation wants maximum safety. |
+| P0 chosen policy | **Renewable `expires_at` + heartbeat** for all owners; reclaim only when `now > expires_at`. Foreign PID death **without** expired lease is **not** sufficient. |
+| Test | Active foreign owner holds lock, sleeps past nominal 300s **but renews heartbeat** → second process **must not** enter critical section. After heartbeats stop and lease expires → reclaim allowed. |
 
 **Stale-owner recovery (runtime-aware):**
 
 | Situation | Behavior |
 | --- | --- |
-| Same `runtime_id` + same `hostname` + PID dead (`os.kill` ESRCH) **and** `process_start` mismatches any live process of that PID | Treat stale → reclaim (unlink + exclusive create) |
-| Same host but **different** `runtime_id` (e.g. Windows vs WSL on shared checkout) | **Do not** trust foreign PID namespace. Treat as live until `started_at` age ≥ `lock_timeout_seconds` (**lease / fail-closed**), then reclaim |
-| PID “alive” but `process_start` token differs (PID reuse) | Treat as **not** our owner; wait or lease-expire |
-| Payload missing/unreadable | Lease-expire on mtime age only; then reclaim |
-| Live owner (same runtime, PID alive, start matches) | Never reclaim |
+| Same `runtime_id` + same `hostname` + PID dead + `process_start` shows reuse **and/or** `now > expires_at` | Reclaim |
+| Foreign `runtime_id` + `now <= expires_at` (heartbeats current) | **Never reclaim** — wait or fail |
+| Foreign `runtime_id` + `now > expires_at` | Reclaim (lease expired); optional doctor-only if config `foreign_lock_policy=doctor` |
+| PID “alive” but `process_start` differs (PID reuse) + lease expired | Reclaim |
+| Payload missing/unreadable | Treat as expired only if mtime age ≥ lease_ttl; else wait |
+| Live owner, lease current | Never reclaim |
 
 **Dual-lock transition protocol (one acquire, both names):**
 
@@ -502,10 +517,10 @@ health_path = ".collector/health.json"
 **`collect watch` (P0 = poll loop):**
 
 1. Exclusive lock **per export cycle**, not forever across sleep (so interactive export can run between cycles).
-2. **P0 algorithm (KD21 / #3945):** On **every** poll interval, run **full** reuse-aware `export_sources` for configured sources (equivalent to `export --all` or configured list).  
-   - **No** root-directory mtime shortcut. Nested session file edits do **not** advance ancestor directory mtimes; a root watermark can stay stale and skip exports forever.  
-   - **No** “walk every descendant for max mtime” pseudo-optimization (still wrong under timestamp granularity / clock skew, and not cheap).  
-   - Cost control is the existing per-file `_can_reuse_record` path (size/mtime/tail_sha256), not tree watermarks.  
+2. **P0 algorithm (KD21 / #3945):** On **every** poll interval, run **full** reuse-aware `export_sources` for configured sources (equivalent to `export --all` or configured list).
+   - **No** root-directory mtime shortcut. Nested session file edits do **not** advance ancestor directory mtimes; a root watermark can stay stale and skip exports forever.
+   - **No** “walk every descendant for max mtime” pseudo-optimization (still wrong under timestamp granularity / clock skew, and not cheap).
+   - Cost control is the existing per-file `_can_reuse_record` path (size/mtime/tail_sha256), not tree watermarks.
    - Future optional design (not P0): **persisted per-file fingerprints** with tests for nested in-place edits, same-timestamp rewrites, and clock skew—tracked as a separate row if needed.
 3. On failure: exponential backoff `min(max_backoff, base * 2^n)`.
 4. SIGTERM: finish in-flight export, token-checked release, exit 0.
@@ -535,22 +550,23 @@ def resolve_machine_id(config_value: str | None = None) -> str:
 
 | Key | Type | Rule |
 | --- | --- | --- |
-| `machine_id` | string | **Last writer convenience** / primary display; may change. Not provenance SoT. |
-| `observed_on` | array of string | **Sorted unique** machine ids that have exported this identity. **Source of truth for fleet coverage.** |
+| `machine_id` | string | **Shard rows:** owning machine. **Derived index (`merge_shards` output):** `min(observed_on)` only—**never** the merge executor’s id (#3973). |
+| `observed_on` | array of string | **Sorted unique** machine ids. **Provenance SoT** for fleet coverage. |
 
 **Merge algebra when identity keys equal:**
 
-1. Content fields (markdown path, messages, sha256, …): existing supersede / path rules.
+1. Content fields (markdown path, messages, sha256, …): existing supersede / path rules (must themselves be executor-independent when merging shards—prefer higher mtime, then lexicographic `source_file`, documented).
 2. `observed_on` := `sorted(set(left.observed_on ∪ right.observed_on ∪ {left.machine_id?} ∪ {right.machine_id?}))` (ignore empty).
-3. `machine_id` := current writer’s id when this process is writing; on pure merge without local write, keep lexicographically first of `observed_on` or existing non-empty.
-4. Restamp/reuse: **union** current machine into `observed_on`; never drop foreign ids via `setdefault` alone on scalar only.
+3. **Derived catalog:** `machine_id := observed_on[0]` if non-empty else `""`. **Forbidden:** stamping `current_machine_id` of the process running `merge_shards`.
+4. **Local shard write / restamp on this machine’s export:** set shard row `machine_id = current`; **union** current into `observed_on`.
+
+**Determinism test (#3973):** same set of shard files, shuffled order, run `merge_shards` under `AGENT_ARCHIVE_MACHINE_ID=alice` and `=bob` → **byte-identical** `index.jsonl` and `INDEX.md` (normalize Generated timestamp in INDEX if needed via stable clock injection in tests).
 
 **P0 acceptance — multi-machine merge regression:**
 
 1. Two records, same `session_id`, different `sha256` → two rows after merge.
 2. Path-key older row superseded when same `(source, source_file)` gets new digest.
-3. **Same identity, two `machine_id`s → one row with `observed_on` containing both** (order sorted); neither observation lost.
-3. `machine_id` differs across rows without collapsing them.
+3. **Same identity, two machines → one row with `observed_on` containing both**; derived `machine_id = min(observed_on)`.
 
 ### Schema extension + contract policy (KD5)
 
@@ -641,12 +657,13 @@ In `export_sources`, when `_can_reuse_record` is true:
 
 ```python
 record = dict(prior)  # shallow copy
-record["machine_id"] = current_machine_id  # last writer
 obs = set(record.get("observed_on") or [])
 if prior.get("machine_id"):
     obs.add(prior["machine_id"])
 obs.add(current_machine_id)
 record["observed_on"] = sorted(obs)
+# Local/shard row: owning machine. Derived index rewrite uses min(observed_on) only (KD16).
+record["machine_id"] = current_machine_id
 record.setdefault("workload_kind", source.workload_kind or "code")
 if source.domain is not None:
     record.setdefault("domain", source.domain)
@@ -721,13 +738,14 @@ Introduce an explicit **bundle expander** stage (not a silent overload of single
 **Vendor-ID resolution + persistent identity map:**
 
 1. **If vendor id present** (`conversation_id` / `id` / `uuid` first non-empty): `session_id = "{vendor}:{vendor_id}"` (stable). Record in map.
-2. **Else** look up **import fingerprint** in `.collector/inbox-identity-map.json`:
-   - Fingerprint keys (try in order):  
-     a. `create_time` (or first-message timestamp) **only**—never `update_time`  
-     b. If no create time: first user message text hash under **canonicalization v1** (below) of a **stable prefix** (e.g. first 2KiB of message texts), not the whole evolving body  
-   - If map hit → reuse prior `session_id` (even if title/body changed).
-3. **Else** allocate `session_id = "import-{vendor}-{uuid4}"` once, **persist** fingerprint→session_id in the map, then materialize under that id.
-4. On collision (two fingerprints map to different conversations that later look alike): keep first mapping; second gets new uuid; log warn. Never silently merge distinct vendor ids.
+2. **Else** look up **composite import fingerprint** in `.collector/inbox-identity-map.json` (KD20 / #3976):
+   - Fingerprint is a **tuple**, not bare `create_time` alone (second-level timestamps collide):
+     `fingerprint = canon_v1({vendor, create_time?, first_user_msg_prefix_hash, message_count_at_import?, attachment_names_hash?})`
+   - **Never** use `update_time` or full evolving body.
+   - If map hit → reuse prior `session_id` (title/body may change).
+3. **Else** allocate `session_id = "import-{vendor}-{uuid4}"` once, **persist** fingerprint→session_id **plus ambiguity anchors** (create_time, prefix hash, count) in the map.
+4. **Ambiguity detection:** before treating a map hit as definitive, compare stored anchors to the candidate conversation. If create_time matches but prefix hash / count disagree beyond threshold → **not** a hit; allocate a new session_id and store a second entry (do not silently merge two no-id chats that share a timestamp).
+5. **Cross-machine map (#3976):** local maps assign different UUIDs if the same export is imported on two machines. **Before SC-6 ships:** either (a) document **single designated inbox importer** machine (recommended for v1), or (b) include a stable **content-derived** secondary key that does not change on title edits (create_time + first-message prefix only) so two machines converge on the same synthetic id without UUID. Prefer (a) for SC-6 v1; (b) as SC-6.1 if multi-importer is required. Fixtures: same-timestamp distinct conversations; cross-machine replay under chosen policy.
 
 **Map file (local-only, gitignored under `.collector/`):**
 
@@ -735,8 +753,16 @@ Introduce an explicit **bundle expander** stage (not a silent overload of single
 {
   "version": 1,
   "entries": {
-    "chatgpt:create:1690000000": {"session_id": "import-chatgpt-…", "vendor": "chatgpt"},
-    "chatgpt:vendor:abc-123": {"session_id": "chatgpt:abc-123", "vendor": "chatgpt"}
+    "chatgpt:vendor:abc-123": {
+      "session_id": "chatgpt:abc-123",
+      "vendor": "chatgpt",
+      "anchors": {"create_time": null, "prefix_sha": null}
+    },
+    "chatgpt:fp:<canon_hash>": {
+      "session_id": "import-chatgpt-…",
+      "vendor": "chatgpt",
+      "anchors": {"create_time": "1690000000", "prefix_sha": "…", "msg_count": 12}
+    }
   }
 }
 ```
@@ -768,10 +794,11 @@ Official exports arrive as zip. Treat as **untrusted input** even from the owner
 | API | Prefer `zipfile` with explicit member iteration—not `extractall` to arbitrary paths |
 | Path | Reject absolute paths, `..` segments, Windows drive prefixes, and any member whose resolved path escapes the temp root |
 | Links | Reject symlink/reparse/`ZipInfo` with external_attr indicating links |
-| Caps | Max entries (e.g. 10_000); max compressed total; max uncompressed total; max ratio compressed:uncompressed (bomb); max per-file; max conversations after parse |
+| Caps | Max entries (e.g. 10_000); max **compressed** total bytes; max **uncompressed** total bytes; max **per-member** compressed/uncompressed; max conversations after parse |
+| **Bomb ratio (#3975)** | A zip bomb has **large** `uncompressed / compressed`. Check **per member and cumulative:** `uncompressed_bytes / max(1, compressed_bytes) <= max_ratio` (e.g. `max_ratio = 100`). **Not** `compressed:uncompressed` (that fraction is tiny for bombs and would pass a max check incorrectly). |
 | Parse | Cap JSON depth/size when loading conversations |
 | Lifecycle | Temp dir under `.collector/inbox-extract/{nonce}/`; **delete on success, failure, and signal** |
-| Tests | Fixtures: `../` traversal, absolute path member, symlink member, bomb (high ratio), huge entry count |
+| Tests | Fixtures: `../` traversal, absolute path member, symlink member, **high uncompressed/compressed ratio** member that **must be rejected**, huge entry count |
 
 #### Idempotent `processed/` replay
 
@@ -1053,30 +1080,55 @@ Change registry to `Callable[[Path], Iterable[ExtractedSession]]` for all source
 
 ---
 
-### Multi-writer convergent topology (KD15 / #3938)
+### Multi-writer convergent topology (KD15 / #3938 / #3972)
 
-**Problem:** Two machines at base A each export and commit full `index.jsonl` → B and C. After B pushes, C’s push is rejected; C’s tree is diverged so later `pull --ff-only` also fails. Collect is **permanently wedged**. Leaving this as NG8 contradicts always-available multi-machine collection.
+**Problem:** Two machines at base A each commit → tips B and C. After B pushes, C’s push is rejected; C is diverged so plain `pull --ff-only` fails. Collect wedges.
 
-**Chosen topology — per-machine shards + deterministic merge:**
+**Critical correction (#3972):** Git decides the **branch ref**, not “files touched.” Concurrent commits from A that change **different** shard paths still produce **two non-ff tips**. Shards alone do **not** make the second push fast-forward. (Reproduced in two clean clones: second push `rc=1`, follow-up ff-only pull `rc=128`.)
+
+**Chosen topology — shards + deterministic merge + reconciliation state machine:**
 
 ```text
 archive/
   shards/
-    {machine_id}.jsonl   # records this machine last exported (full replace per machine, crash-atomic)
-  index.jsonl            # deterministic merge of all shards (+ optional router merge)
-  INDEX.md               # derived from index.jsonl
+    {machine_id}.jsonl   # this machine's export snapshot (crash-atomic replace)
+  index.jsonl            # pure merge_shards output (executor-independent)
+  INDEX.md               # pure derived view
 ```
 
 | Rule | Spec |
 | --- | --- |
-| Write set per machine | Collect on machine M writes **only** `archive/shards/{M}.jsonl` (and local markdown). |
-| Merge | Pure function `merge_shards(shard_paths) → records` applying `merge_index_records` + **KD16 observation union**. Sort shard paths for stability. |
-| Publish index | After pull, any machine may run merge → crash-atomic write of `index.jsonl` + `INDEX.md`. Prefer: collect always merge-after-export before commit. |
-| Git conflicts | Concurrent pushes usually touch **different shard files** → ff merge works. If two rewrite `index.jsonl`, either side re-runs merge from shards (lossless). |
-| Rollout gate | **Fleet `push=true` forbidden** until SC-MW (below) lands + **two-clone concurrent push/recovery test** is green. |
-| P0 interim | Single machine or single designated publisher with `push=true`; other machines `push=false` / export-only. Document in COLLECTOR.md. |
+| Write set per machine | Working tree may update `archive/shards/{M}.jsonl` + local markdown + derived index for local use. |
+| `merge_shards` | Pure function of shard **bytes** only (+ router sidecar if present). Sort shard paths. Apply KD16. **No** dependence on `AGENT_ARCHIVE_MACHINE_ID` of the runner (#3973). |
+| Derived index | `machine_id` field on merged rows = `min(observed_on)` only. |
 
-**Acceptance (SC-MW):** two clones, simultaneous collect+commit+push of different sessions → both shards present after pull; `observed_on` correct for shared session; neither collector wedges.
+#### Git reconciliation state machine (required for SC-MW)
+
+Collector git commit/push **must not** be “commit everything and hope for ff.” After a local export of machine M:
+
+1. **Snapshot** the intended shard payload for M in memory / temp (post-export `shards/{M}.jsonl` bytes + deterministic merge inputs).
+2. `git fetch origin`.
+3. If local `main` is behind: verify every **local unpushed commit** (if any) only touches **allowlisted collector paths** (`archive/shards/*`, `archive/index.jsonl`, `archive/INDEX.md`). If not allowlisted → hard fail (human WIP in daemon checkout).
+4. **Reset working merge base** to `origin/main` (e.g. `git reset --hard origin/main` **only** in dedicated collector checkout after allowlist check—never in a human dev tree).
+5. Re-apply: write `shards/{M}.jsonl` from snapshot; run `merge_shards` → crash-atomic `index.jsonl` + `INDEX.md`.
+6. Commit allowlisted paths only; message `archive: collect <date> [<M>]`.
+7. **Compare-and-swap push:** `git push origin HEAD:main`. On rejection (non-ff): **loop** from step 2 with bounded retries/backoff—not a permanent health error wedge.
+8. Never force-push. Never rebase non-allowlisted history.
+
+**Alternative (also acceptable for SC-MW):** **per-machine refs** `refs/collectors/{M}` push always ff on that ref; one **aggregator** job/machine merges all collector refs into `main` deterministically. Document which alternative is implemented; tests must match.
+
+| Rollout | Spec |
+| --- | --- |
+| Gate | Fleet multi-machine `push=true` **forbidden** until SC-MW + tests green. |
+| P0 interim | Single publisher only. |
+
+**Acceptance (SC-MW) — must assert recovery after forced rejection:**
+
+1. Two clones at A; both export different sessions; both attempt push.
+2. Exactly one push wins; loser gets rejection.
+3. Loser runs reconciliation loop → succeeds; `origin/main` contains **both** shards.
+4. `merge_shards` on either clone after pull → identical `index.jsonl` (byte-stable, #3973).
+5. Shared session identity → `observed_on` has both machines.
 
 ### Dedicated collector checkout (KD17 / #3942)
 
@@ -1243,39 +1295,45 @@ Logs: paths (portable) + counts only for collect **and** intel CLIs.
 
 ## Implementation notes sufficient for P0
 
-### Files to add/change
+Synced with **KD5–KD21** (#3977). This checklist is the **only** P0/SC-1 acceptance source—do not invent a parallel obsolete list.
 
-1. `agent_sessions/machine_id.py`
-2. `agent_sessions/archive_lock.py` — atomic O_EXCL acquire; dual legacy protocol; PID/mtime stale recovery
-3. `agent_sessions/agent_family.py` — mapping table (hub + all router kinds) + tests
-4. `agent_sessions/collector/{config,health,service,git_ops,coverage,settle}.py`
-5. `agent_sessions/cli.py` — `collect` subcommands; export/prune take lock
-6. `agent_sessions/archive.py` — restamp-on-reuse; stamp on extract; lock integration
-7. `agent_sessions/config.py` + `models.py` — Source optional workload/domain
-8. `config/default_sources.toml` — `[collector]` + Source defaults
-9. `.gitignore` — `.collector/`, `inbox/**`, `!inbox/README.md`, `.router-index.jsonl`
-10. `inbox/README.md` — local-only policy
-11. `scripts/daily-export.sh` + **`.ps1`** thin wrappers
-12. `scripts/systemd/…`
-13. Docs: `COLLECTOR.md`, `AUTOMATION.md`, `MULTI_MACHINE.md`, `OUTPUT_CONTRACT.md` §6
-14. Tests: **simultaneous** lock contenders, restamp-on-reuse, merge identity cases, git allowlist, agent_family (incl. cline/continue_dev/cody/aider/…), health portable paths, PS1/sh invoke collect
-15. `docs/OUTPUT_CONTRACT.md` §6/§9 amendment + consumer audit note
+### Files to add/change (SC-1 / early P0)
 
-### P0 acceptance checklist
+1. `agent_sessions/machine_id.py` — resolve machine id
+2. `agent_sessions/archive_lock.py` — O_EXCL, **owner_token**, **expires_at heartbeat**, runtime-aware reclaim, dual legacy
+3. `agent_sessions/agent_family.py` — hub + all router kinds + tests
+4. `agent_sessions/archive.py` — restamp + **`observed_on` union**; crash-atomic `write_indexes`; **fail-closed** corrupt jsonl (no auto git restore); merge algebra for derived fields
+5. `agent_sessions/cli.py` — export/prune take lock; collect stubs later
+6. `config` / `models` — Source workload/domain; optional catalog keys in contract docs
+7. `.gitignore` — `.collector/`, `inbox/**`, `!inbox/README.md`, `.router-index.jsonl`
+8. `inbox/README.md`, `OUTPUT_CONTRACT.md` §6/§9, `MULTI_MACHINE.md` notes
+9. Tests listed below
 
-- [ ] `collect run` exports same sessions as `export --all` on fixtures.
-- [ ] **Simultaneous** multi-process lock contenders: exactly one critical-section winner; no torn index.
-- [ ] Dual-lock protocol: live legacy lock blocks canonical acquire; stale reclaim works.
-- [ ] Crash-atomic `write_indexes`: temp+fsync+replace; fault between jsonl and INDEX → rebuild INDEX; partial temp does not corrupt final.
-- [ ] Reuse path restamps missing `machine_id`/`workload_kind`/`domain`/`agent_family`; index may dirty git when fields fill.
-- [ ] Merge tests: same session_id different sha256 → two rows; path supersede works; machine_id not in key.
-- [ ] Contract §6/§9 amendment landed; **C1–C8** consumer + cross-repo checklist evidenced in SC-1 PR body (hub goldens + router contract suite).
-- [ ] git_ops stages only allowlist; test fails if staging `.router-index.jsonl` attempted.
-- [ ] ps1 and sh both invoke collect (guardrails in Python).
-- [ ] Health paths are portable.
+(SC-2+: collector package, git_ops, dedicated checkout, SC-MW reconciliation, SC-6 inbox—not all required to call SC-1 done.)
+
+### P0 / SC-1 acceptance checklist
+
+- [ ] `collect run` / `export --all` parity on fixtures (when collect exists; else export path).
+- [ ] **Lock:** simultaneous multi-process contenders → one winner.
+- [ ] **Lock:** owner_token release; late-release after reclaim does not unlink successor.
+- [ ] **Lock:** foreign-runtime owner with **renewed** lease past nominal timeout **retains** exclusion (#3974).
+- [ ] **Lock:** dual-check legacy `.daily-export.lock`.
+- [ ] **Crash-atomic** write_indexes: temp+fsync+replace; between-file fault rebuilds INDEX only.
+- [ ] **Fail-closed:** corrupt jsonl → hard error, bytes preserved; **no** git checkout of index on collect start (#3941).
+- [ ] **Restamp:** reuse unions `observed_on`; sets workload/domain/family; does not drop foreign observations.
+- [ ] **Merge:** same session_id+sha256 from two machines → one row, `observed_on` has both; derived `machine_id = min(observed_on)` (#3939/#3973).
+- [ ] **Merge:** session_id same, sha256 differs → two rows; path supersede still works; machine fields not in identity key.
+- [ ] Contract §6/§9 amendment; **C1–C8** evidenced (C2: status groups by **`observed_on`**, not scalar-only).
+- [ ] git stage allowlist: `archive/index.jsonl`, `archive/INDEX.md` (and later `archive/shards/*` for SC-MW)—never `.router-index.jsonl`.
+- [ ] Health paths portable.
 - [ ] Router merge still works.
-- [ ] Coverage/ruff/mypy green.
-- [ ] Docs: Forgejo push remote expectation; lock; inbox privacy for P1 path already gitignored.
+- [ ] Coverage/ruff/mypy green; PII clean (no `*.ts.net` in tracked docs).
+
+### SC-2+ checklist pointers (not SC-1)
+
+- Dedicated checkout doctor (KD17); full export every poll no root-mtime (KD21); single-publisher git until SC-MW.
+- SC-MW: reconciliation state machine + forced push-reject recovery (#3972); byte-identical merge under two machine ids (#3973).
+- SC-6: identity map ambiguity anchors (#3976); ZIP ratio `uncompressed/compressed` (#3975).
 
 ### Service unit sketch (Linux)
 
@@ -1371,12 +1429,12 @@ Effort: **S** &lt; ~1 day, **M** ~1–3 days, **L** multi-day. Each PR independe
 - **Description:** Allowlist stage; no force; `push` default true only for designated publisher machines.
 - **Effort:** M
 
-### SC-MW / PR — Multi-writer shards + convergence test (L)
+### SC-MW / PR — Multi-writer shards + reconciliation + convergence test (L)
 
-- **Title:** `feat(archive): per-machine catalog shards and deterministic merge`
-- **Files:** shard write/merge, git stage allowlist includes `archive/shards/*`, two-clone integration test, MULTI_MACHINE.md
+- **Title:** `feat(archive): catalog shards, deterministic merge, git reconciliation loop`
+- **Files:** shard write/merge, `git_ops` reconciliation state machine (fetch/reset-allowlist/re-apply/CAS push), allowlist `archive/shards/*`, two-clone integration test with **forced push rejection**, MULTI_MACHINE.md
 - **Dependencies:** SC-2b
-- **Description:** KD15. **Blocks fleet multi-machine push.** Concurrent push must not wedge.
+- **Description:** KD15 + #3972/#3973. Shards alone are insufficient—must recover after non-ff. Byte-identical merge under two executor machine ids.
 - **Effort:** L
 
 ### SC-3 / PR3 — Thin shells + dedicated-checkout systemd (S)
@@ -1485,6 +1543,7 @@ flowchart TB
 - `2026-08-01` — Tighten residual review gaps: SC-1 cross-repo conformance checklist C1–C8 (hub + router goldens); vendor-ID fallback chain + numbered multi-file export handling; Review findings disposition matrix.
 - `2026-08-01` — PII: remove tailnet hostname from progress tracker link.
 - `2026-08-01` — Review #349 (8 P1s): multi-writer shards (KD15); `observed_on` merge algebra (KD16); owner_token locks (KD11); fail-closed recovery (KD18); dedicated checkout (KD17); safe ZIP (KD19); stable identity map (KD20); no root-mtime skip (KD21).
+- `2026-08-01` — Review #351 final pass: git reconciliation state machine (#3972); deterministic merge_shards independent of executor (#3973); renewable lock lease/heartbeat (#3974); zip bomb ratio formula (#3975); identity-map ambiguity + importer policy (#3976); P0 checklist resynced to KD15–KD21 (#3977).
 
 ---
 
@@ -1517,7 +1576,18 @@ Maps each Forgejo review finding to the design text that incorporates it. Inline
 | **#3944** | P1 | Stable fallback identity across edits | **KD20**; identity map; canonicalization v1 | **In design** |
 | **#3945** | P1 | Remove root-mtime shortcut | **KD21**; collect watch algorithm | **In design** |
 
-Implementation remains out of scope for #142 (docs-only).
+### Pass 3 (review #351 @ `089ff39` — final)
+
+| Finding ID | Severity | Ask | Incorporated in | Status |
+| --- | --- | --- | --- | --- |
+| **#3972** | P1 | Shards ≠ ff; need reconciliation state machine | KD15 rewrite; SC-MW steps 1–8; forced-reject acceptance | **In design** |
+| **#3973** | P1 | merge_shards must not stamp executor machine_id | KD16; derived `machine_id=min(observed_on)`; byte-identical test | **In design** |
+| **#3974** | P1 | Fixed timeout not a lease; heartbeat | KD11 `expires_at` + renew; foreign reclaim rules | **In design** |
+| **#3975** | P1 | Zip bomb ratio direction | KD19 formula `uncompressed/max(1,compressed) <= max_ratio` | **In design** |
+| **#3976** | P2 | Identity map ambiguity / multi-importer | Composite fingerprint + anchors; designated importer v1 | **In design** |
+| **#3977** | P2 | P0 checklist drift vs KD15–21 | Implementation notes + checklist rewritten | **In design** |
+
+Implementation remains out of scope for #142 (docs-only). D0 is ready to merge when CI/process allows; SC-* implement the design.
 
 ---
 
