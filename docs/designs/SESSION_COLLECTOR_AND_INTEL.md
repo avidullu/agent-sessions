@@ -1,6 +1,6 @@
 # Session Collector, Non-Code Archive Extension, and Session-Intel
 
-> **Status:** `IN PROGRESS` — design landed on branch; implementation not started · **Owner:** `avidullu` · **Created:** `2026-08-01` · **Last updated:** `2026-08-01`
+> **Status:** `IN PROGRESS` — design on PR #142; all review findings incorporated in doc; implementation not started · **Owner:** `avidullu` · **Created:** `2026-08-01` · **Last updated:** `2026-08-01`
 > **Lifecycle:** `DRAFT → IN PROGRESS → DONE → ARCHIVED` (archive to `docs/archives/` when DONE)
 > **Tracking anchors:** § Progress tracker is the **source of truth**; indexed in `docs/README.md`; pointer in avis-agents-xdsync `memory/agent-sessions/session-handoff.md`.
 > **Relation to existing docs:** extends `OUTPUT_CONTRACT.md`, `MULTI_MACHINE.md`, `AUTOMATION.md`, `COMPOSE_STACK.md`, `ENGINEERING_BASELINE.md`; peer of engineering baseline (does not replace it).
@@ -185,7 +185,7 @@ Skill proposals that include excerpts are **inherently machine-local**; git-trac
 | **KD2** | **Collector evolves daily-export; `git_ops` is the canonical guardrail implementation** (branch, clean tree, lock, allowlisted stage paths, commit, push). Both `daily-export.sh` and **`.ps1` become thin** wrappers to `collect run`. PS1 is currently under-guarded; P0 closes that gap. Stage **only** `archive/index.jsonl` + `archive/INDEX.md` (never `git add -- archive/`). | Single implementation of safety; Windows parity; avoid staging `.router-index.jsonl` or other archive noise. |
 | **KD3** | **Router auto-watch and collector complement; collector does not subsume the router.** | Router owns VS Code storage parsers; collector owns CLI stores + system-wide schedule; hub merges `.router-index.jsonl` as today. |
 | **KD4** | **Synthesis subsystem name: `session-intel`** (`session_intel/`, CLI `agent-archive intel …`). | Avoids `agentforge` and engineering `baseline`. |
-| **KD5** | **Contract policy amendment, still labeled `format_version: 1` for Markdown.** Active `OUTPUT_CONTRACT.md` §9 today says any change that alters the §6 schema is a **version bump** `[verified]`. That conflicts with “just emit optional keys.” **PR1 must first amend §6 and §9** as follows: (1) §6 lists optional keys `machine_id`, `workload_kind`, `domain`, `agent_family` as **MAY** be present; (2) §9 gains an explicit rule: *additive optional keys whose absence is equivalent to the documented read-default, and which consumers MUST ignore if unknown, do **not** require a format_version bump*; required-key changes, Markdown §2 byte changes, or feeder naming breaks **do** bump and get `v2/` goldens. **No** per-record `format_version`. **No** human “catalog v1.1” product label. **Downstream audit (required before merge of PR1):** hub JSON merge/readers ignore unknown keys; baseline/status only touch known fields or tolerate extras; router conformance goldens remain Markdown + required §6 keys only (feeder need not emit optional keys). Cross-repo: no router TypeScript change required for optional keys. Alternative rejected: full `format_version: 2` with required nullables — forces feeder golden churn without benefit. | Honest vs active §9; preserves feeder Markdown goldens. |
+| **KD5** | **Contract policy amendment, still labeled `format_version: 1` for Markdown.** Active `OUTPUT_CONTRACT.md` §9 today says any change that alters the §6 schema is a **version bump** `[verified]`. That conflicts with “just emit optional keys.” **PR1 / SC-1 must first amend §6 and §9** as follows: (1) §6 lists optional keys `machine_id`, `workload_kind`, `domain`, `agent_family` as **MAY** be present; (2) §9 gains an explicit rule: *additive optional keys whose absence is equivalent to the documented read-default, and which consumers MUST ignore if unknown, do **not** require a format_version bump*; required-key changes, Markdown §2 byte changes, or feeder naming breaks **do** bump and get `v2/` goldens. **No** per-record `format_version`. **No** human “catalog v1.1” product label. **Downstream consumer audit + cross-repo conformance (blocking for SC-1 merge):** see § Schema extension + contract policy checklist (hub + router). Alternative rejected: full `format_version: 2` with required nullables — forces feeder golden churn without benefit. | Honest vs active §9; preserves feeder Markdown goldens. |
 | **KD6** | **`machine_id` is explicit, stable, machine-local**, from `AGENT_ARCHIVE_MACHINE_ID` else config else hostname slug; never a username; **never part of merge identity**. | Implements `MULTI_MACHINE.md` future without changing dedupe. |
 | **KD7** | **`workload_kind` + `domain` are first-class optional catalog fields from the first schema PR.** **Read path:** missing `domain` → `""` (unknown); missing `workload_kind` → treat as `"code"` only when filtering for backward compatibility with today’s corpus. **Write path:** coding Source defaults stamp `workload_kind=code`, `domain=engineering`; chat/inbox stamps `chat` + empty or vendor domain. | Prevents dual defaults; empty domain is correct for non-code. |
 | **KD8** | **Skill/routine proposals are propose-only** (#86 D7 spirit). P2 v1 **creates new skill directories only**; marker-update of existing skills is stretch. Never write `avis-agents-xdsync/memory/**`. | Minimizes clobber risk. |
@@ -505,12 +505,27 @@ Markdown §2 **unchanged** (existing `tests/fixtures/contract/v1/` Markdown gold
 
 **Active contract conflict `[verified]`:** `OUTPUT_CONTRACT.md` §9 currently states that a change which alters the §6 schema is a version bump. §6 today has **no** MAY/ignore-unknown extension point. Emitting new keys under the *unamended* contract would be a silent policy violation.
 
-**Required PR1 ordering (blocking):**
+**Required SC-1 ordering (blocking — not implicit):**
 
 1. Amend `docs/OUTPUT_CONTRACT.md` §6: document the optional keys table below; state consumers **MUST ignore unknown keys**.
 2. Amend §9: carve out **additive optional keys** (absence ≡ read-default) as **not** requiring `format_version` bump; keep bump rule for Markdown bytes, required keys, §4/§5 naming breaks.
-3. Consumer audit checklist in PR1 description (hub merge, status, baseline, rules ledger, router goldens).
-4. **Then** hub producers may stamp optional keys. Router continues to omit them until optional later work.
+3. Complete the **downstream consumer audit + cross-repo conformance checklist** (below) and paste evidence into the SC-1 PR body.
+4. **Then** hub producers may stamp optional keys. Router continues to **omit** them (no TypeScript change required for SC-1).
+
+**Downstream consumer audit + cross-repo conformance checklist (SC-1):**
+
+| # | Consumer / repo | Check | Pass criterion |
+| --- | --- | --- | --- |
+| C1 | Hub `merge_index_records` / `read_jsonl_dicts` | Extra JSON keys round-trip | Unknown keys preserved or ignored without crash; merge identity unchanged |
+| C2 | Hub `archive_status` / status CLI | Reads catalog | No KeyError on missing optional keys; grouping by `machine_id` treats absent as unknown |
+| C3 | Hub baseline / rules ledger / redaction paths | Index iteration | Only required keys assumed; optional keys ignored if unused |
+| C4 | Hub `tests/test_output_contract.py` + `tests/fixtures/contract/v1/` | Markdown §2 goldens | **Byte-identical** after §6/§9 doc change (Markdown unchanged) |
+| C5 | Hub unit tests for optional keys | Stamp/restamp | Present when written; absent rows still valid |
+| C6 | **Router** `avidullu/agent-session-router` | Vendored contract goldens / `npm test` contract suite | Still green **without** emitting optional keys; Markdown renderer unchanged |
+| C7 | Router → hub merge | Fixture `.router-index.jsonl` without optional keys | Hub export merges as today |
+| C8 | Docs | `OUTPUT_CONTRACT.md` §8 kind registry | Optional note that optional catalog keys are hub-stamped; feeders MAY omit |
+
+SC-1 is **not mergeable** until C1–C8 are checked (or explicitly waived with owner note). This is the “cross-repo conformance coverage” required by review #3865.
 
 **No** per-record `format_version`. **No** “catalog v1.1” product label.
 
@@ -637,20 +652,45 @@ Introduce an explicit **bundle expander** stage (not a silent overload of single
 
 | Field | Rule |
 | --- | --- |
-| `metadata.session_id` | Vendor conversation id when present (e.g. ChatGPT `conversation_id` / `id`); else stable hash of vendor id fields; **never** the bundle filename alone. |
+| `metadata.session_id` | See **vendor-ID resolution** below. **Never** the bulk bundle filename alone. |
 | `source_file` | Path to the **materialized** per-conversation file (portable `~` form in catalog), **not** only the bulk `conversations.json`. |
-| `sha256` | Digest of the **materialized conversation payload bytes** (canonical JSON serialization of that conversation). Re-import of an unchanged conversation → same digest → reuse/skip. Changing one chat in a re-export updates **only that** row. |
+| `sha256` | Digest of the **materialized conversation payload bytes** (canonical JSON serialization of that conversation only). Re-import of an unchanged conversation → same digest → reuse/skip. Changing one chat in a re-export updates **only that** row. Whole-bundle hash is **never** used as the catalog digest. |
 | Merge key | Existing `index_identity_key`: `("session", session_id, sha256)` when both set. |
+
+**Vendor-ID resolution (stable fallback chain)** — applied per conversation object during Expand:
+
+1. Prefer first non-empty among vendor fields (adapter-specific, ordered): e.g. ChatGPT `conversation_id`, `id`, `uuid`.
+2. Else if the conversation has a stable vendor `create_time`/`update_time` **and** a non-empty title/slug field:  
+   `session_id = "import-{vendor}-" + sha256(f"{create_time}|{title}")[:16]` (deterministic).
+3. Else: `session_id = "import-{vendor}-" + sha256(canonical_conversation_json)[:16]`  
+   (content-addressed; may change if vendor rewrites history without id — acceptable last resort; log at warn).
+4. Materialized filename uses the resolved `session_id` (filesystem-safe slug), so re-expand of the same export lands on the same path → path-key upsert still works if session_id were ever empty (should not happen after step 3).
+
+**Bundle discovery shapes (Expand input):**
+
+| Pattern | Handling |
+| --- | --- |
+| Single `conversations.json` | Expand all elements of the conversations array/object map |
+| Numbered parts (`conversations-001.json`, …) for large accounts | Expand each file; de-dupe by resolved `session_id` across parts |
+| Vendor zip of the above | Unzip to temp under `.collector/`, then same rules |
+| One conversation per file already | Materialize is copy/normalize; still one catalog row per file |
 
 **Idempotent `processed/` replay:**
 
-1. Expand bundle → materialize conversations.
-2. For each unit: if index already has `(session_id, sha256)` match, skip extract/render (count as skipped).
-3. If session_id exists with **different** sha256, re-export (new digest → distinct or path-supersede via materialize path upsert).
-4. Only when every unit is exported or skipped-as-unchanged: move original bundle to `inbox/processed/` and record a small `.collector/inbox-receipts/{bundle_sha}.json` (list of conversation ids + digests) for operator debugging.
-5. Re-dropping the same export into `inbox/` after process: receipt + digests make the run a no-op.
+1. Expand bundle → materialize conversations (stable paths from session_id).
+2. For each unit: if index already has session-key `(session_id, sha256)` match, skip extract/render (count as skipped).
+3. If session_id exists with **different** sha256, re-export (new digest → distinct session-key rows or path-supersede via same materialize `source_file`).
+4. Only when every unit is exported or skipped-as-unchanged: move original bundle to `inbox/processed/` and write `.collector/inbox-receipts/{bundle_content_sha}.json` listing `{session_id, sha256, materialize_path}` for operator debugging.
+5. Re-dropping the same export into `inbox/`: receipt + digests → no-op (0 new rows).
+6. Partial failure: **do not** move to `processed/`; leave original in place; next collect retries.
 
-PR6 acceptance must include fixtures for: multi-conversation bundle → N catalog rows; second import of identical bundle → 0 new rows; one conversation edited → one row updates.
+**SC-6 / PR6 acceptance fixtures (required):**
+
+- Multi-conversation bundle → **N** catalog rows (N > 1).
+- Second import of identical bundle → **0** new rows.
+- One conversation edited in a re-export → **exactly one** row updates.
+- Conversation missing vendor id → fallback session_id stable across two expands of the same payload.
+- Numbered multi-file export → de-duped union, no double rows for the same conversation_id.
 
 ### P1 source strategy (honest gaps)
 
@@ -1064,7 +1104,7 @@ Logs: paths (portable) + counts only for collect **and** intel CLIs.
 - [ ] Crash-atomic `write_indexes`: temp+fsync+replace; fault between jsonl and INDEX → rebuild INDEX; partial temp does not corrupt final.
 - [ ] Reuse path restamps missing `machine_id`/`workload_kind`/`domain`/`agent_family`; index may dirty git when fields fill.
 - [ ] Merge tests: same session_id different sha256 → two rows; path supersede works; machine_id not in key.
-- [ ] Contract §6/§9 amendment landed; consumer audit checklist checked in PR1.
+- [ ] Contract §6/§9 amendment landed; **C1–C8** consumer + cross-repo checklist evidenced in SC-1 PR body (hub goldens + router contract suite).
 - [ ] git_ops stages only allowlist; test fails if staging `.router-index.jsonl` attempted.
 - [ ] ps1 and sh both invoke collect (guardrails in Python).
 - [ ] Health paths are portable.
@@ -1143,7 +1183,7 @@ Effort: **S** &lt; ~1 day, **M** ~1–3 days, **L** multi-day. Each PR independe
 - **Title:** `feat(archive): optional catalog fields, machine_id, restamp, atomic lock, crash-safe indexes`
 - **Files:** `OUTPUT_CONTRACT.md` (§6 optional keys + §9 additive-key carve-out), `machine_id.py`, `archive_lock.py` (O_EXCL), `agent_family.py` (hub **and** router kinds), `models.py`, `config.py`, `archive.py` (`write_indexes` / `write_text_if_changed` → temp+fsync+replace; INDEX rebuild helper), `cli.py`, `default_sources.toml`, `.gitignore`, `inbox/README.md`, `MULTI_MACHINE.md`, tests (simultaneous lock, fault-injection catalog pair, restamp, merge, agent_family)
 - **Dependencies:** D0
-- **Description:** Amend contract policy **first**, then stamp/restamp fields. Atomic shared lock on export/prune. Crash-atomic catalog pair with `index.jsonl` as SoT. Inbox gitignore early. Source TOML workload/domain defaults included. Consumer audit in PR body.
+- **Description:** Amend contract policy **first**, then stamp/restamp fields. Atomic shared lock on export/prune. Crash-atomic catalog pair with `index.jsonl` as SoT. Inbox gitignore early. Source TOML workload/domain defaults included. **PR body must attach C1–C8 consumer/cross-repo checklist evidence** (hub goldens + router contract suite still green without optional keys).
 - **Effort:** L
 
 ### SC-2a / PR2a — Collector run without git (M)
@@ -1265,6 +1305,25 @@ flowchart TB
 - `2026-08-01` — Initial design (rev 1–2); design-review consensus; open-question defaults accepted.
 - `2026-08-01` — Address PR #142 review: atomic O_EXCL lock + dual protocol; explicit OUTPUT_CONTRACT §6/§9 policy amendment; tracked-project lifecycle + progress table + DoD; inbox multi-conversation expand/materialize identity; full router `agent_family` map (cline, continue_dev, cody, aider, tabby, codeium, amazon_q).
 - `2026-08-01` — Address review #345: crash-atomic catalog writes (temp+fsync+`os.replace`), `index.jsonl` source of truth, INDEX rebuild after interrupted pair, fault-injection tests (KD14).
+- `2026-08-01` — Tighten residual review gaps: SC-1 cross-repo conformance checklist C1–C8 (hub + router goldens); vendor-ID fallback chain + numbered multi-file export handling; Review findings disposition matrix.
+
+---
+
+## Appendix R — Review findings disposition (PR #142)
+
+Maps each Forgejo review finding to the design text that incorporates it. Inline replies on the PR are pointers; **this matrix is authoritative**.
+
+| Finding ID | Severity | Ask | Incorporated in | Status |
+| --- | --- | --- | --- | --- |
+| **#3864** | P1 | Atomic lock acquisition; dual-lock as one protocol; simultaneous contender tests | KD11; § Shared archive write lock → Atomic acquisition; P0 acceptance | **In design** |
+| **#3865** | P1 | Resolve active §9 vs optional keys; policy change + consumer audit + **cross-repo** conformance before emit | KD5; § Schema extension + contract policy; checklist **C1–C8** (incl. router goldens C6–C7) | **In design** |
+| **#3866** | P1 | Canonical tracked-project doc: lifecycle, progress SoT, DoD, changelog | Header lifecycle; § Progress tracker; § Definition of done; Changelog; docs/README index | **In design** |
+| **#3867** | P2 | Map router kinds cline / continue_dev / cody / aider (not only Copilot/DeepSeek/Gemini) | § `agent_family` mapping table (full router set + generic kinds) | **In design** |
+| **#3868** | P1 | Per-conversation split for bulk exports; stable vendor-ID fallback; per-conversation digest; idempotent processed/ | § P1 inbox importer + multi-session splitting; vendor-ID chain; SC-6 fixtures | **In design** |
+| **#3887** | P1 | Crash-atomic catalog writes + recovery; index.jsonl SoT; INDEX rebuild; fault-injection | KD14; § Crash-atomic catalog writes; SC-1 files/tests; P0 acceptance | **In design** |
+| **PR body** | meta | Stripped inline-code in description | Live PR description repaired on Forgejo | **Fixed on PR** |
+
+Implementation work remains **out of scope** for #142 (docs-only). SC-1 implements lock, crash-atomic write, contract amendment, and fields.
 
 ---
 
