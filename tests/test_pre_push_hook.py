@@ -18,8 +18,23 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HOOK = REPO_ROOT / "scripts" / "pre-push"
 
-BASH = shutil.which("bash")
 GIT = shutil.which("git")
+
+
+def find_bash() -> str | None:
+    """Prefer Git Bash over the unrelated WSL launcher on native Windows."""
+    if os.name == "nt" and GIT is not None:
+        git_path = Path(GIT).resolve()
+        # Git for Windows normally resolves to Git/cmd/git.exe. Its POSIX
+        # shell is Git/bin/bash.exe; System32/bash.exe is the WSL launcher and
+        # cannot consume the native paths used by these subprocess tests.
+        git_bash = git_path.parent.parent / "bin" / "bash.exe"
+        if git_bash.is_file():
+            return str(git_bash)
+    return shutil.which("bash")
+
+
+BASH = find_bash()
 
 requires_bash = pytest.mark.skipif(BASH is None, reason="bash is not available on this platform")
 requires_git = pytest.mark.skipif(BASH is None or GIT is None, reason="bash and git are required")
