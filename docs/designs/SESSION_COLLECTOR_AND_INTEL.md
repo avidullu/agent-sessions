@@ -1141,7 +1141,7 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated · **Deferr
 
 | ID | Deliverable | Depends on | Gated? | Status | PR |
 |----|-------------|-----------|--------|--------|----|
-| D0 | Design + tracked project doc (this file) | — | No | ◐ | [#142](https://avis-pbook.tail651ec3.ts.net/avidullu/agent-sessions/pulls/142) |
+| D0 | Design + tracked project doc (this file) | — | No | ◐ | #142 (Forgejo PR on this repo) |
 | SC-1 | Contract §6/§9 amendment + optional catalog fields + machine_id + restamp-on-reuse + **atomic** shared write lock + **crash-atomic** `write_indexes` (temp+fsync+replace; INDEX rebuild) + inbox gitignore + full agent_family map | D0 | No | ☐ | — |
 | SC-2a | Collector `run`/`status`/`doctor` + health (no git) | SC-1 | No | ☐ | — |
 | SC-2b | git_ops allowlist commit/push | SC-2a | No | ☐ | — |
