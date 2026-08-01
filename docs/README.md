@@ -20,6 +20,7 @@
 | [ENGINEERING_BASELINE.md](ENGINEERING_BASELINE.md) | Baseline architecture |
 | [BASELINE_PLANNING.md](BASELINE_PLANNING.md) | PR-sized implementation plan |
 | [ROADMAP.md](ROADMAP.md) | Future importers and features |
+| [designs/SESSION_COLLECTOR_AND_INTEL.md](designs/SESSION_COLLECTOR_AND_INTEL.md) | **Ready for implementation** — lightweight collector agent, chat/non-code archive extension, and `session-intel` (routines / skill proposals) |
 | [archives/PUBLIC_LAUNCH_TRACKER.md](archives/PUBLIC_LAUNCH_TRACKER.md) | **DONE (archived 2026-07-30 IST)** — launch shipped; L16/L17 **Deferred** → #136 / #137 (not done) |
 | [PROJECT_TRACKER.md](PROJECT_TRACKER.md) | **Fleet export** (slug `agent-sessions-launch`) — **18/20 Complete**, 2 Deferred; historical dashboard |
 | [GETTING_STARTED.md](GETTING_STARTED.md) | 5-minute setup guide covering hub + router end-to-end |
