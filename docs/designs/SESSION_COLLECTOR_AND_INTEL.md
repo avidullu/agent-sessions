@@ -192,6 +192,7 @@ Skill proposals that include excerpts are **inherently machine-local**; git-trac
 | **KD9** | **Redaction reuses exact `baseline_redaction` APIs:** `redact_text` → `RedactionResult`; `result_to_report`; `build_preflight_report` / `RedactionPreflight`; `SCANNER_VERSION = "redaction-v1"`. Refuse publish/git of quote-bearing artifacts when any evidence has `blocked=True` or preflight `blocked > 0`. No invented `scan_text` / `status=allowed` schema. | Implementable against real code. |
 | **KD10** | **Delivery is PR-only, Forgejo-primary.** Collector `git push` uses the checkout’s default remote; operator must set Forgejo as `origin` / `pushDefault`. Hub docs that still say “GitHub” are historical; COLLECTOR/AUTOMATION updates note the invariant without rewriting all docs in P0. | Owner global rules. |
 | **KD11** | **Atomic shared archive write lock** (`O_CREAT\|O_EXCL` exclusive create + dual-legacy protocol + stale PID recovery) for any process that mutates `archive/index.jsonl` / `INDEX.md` / rendered artifacts via hub writers: `collect run`, `collect watch` export steps, CLI `export`, CLI `prune`. Read-only commands are lock-free. Acceptance requires **simultaneous multi-process** contender tests, not sequential-only. | Closes TOCTOU and concurrent corruption. |
+| **KD14** | **Crash-atomic catalog publication:** `write_indexes` (and any collector path that rewrites the pair) uses temp + fsync + `os.replace` per file; **`index.jsonl` is source of truth**; `INDEX.md` is rebuilt if the pair is interrupted. Fault-injection tests required in SC-1. Mutual exclusion alone is insufficient. | Always-on collect increases write frequency; in-place write can truncate. |
 | **KD12** | **session-intel body locality:** fleet-wide miners are **catalog-only**; body-dependent miners run only where local Markdown (or regenerable sources) exist. No body sync in this design (NG5). | Matches OUTPUT_CONTRACT / AUTOMATION local-only policy. |
 | **KD13** | **Restamp-on-reuse is in P0 scope:** when `_can_reuse_record` returns true, shallow-copy prior and `setdefault` additive fields (`machine_id`, `workload_kind`, `domain`, `agent_family`) without changing sha256/markdown/imported_at. If any field value changes, the index write is a real metadata change (may dirty git). Optional `--restamp-catalog-fields` / `migrate catalog-fields` remains as an explicit full pass. | Continuous collect converges tags without waiting for session file edits. |
 
@@ -362,6 +363,35 @@ After PR3 deprecates shell-only locking, drop writing the legacy file but keep *
 4. Dual-lock: holding only legacy blocks canonical acquire; holding only canonical blocks a synthetic legacy-only contender.
 
 **Success metric wording:** Catalog corruption zero **requires** this atomic lock on index writers—not “document that collect holds lock.”
+
+#### Crash-atomic catalog writes (mutual exclusion is not enough)
+
+`[verified]` Today `write_indexes` builds full text then calls `write_text_if_changed`, which opens the **final path** and writes in place when content differs (`archive.py::write_indexes` / `write_text_if_changed`). That is fine under a lock for **concurrency**, but a SIGKILL, power loss, or I/O error mid-write can **truncate** `archive/index.jsonl` or leave `index.jsonl` and `INDEX.md` as an inconsistent pair. Always-on collect raises write frequency, so SC-1 must harden this.
+
+**Required write protocol for each catalog file** (`index.jsonl`, then `INDEX.md`):
+
+1. Write full content to a sibling temp file in the same directory (e.g. `index.jsonl.tmp.{pid}` or `index.jsonl.{nonce}.tmp`).
+2. `flush` + `os.fsync(fd)` (or platform equivalent) before close.
+3. **Atomic replace** onto the final name: `os.replace(tmp, final)` (POSIX rename; on Windows `os.replace` overwrites destinaton atomically when on the same volume).
+4. Best-effort fsync of the parent directory after replace where the OS allows (document Linux yes / Windows best-effort).
+
+**Pair ordering and recovery:**
+
+| Rule | Spec |
+| --- | --- |
+| Source of truth | **`archive/index.jsonl` is authoritative.** `INDEX.md` is a derived human view. |
+| Order | Always publish `index.jsonl` via temp+replace **first**, then rebuild and temp+replace `INDEX.md`. |
+| Interrupted after jsonl, before INDEX | Next `export`/`collect`/`doctor --repair-index` regenerates `INDEX.md` from `index.jsonl` without requiring source re-extraction. |
+| Truncated / invalid jsonl | `doctor` / collect start: detect empty file, non-JSONL lines majority, or failed parse; refuse silent partial merge; restore from last good git blob if the file is tracked and dirty, else surface hard error + keep `.tmp` / backup if present. Prefer: if `index.jsonl.tmp.*` exists from crashed writer and final is empty/corrupt, offer recovery path in doctor. |
+| Unchanged content | Keep “skip write if identical” optimization **only after** hashing/comparing; when writing, still use temp+replace (never truncate-in-place). |
+
+**Tests (SC-1):**
+
+1. Fault-injection: kill/simulate crash **between** jsonl replace and INDEX replace → next run rebuilds INDEX from jsonl; catalog rows preserved.
+2. Fault-injection: interrupt **during** temp write (leave partial `.tmp`, final untouched) → final catalog unchanged; next run succeeds.
+3. Optional: monkeypatch open/write to raise mid-write on final path must **not** be used once protocol is temp-only (assert no direct truncate of final paths in unit tests of the writer helper).
+
+This pairs with the exclusive lock: lock = one writer; temp+replace = crash safety.
 
 ### CollectorConfig load path (Issue 15)
 
@@ -865,6 +895,10 @@ Reject — cost/privacy/nondeterminism; deterministic first.
 
 Change registry to `Callable[[Path], Iterable[ExtractedSession]]` for all sources. **Defer** (wide blast radius). **Chosen for P1:** expand → materialize → existing single-session extractors.
 
+### 12. Rely on lock alone without crash-atomic file replace
+
+**Reject** — lock prevents concurrent writers only; in-place `write_text_if_changed` can still truncate on crash (`write_indexes` today). **Chosen:** temp + fsync + `os.replace` per catalog file + INDEX rebuild (KD14).
+
 ---
 
 ## Security & Privacy Considerations
@@ -876,6 +910,7 @@ Change registry to `Callable[[Path], Iterable[ExtractedSession]]` for all source
 | Secrets in intel proposals | High | `redact_text` / preflight; default session_id-only evidence in git |
 | Health file absolute user paths | Medium | **Require** `portable_path` on all paths in health.json |
 | Concurrent catalog writers | High | **Atomic** shared write lock (O_EXCL) on export/collect/prune; dual legacy protocol |
+| Crash mid-catalog write / torn pair | High | Temp+fsync+`os.replace`; `index.jsonl` SoT; rebuild `INDEX.md`; fault-injection tests |
 | Dirty/wrong branch push | Medium | git_ops branch + clean tree (both OS wrappers) |
 | Skill publish clobber | High | New skill dir only; never memory/ |
 | Broad `git add archive/` stages router sidecar | Medium | Allowlist; gitignore `.router-index.jsonl` |
@@ -1026,6 +1061,7 @@ Logs: paths (portable) + counts only for collect **and** intel CLIs.
 - [ ] `collect run` exports same sessions as `export --all` on fixtures.
 - [ ] **Simultaneous** multi-process lock contenders: exactly one critical-section winner; no torn index.
 - [ ] Dual-lock protocol: live legacy lock blocks canonical acquire; stale reclaim works.
+- [ ] Crash-atomic `write_indexes`: temp+fsync+replace; fault between jsonl and INDEX → rebuild INDEX; partial temp does not corrupt final.
 - [ ] Reuse path restamps missing `machine_id`/`workload_kind`/`domain`/`agent_family`; index may dirty git when fields fill.
 - [ ] Merge tests: same session_id different sha256 → two rows; path supersede works; machine_id not in key.
 - [ ] Contract §6/§9 amendment landed; consumer audit checklist checked in PR1.
@@ -1066,7 +1102,7 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated · **Deferr
 | ID | Deliverable | Depends on | Gated? | Status | PR |
 |----|-------------|-----------|--------|--------|----|
 | D0 | Design + tracked project doc (this file) | — | No | ◐ | [#142](https://avis-pbook.tail651ec3.ts.net/avidullu/agent-sessions/pulls/142) |
-| SC-1 | Contract §6/§9 amendment + optional catalog fields + machine_id + restamp-on-reuse + **atomic** shared write lock + inbox gitignore + full agent_family map | D0 | No | ☐ | — |
+| SC-1 | Contract §6/§9 amendment + optional catalog fields + machine_id + restamp-on-reuse + **atomic** shared write lock + **crash-atomic** `write_indexes` (temp+fsync+replace; INDEX rebuild) + inbox gitignore + full agent_family map | D0 | No | ☐ | — |
 | SC-2a | Collector `run`/`status`/`doctor` + health (no git) | SC-1 | No | ☐ | — |
 | SC-2b | git_ops allowlist commit/push | SC-2a | No | ☐ | — |
 | SC-3 | Thin daily-export sh **and** ps1 + systemd sketches + Forgejo push note | SC-2b | No | ☐ | — |
@@ -1088,6 +1124,7 @@ Every implementation PR updates **its own row** (status + PR link) and the Chang
 - [ ] All non-Deferred rows above are ☑ or explicitly **Deferred** with linked issues (not labeled Complete).
 - [ ] P0 acceptance checklist satisfied on at least one Linux host; Windows ps1 path exercised or gap filed.
 - [ ] Atomic lock proven with simultaneous multi-process test.
+- [ ] Crash-atomic catalog writes proven with fault-injection (between-file and mid-temp); `index.jsonl` recovery rebuilds `INDEX.md`.
 - [ ] OUTPUT_CONTRACT §6/§9 amendment merged; Markdown v1 goldens still pass hub + router.
 - [ ] Inbox tree cannot be git-tracked except README; doctor warns otherwise.
 - [ ] P1 multi-conversation fixtures green; identity is per conversation.
@@ -1101,12 +1138,12 @@ Every implementation PR updates **its own row** (status + PR link) and the Chang
 
 Effort: **S** &lt; ~1 day, **M** ~1–3 days, **L** multi-day. Each PR independently reviewable. IDs match the progress tracker.
 
-### SC-1 / PR1 — Contract amendment + catalog fields + restamp + atomic lock (L)
+### SC-1 / PR1 — Contract amendment + catalog fields + restamp + atomic lock + crash-safe indexes (L)
 
-- **Title:** `feat(archive): optional catalog fields, machine_id, restamp, atomic write lock`
-- **Files:** `OUTPUT_CONTRACT.md` (§6 optional keys + §9 additive-key carve-out), `machine_id.py`, `archive_lock.py` (O_EXCL), `agent_family.py` (hub **and** router kinds), `models.py`, `config.py`, `archive.py`, `cli.py`, `default_sources.toml`, `.gitignore`, `inbox/README.md`, `MULTI_MACHINE.md`, tests (simultaneous lock, restamp, merge, agent_family)
+- **Title:** `feat(archive): optional catalog fields, machine_id, restamp, atomic lock, crash-safe indexes`
+- **Files:** `OUTPUT_CONTRACT.md` (§6 optional keys + §9 additive-key carve-out), `machine_id.py`, `archive_lock.py` (O_EXCL), `agent_family.py` (hub **and** router kinds), `models.py`, `config.py`, `archive.py` (`write_indexes` / `write_text_if_changed` → temp+fsync+replace; INDEX rebuild helper), `cli.py`, `default_sources.toml`, `.gitignore`, `inbox/README.md`, `MULTI_MACHINE.md`, tests (simultaneous lock, fault-injection catalog pair, restamp, merge, agent_family)
 - **Dependencies:** D0
-- **Description:** Amend contract policy **first**, then stamp/restamp fields. Atomic shared lock on export/prune. Inbox gitignore early. Source TOML workload/domain defaults included (schema-complete write path). Consumer audit in PR body.
+- **Description:** Amend contract policy **first**, then stamp/restamp fields. Atomic shared lock on export/prune. Crash-atomic catalog pair with `index.jsonl` as SoT. Inbox gitignore early. Source TOML workload/domain defaults included. Consumer audit in PR body.
 - **Effort:** L
 
 ### SC-2a / PR2a — Collector run without git (M)
@@ -1227,6 +1264,7 @@ flowchart TB
 
 - `2026-08-01` — Initial design (rev 1–2); design-review consensus; open-question defaults accepted.
 - `2026-08-01` — Address PR #142 review: atomic O_EXCL lock + dual protocol; explicit OUTPUT_CONTRACT §6/§9 policy amendment; tracked-project lifecycle + progress table + DoD; inbox multi-conversation expand/materialize identity; full router `agent_family` map (cline, continue_dev, cody, aider, tabby, codeium, amazon_q).
+- `2026-08-01` — Address review #345: crash-atomic catalog writes (temp+fsync+`os.replace`), `index.jsonl` source of truth, INDEX rebuild after interrupted pair, fault-injection tests (KD14).
 
 ---
 
