@@ -1,17 +1,19 @@
-# Design: Session Collector Agent, Non-Code Workload Archive, and Session-Intel Synthesis
+# Session Collector, Non-Code Archive Extension, and Session-Intel
 
-| Field | Value |
-| --- | --- |
-| **Document title** | Lightweight agent-session collector + non-code workload extension + routine/skill synthesis |
-| **Author** | TBD (design for avidullu / agent-sessions program) |
-| **Date** | 2026-08-01 |
-| **Status** | Ready for implementation (rev 2; review consensus; open-question defaults accepted 2026-08-01) |
-| **Primary repo** | `avidullu/agent-sessions` (Forgejo-primary: `forge:avidullu/agent-sessions.git`; GitHub is backup only per avis-agents-xdsync) |
-| **Companion feeder** | `avidullu/agent-session-router` |
-| **Cross-machine semantics** | `avis-agents-xdsync` (CLAUDE.md, memory/, skills/) |
-| **Related issues** | hub #32 (backfill/regenerate), hub #86 (publish rules / propose-only), router #24 (inject-context spike) — content assumed from local docs, not re-fetched from forge in this design |
+> **Status:** `IN PROGRESS` — design landed on branch; implementation not started · **Owner:** `avidullu` · **Created:** `2026-08-01` · **Last updated:** `2026-08-01`
+> **Lifecycle:** `DRAFT → IN PROGRESS → DONE → ARCHIVED` (archive to `docs/archives/` when DONE)
+> **Tracking anchors:** § Progress tracker is the **source of truth**; indexed in `docs/README.md`; pointer in avis-agents-xdsync `memory/agent-sessions/session-handoff.md`.
+> **Relation to existing docs:** extends `OUTPUT_CONTRACT.md`, `MULTI_MACHINE.md`, `AUTOMATION.md`, `COMPOSE_STACK.md`, `ENGINEERING_BASELINE.md`; peer of engineering baseline (does not replace it).
+> **Honesty note:** claims marked `[verified]` against hub/router code; open product choices marked `[design]`.
+> **Primary repo:** `avidullu/agent-sessions` (Forgejo-primary: `forge:avidullu/agent-sessions.git`; GitHub backup only)
+> **Companion feeder:** `avidullu/agent-session-router`
+> **Related issues:** hub #32 (backfill/regenerate), hub #86 (publish rules / propose-only), router #24 (inject-context spike)
 
 ---
+
+## 0. TL;DR
+
+Ship a **lightweight continuous collector** inside the agent-sessions hub (not a third archive), extend the catalog for **chat / non-code** workloads via an official-export inbox, then add **session-intel** to mine routines and propose skills—without overwriting agent memory. Preserve Output Contract Markdown goldens; amend catalog policy **explicitly** for additive optional keys; use an **atomic** shared write lock. Progress is tracked per PR row below.
 
 ## Overview
 
@@ -76,7 +78,7 @@ This design extends that hub—without inventing a third archive format—along 
 | ID | Goal |
 | --- | --- |
 | G1 | Ship a **lightweight collector** that keeps local agent logs flowing into the existing archive with debounce, health, backoff, and multi-source coverage reporting. |
-| G2 | Preserve **Output Contract `format_version: 1`** byte compatibility for Markdown; document **additive optional catalog keys** that consumers MUST ignore if unknown (still contract v1 — not a semi-version “v1.1”). |
+| G2 | Preserve **Output Contract Markdown §2 goldens** (`format_version: 1` for bodies). For catalog keys: land an **explicit §6/§9 policy amendment** (additive optional keys + ignore-unknown) **before** producers emit them—do not pretend the active contract already allows silent schema growth. |
 | G3 | Make **non-code workloads** and general chat **first-class** in schema and filtering so P2 synthesis is not blocked by re-exports. |
 | G4 | Design **session-intel** (routines / periodic tasks / skill proposals) so contracts and redaction boundaries are correct before implementation, including **catalog-only vs body-local** miner tiers. |
 | G5 | Stay **local-first**: transcripts default local-only; git tracks catalog metadata; multi-machine merge continues via existing identity keys; no body sync (NG5). |
@@ -111,11 +113,12 @@ P0 ships **collector + schema stamping only**. Explicitly **not** in P0 code:
 
 | Surface | Frozen shape |
 | --- | --- |
-| Catalog optional keys | `machine_id`, `workload_kind`, `domain`, `agent_family` (MAY be present; ignore if unknown) |
+| Catalog optional keys | `machine_id`, `workload_kind`, `domain`, `agent_family` (MAY be present; ignore if unknown) — only after §6/§9 amendment |
 | Collect subcommands | `collect run \| watch \| status \| doctor` |
-| Lock path | `.collector/collect.lock` (+ dual-check `.daily-export.lock` until shell fully migrated) |
+| Lock path + protocol | Atomic exclusive-create on `.collector/collect.lock` (+ dual legacy protocol until shell migrated) |
 | Git stage allowlist | `archive/index.jsonl`, `archive/INDEX.md` only |
 | Export contract Markdown | Unchanged v1 goldens |
+| Inbox expand interface | Discover → Expand → Materialize → single-session Extract (P1) |
 
 ---
 
@@ -182,13 +185,13 @@ Skill proposals that include excerpts are **inherently machine-local**; git-trac
 | **KD2** | **Collector evolves daily-export; `git_ops` is the canonical guardrail implementation** (branch, clean tree, lock, allowlisted stage paths, commit, push). Both `daily-export.sh` and **`.ps1` become thin** wrappers to `collect run`. PS1 is currently under-guarded; P0 closes that gap. Stage **only** `archive/index.jsonl` + `archive/INDEX.md` (never `git add -- archive/`). | Single implementation of safety; Windows parity; avoid staging `.router-index.jsonl` or other archive noise. |
 | **KD3** | **Router auto-watch and collector complement; collector does not subsume the router.** | Router owns VS Code storage parsers; collector owns CLI stores + system-wide schedule; hub merges `.router-index.jsonl` as today. |
 | **KD4** | **Synthesis subsystem name: `session-intel`** (`session_intel/`, CLI `agent-archive intel …`). | Avoids `agentforge` and engineering `baseline`. |
-| **KD5** | **Output Contract stays `format_version: 1`.** Additive optional catalog keys are documented in §6 as MAY/ignore-unknown. **Do not** introduce a human “catalog v1.1” semi-version or per-record `format_version` field. Bump contract version only if Markdown bytes or **required** keys change. | Matches `OUTPUT_CONTRACT.md` §9 and feeder goldens; optional keys already work with “ignore unknown.” |
+| **KD5** | **Contract policy amendment, still labeled `format_version: 1` for Markdown.** Active `OUTPUT_CONTRACT.md` §9 today says any change that alters the §6 schema is a **version bump** `[verified]`. That conflicts with “just emit optional keys.” **PR1 must first amend §6 and §9** as follows: (1) §6 lists optional keys `machine_id`, `workload_kind`, `domain`, `agent_family` as **MAY** be present; (2) §9 gains an explicit rule: *additive optional keys whose absence is equivalent to the documented read-default, and which consumers MUST ignore if unknown, do **not** require a format_version bump*; required-key changes, Markdown §2 byte changes, or feeder naming breaks **do** bump and get `v2/` goldens. **No** per-record `format_version`. **No** human “catalog v1.1” product label. **Downstream audit (required before merge of PR1):** hub JSON merge/readers ignore unknown keys; baseline/status only touch known fields or tolerate extras; router conformance goldens remain Markdown + required §6 keys only (feeder need not emit optional keys). Cross-repo: no router TypeScript change required for optional keys. Alternative rejected: full `format_version: 2` with required nullables — forces feeder golden churn without benefit. | Honest vs active §9; preserves feeder Markdown goldens. |
 | **KD6** | **`machine_id` is explicit, stable, machine-local**, from `AGENT_ARCHIVE_MACHINE_ID` else config else hostname slug; never a username; **never part of merge identity**. | Implements `MULTI_MACHINE.md` future without changing dedupe. |
 | **KD7** | **`workload_kind` + `domain` are first-class optional catalog fields from the first schema PR.** **Read path:** missing `domain` → `""` (unknown); missing `workload_kind` → treat as `"code"` only when filtering for backward compatibility with today’s corpus. **Write path:** coding Source defaults stamp `workload_kind=code`, `domain=engineering`; chat/inbox stamps `chat` + empty or vendor domain. | Prevents dual defaults; empty domain is correct for non-code. |
 | **KD8** | **Skill/routine proposals are propose-only** (#86 D7 spirit). P2 v1 **creates new skill directories only**; marker-update of existing skills is stretch. Never write `avis-agents-xdsync/memory/**`. | Minimizes clobber risk. |
 | **KD9** | **Redaction reuses exact `baseline_redaction` APIs:** `redact_text` → `RedactionResult`; `result_to_report`; `build_preflight_report` / `RedactionPreflight`; `SCANNER_VERSION = "redaction-v1"`. Refuse publish/git of quote-bearing artifacts when any evidence has `blocked=True` or preflight `blocked > 0`. No invented `scan_text` / `status=allowed` schema. | Implementable against real code. |
 | **KD10** | **Delivery is PR-only, Forgejo-primary.** Collector `git push` uses the checkout’s default remote; operator must set Forgejo as `origin` / `pushDefault`. Hub docs that still say “GitHub” are historical; COLLECTOR/AUTOMATION updates note the invariant without rewriting all docs in P0. | Owner global rules. |
-| **KD11** | **Shared archive write lock** for any process that mutates `archive/index.jsonl` / `INDEX.md` / rendered artifacts via hub writers: `collect run`, `collect watch` export steps, CLI `export`, CLI `prune`. Read-only (`status`, `doctor`, `discover`, `intel suggest` reads) are lock-free (intel may take a **shared/read** advisory lock later if needed; P2 default: best-effort read). | Closes concurrent corruption; success metric “zero catalog corruption” requires this. |
+| **KD11** | **Atomic shared archive write lock** (`O_CREAT\|O_EXCL` exclusive create + dual-legacy protocol + stale PID recovery) for any process that mutates `archive/index.jsonl` / `INDEX.md` / rendered artifacts via hub writers: `collect run`, `collect watch` export steps, CLI `export`, CLI `prune`. Read-only commands are lock-free. Acceptance requires **simultaneous multi-process** contender tests, not sequential-only. | Closes TOCTOU and concurrent corruption. |
 | **KD12** | **session-intel body locality:** fleet-wide miners are **catalog-only**; body-dependent miners run only where local Markdown (or regenerable sources) exist. No body sync in this design (NG5). | Matches OUTPUT_CONTRACT / AUTOMATION local-only policy. |
 | **KD13** | **Restamp-on-reuse is in P0 scope:** when `_can_reuse_record` returns true, shallow-copy prior and `setdefault` additive fields (`machine_id`, `workload_kind`, `domain`, `agent_family`) without changing sha256/markdown/imported_at. If any field value changes, the index write is a real metadata change (may dirty git). Optional `--restamp-catalog-fields` / `migrate catalog-fields` remains as an explicit full pass. | Continuous collect converges tags without waiting for session file edits. |
 
@@ -300,30 +303,65 @@ inbox/                       # entire tree — see Gitignore
 
 ### Shared archive write lock (KD11)
 
-**Lock file path (canonical):** `{repo_root}/.collector/collect.lock`
+**Lock file path (canonical):** `{repo_root}/.collector/collect.lock`  
+**Legacy path (transition):** `{repo_root}/.daily-export.lock`
 
-**Migration / dual-check (Issue 3):**
+#### Atomic acquisition (required — not check-then-write)
 
-1. On acquire, refuse (or wait) if **either** `.collector/collect.lock` **or** legacy `.daily-export.lock` is fresh (mtime age &lt; `lock_timeout_seconds`).
-2. Write **both** lock files during transition **or** write only `.collector/collect.lock` but still **check** `.daily-export.lock` until all automation is on thin wrappers (same PR as lock introduction + script thin-out: PR2a/PR3).
-3. Prefer **PID liveness** when PID is recorded and `os.kill(pid, 0)` is available; fall back to **mtime stale** semantics matching current shell (300s default) when PID is dead or missing.
+Check-then-write is a TOCTOU race: two processes can both observe “no fresh lock” and both proceed, re-creating interleaved `write_indexes`. **Acquisition MUST be atomic** on every supported platform (Linux, Windows, WSL).
+
+**Primitive (stdlib-first, cross-platform):**
+
+1. Ensure `.collector/` exists (`mkdir -p`, ignore EEXIST).
+2. Attempt **exclusive create** of the lock file:
+   - `fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)` then write payload and `os.close(fd)` (or keep fd open until release if preferred).
+   - On Windows this is supported by Python’s `os.open` with `O_EXCL`.
+3. If `FileExistsError`:
+   - Read payload (best-effort). If **stale** (see below), `os.unlink` the path and **retry exclusive create** (bounded retries).
+   - If **live**, sleep briefly and retry until `lock_timeout_seconds`, then fail non-zero.
+4. Payload (UTF-8 text, one JSON object or simple lines): `pid`, `hostname`, `started_at` (UTC ISO), `owner` (`export` \| `collect` \| `prune`).
+
+**Stale-owner recovery:**
+
+- Prefer **PID liveness**: if payload has `pid` and `os.kill(pid, 0)` raises `ProcessLookupError` / `ESRCH` (or Windows equivalent “no such process”), treat as stale and unlink.
+- Else if payload missing/unreadable and mtime age ≥ `lock_timeout_seconds`, treat as stale.
+- **Never** unlink a lock whose PID is alive.
+
+**Dual-lock transition protocol (one acquire, both names):**
+
+Until all automation uses thin wrappers (through PR3), acquire as **one protocol**:
+
+1. Atomically exclusive-create **canonical** `.collector/collect.lock`.
+2. Atomically exclusive-create **legacy** `.daily-export.lock` (same payload, `owner` field notes dual).
+3. If step 2 fails because legacy is held by a **live** non-us process: release canonical (unlink) and retry from step 1 / wait.
+4. If step 2 fails because legacy is **stale**: unlink legacy, retry step 2.
+5. Hold **both** until release; release unlinks both (best-effort, ignore missing).
+
+After PR3 deprecates shell-only locking, drop writing the legacy file but keep **checking** exclusive-create against legacy for one release if old cron remains (or document “remove dual-write after N days”).
 
 **Who acquires (exclusive, write):**
 
 | Command | Lock? |
 | --- | --- |
 | `collect run` / `collect watch` (during export/git) | Yes exclusive |
-| `agent-archive export` | Yes exclusive (new; library `export_sources` acquires when not already held by collect, or CLI always acquires) |
+| `agent-archive export` | Yes exclusive (CLI always acquires; library path used only under an already-held owner via re-entrant token — see Q9) |
 | `agent-archive prune` | Yes exclusive |
 | `status`, `doctor`, `discover`, baseline/intel reads | No |
 
 **Semantics:**
 
 - Wait up to `lock_timeout_seconds` with short sleep, then fail with clear error (non-zero).
-- Test: second concurrent `export` fails or blocks until timeout then fails; no interleaved `write_indexes`.
-- Health file updates use atomic temp+rename and should also run under the same exclusive lock when written from export path (collect holds lock for whole run).
+- Health file updates use atomic temp+rename under the same exclusive lock when written from export/collect.
+- **Re-entrancy (Q9):** process-local contextvar / thread-local “held” flag so `collect` → `export_sources` does not double-open; nested acquire by the same owner is a no-op.
 
-**Success metric wording:** Catalog corruption zero **requires** this lock on index writers—not “document that collect holds lock.”
+**Acceptance tests (must prove mutual exclusion):**
+
+1. **Simultaneous contenders:** spawn ≥2 processes (e.g. `multiprocessing` / subprocess) that call acquire at the same time; **exactly one** succeeds within the first attempt window; losers wait or fail; only one may enter a critical section that appends to a shared test file / mock `write_indexes`.
+2. Sequential second writer (optional extra) is **not** sufficient alone.
+3. Stale lock with dead PID is reclaimable; live PID is not.
+4. Dual-lock: holding only legacy blocks canonical acquire; holding only canonical blocks a synthetic legacy-only contender.
+
+**Success metric wording:** Catalog corruption zero **requires** this atomic lock on index writers—not “document that collect holds lock.”
 
 ### CollectorConfig load path (Issue 15)
 
@@ -431,9 +469,20 @@ def resolve_machine_id(config_value: str | None = None) -> str:
 2. Path-key older row superseded when same `(source, source_file)` gets new digest.
 3. `machine_id` differs across rows without collapsing them.
 
-### Schema extension (still Output Contract v1)
+### Schema extension + contract policy (KD5)
 
-Markdown §2 **unchanged**. Catalog §6 documents **optional** keys (MAY be present; consumers MUST ignore unknown keys). **No** per-record `format_version`. **No** “catalog v1.1” product version name in contract text—use “additive optional catalog fields (contract remains format_version 1).”
+Markdown §2 **unchanged** (existing `tests/fixtures/contract/v1/` Markdown goldens stay valid).
+
+**Active contract conflict `[verified]`:** `OUTPUT_CONTRACT.md` §9 currently states that a change which alters the §6 schema is a version bump. §6 today has **no** MAY/ignore-unknown extension point. Emitting new keys under the *unamended* contract would be a silent policy violation.
+
+**Required PR1 ordering (blocking):**
+
+1. Amend `docs/OUTPUT_CONTRACT.md` §6: document the optional keys table below; state consumers **MUST ignore unknown keys**.
+2. Amend §9: carve out **additive optional keys** (absence ≡ read-default) as **not** requiring `format_version` bump; keep bump rule for Markdown bytes, required keys, §4/§5 naming breaks.
+3. Consumer audit checklist in PR1 description (hub merge, status, baseline, rules ledger, router goldens).
+4. **Then** hub producers may stamp optional keys. Router continues to omit them until optional later work.
+
+**No** per-record `format_version`. **No** “catalog v1.1” product label.
 
 | Key | Type | Read default if absent | Write behavior | Notes |
 | --- | --- | --- | --- | --- |
@@ -462,20 +511,30 @@ Inbox / chat sources set `workload_kind="chat"`, `domain=""` (or e.g. `chatgpt`)
 
 ### `agent_family` mapping (closed)
 
-| `kind` | `agent_family` |
-| --- | --- |
-| `claude` | `claude` |
-| `codex` | `codex` |
-| `gemini_antigravity` | `gemini` |
-| `grok` | `grok` |
-| `deepseek_request_dump` | `deepseek` |
-| `copilot_chat` | `copilot` |
-| `router_index` | `router` |
-| `inventory` | `inventory` |
-| `chat_export_inbox` | `import` |
-| anything else | `unknown` |
+Kinds below are **first-class producers today** `[verified]` against hub `agent_sessions/sources/*` and router `src/extractors/*` (`registerExtractor(...)` kind strings). Unsupported / future kinds fall through to `unknown` deliberately—not the established router sources.
 
-Pure function + unit tests. Inventory rows may omit family or use `inventory`.
+| `kind` | `agent_family` | Origin |
+| --- | --- | --- |
+| `claude` | `claude` | hub CLI |
+| `codex` | `codex` | hub CLI |
+| `gemini_antigravity` | `gemini` | hub + router |
+| `grok` | `grok` | hub CLI |
+| `deepseek_request_dump` | `deepseek` | hub + router |
+| `copilot_chat` | `copilot` | router |
+| `cline` | `cline` | router |
+| `continue_dev` | `continue` | router |
+| `cody` | `cody` | router |
+| `aider` | `aider` | router |
+| `tabby` | `tabby` | router (generic globalStorage) |
+| `codeium` | `codeium` | router (generic globalStorage) |
+| `amazon_q` | `amazon_q` | router (generic globalStorage) |
+| `router_index` | `router` | hub merge of feeder sidecar |
+| `inventory` | `inventory` | hub inventory-only sources |
+| `chat_export_inbox` | `import` | hub P1 inbox (bundle expander) |
+| `chat_export_materialized` | `import` | hub P1 per-conversation materializations |
+| anything else | `unknown` | intentional fallback |
+
+Pure function `agent_family_for_kind(kind: str) -> str` + unit tests covering **every row above** (including router kinds) and the `unknown` default. Inventory rows may omit family or use `inventory`.
 
 ### Restamp-on-reuse (KD13)
 
@@ -498,7 +557,7 @@ If restamp changes any field relative to `prior`, `write_indexes` will rewrite i
 
 Optional CLI: `agent-archive migrate catalog-fields` or `export --restamp-catalog-fields` for full pass without relying on source file visibility (still only restamps rows this machine’s export touches unless migrate reads whole index and rewrites all missing fields with **current** machine_id only on rows this machine owns—**caution:** migrate must not overwrite foreign `machine_id`. Rule: restamp `machine_id` only when missing **or** when this process exported/reused the row from a local source file; never invent machine_id for not-visible foreign rows).
 
-### P1 inbox importer
+### P1 inbox importer + multi-session splitting
 
 ```text
 inbox/                 # gitignored entire tree
@@ -508,11 +567,11 @@ inbox/                 # gitignored entire tree
   gemini/
   manual/
   processed/           # still under ignored tree
+.collector/
+  inbox-materialized/  # gitignored; one file per conversation after expand
 ```
 
 - Official exports only; no scraping.
-- After export, optional move to `inbox/processed/`.
-- Identity still sha256-based.
 - Doctor: warn if `git ls-files inbox` non-empty (except README).
 
 **Gitignore (required for privacy):**
@@ -525,14 +584,50 @@ archive/.router-index.jsonl
 session_intel/.cache/
 ```
 
-(Exact `.gitignore` syntax may use `inbox/*` + un-ignore README; entire content local-only, same class as transcript bodies.)
+#### Registry contract gap `[verified]`
+
+Hub registry is `Extractor = Callable[[Path], ExtractedSession]` — **one session per source file** (`agent_sessions/sources/registry.py`). Official ChatGPT export commonly ships a **`conversations.json` bundle** (or a small set of numbered JSON files for large accounts; see OpenAI export help) containing **many conversations**. Treating the whole file as one `ExtractedSession` would either collapse the bundle into a single catalog row or force an unplanned one-shot redesign mid-PR6.
+
+#### Required splitter / iterator boundary (before calling P1 “implementation-ready”)
+
+Introduce an explicit **bundle expander** stage (not a silent overload of single-file extractors):
+
+| Stage | Responsibility |
+| --- | --- |
+| **Discover** | Locate official export artifacts under `inbox/{vendor}/` (zip or json). |
+| **Expand** | Vendor adapter yields **N conversation units** from the bundle. |
+| **Materialize** | Write each unit to `.collector/inbox-materialized/{vendor}/{stable_id}.json` (local-only) so the existing `Callable[[Path], ExtractedSession]` path continues to work **without** changing every extractor. |
+| **Extract** | Register kind `chat_export_materialized` (or per-vendor kinds) that extract **one** conversation from a materialized path. |
+| **Catalog** | One index row **per conversation**. |
+| **Processed** | After **all** conversations from a bundle export successfully (or are skipped as unchanged), move the original bundle to `inbox/processed/` (optional, config-gated). Partial failure leaves the bundle in place for retry. |
+
+**Alternative considered and deferred:** changing the global registry to `Callable[[Path], Iterable[ExtractedSession]]` and teaching `export_sources` to fan out. That is a wider archive refactor; materialize-then-single-session is the **P1 default** so PR6 stays reviewable. If materialize cost becomes painful, a later PR may add multi-session extractors behind the same expand interface.
+
+#### Stable identity (per conversation, not per bundle)
+
+| Field | Rule |
+| --- | --- |
+| `metadata.session_id` | Vendor conversation id when present (e.g. ChatGPT `conversation_id` / `id`); else stable hash of vendor id fields; **never** the bundle filename alone. |
+| `source_file` | Path to the **materialized** per-conversation file (portable `~` form in catalog), **not** only the bulk `conversations.json`. |
+| `sha256` | Digest of the **materialized conversation payload bytes** (canonical JSON serialization of that conversation). Re-import of an unchanged conversation → same digest → reuse/skip. Changing one chat in a re-export updates **only that** row. |
+| Merge key | Existing `index_identity_key`: `("session", session_id, sha256)` when both set. |
+
+**Idempotent `processed/` replay:**
+
+1. Expand bundle → materialize conversations.
+2. For each unit: if index already has `(session_id, sha256)` match, skip extract/render (count as skipped).
+3. If session_id exists with **different** sha256, re-export (new digest → distinct or path-supersede via materialize path upsert).
+4. Only when every unit is exported or skipped-as-unchanged: move original bundle to `inbox/processed/` and record a small `.collector/inbox-receipts/{bundle_sha}.json` (list of conversation ids + digests) for operator debugging.
+5. Re-dropping the same export into `inbox/` after process: receipt + digests make the run a no-op.
+
+PR6 acceptance must include fixtures for: multi-conversation bundle → N catalog rows; second import of identical bundle → 0 new rows; one conversation edited → one row updates.
 
 ### P1 source strategy (honest gaps)
 
 | Source | Approach | Phase |
 | --- | --- | --- |
 | Existing CLI/VS Code | As today | done |
-| Claude.ai / ChatGPT / Gemini export | Inbox importer | P1 |
+| Claude.ai / ChatGPT / Gemini export | Inbox expander + per-conversation materialize | P1 |
 | Grok.com / mobile | Document gap; no scrape | P1 docs |
 
 ### P2 session-intel
@@ -752,11 +847,23 @@ Reject — cost/privacy/nondeterminism; deterministic first.
 
 ### 7. Document-only lock discipline for interactive export
 
-**Reject** — not a fix for concurrent `write_indexes` (Issue 2). Shared lock required.
+**Reject** — not a fix for concurrent `write_indexes` (Issue 2). Shared **atomic** lock required.
 
 ### 8. Catalog-only “v1.1” version label + per-record format_version
 
-**Reject** — keep contract v1 + MAY optional keys (Issue 9).
+**Reject** — three competing version names. Prefer stay-at-label-v1 after **explicit** §6/§9 amendment (KD5).
+
+### 9. Full `format_version: 2` for optional catalog keys
+
+**Reject as default** — Markdown unchanged; feeder golden churn without benefit. **Chosen:** §9 carve-out for additive optional keys + consumer audit. If carve-out is refused, fall back to true v2 as a separate decision—not a silent path under unamended §9.
+
+### 10. Check-then-write lock files
+
+**Reject** — TOCTOU lets two writers both pass. **Chosen:** `O_CREAT|O_EXCL` exclusive create, stale recovery, simultaneous multi-process tests.
+
+### 11. Global multi-session `Extractor` signature in PR6
+
+Change registry to `Callable[[Path], Iterable[ExtractedSession]]` for all sources. **Defer** (wide blast radius). **Chosen for P1:** expand → materialize → existing single-session extractors.
 
 ---
 
@@ -768,7 +875,7 @@ Reject — cost/privacy/nondeterminism; deterministic first.
 | **Inbox exports committed** | **High** | **Gitignore entire `inbox/`; doctor warns if tracked; same class as local transcripts** |
 | Secrets in intel proposals | High | `redact_text` / preflight; default session_id-only evidence in git |
 | Health file absolute user paths | Medium | **Require** `portable_path` on all paths in health.json |
-| Concurrent catalog writers | High | Shared write lock on export/collect/prune |
+| Concurrent catalog writers | High | **Atomic** shared write lock (O_EXCL) on export/collect/prune; dual legacy protocol |
 | Dirty/wrong branch push | Medium | git_ops branch + clean tree (both OS wrappers) |
 | Skill publish clobber | High | New skill dir only; never memory/ |
 | Broad `git add archive/` stages router sidecar | Medium | Allowlist; gitignore `.router-index.jsonl` |
@@ -899,8 +1006,8 @@ Logs: paths (portable) + counts only for collect **and** intel CLIs.
 ### Files to add/change
 
 1. `agent_sessions/machine_id.py`
-2. `agent_sessions/archive_lock.py` — dual-check legacy lock; PID+mtime
-3. `agent_sessions/agent_family.py` — mapping table + tests
+2. `agent_sessions/archive_lock.py` — atomic O_EXCL acquire; dual legacy protocol; PID/mtime stale recovery
+3. `agent_sessions/agent_family.py` — mapping table (hub + all router kinds) + tests
 4. `agent_sessions/collector/{config,health,service,git_ops,coverage,settle}.py`
 5. `agent_sessions/cli.py` — `collect` subcommands; export/prune take lock
 6. `agent_sessions/archive.py` — restamp-on-reuse; stamp on extract; lock integration
@@ -911,15 +1018,17 @@ Logs: paths (portable) + counts only for collect **and** intel CLIs.
 11. `scripts/daily-export.sh` + **`.ps1`** thin wrappers
 12. `scripts/systemd/…`
 13. Docs: `COLLECTOR.md`, `AUTOMATION.md`, `MULTI_MACHINE.md`, `OUTPUT_CONTRACT.md` §6
-14. Tests: lock concurrency, restamp-on-reuse, merge identity cases, git allowlist, agent_family, health portable paths, PS1/sh invoke collect
+14. Tests: **simultaneous** lock contenders, restamp-on-reuse, merge identity cases, git allowlist, agent_family (incl. cline/continue_dev/cody/aider/…), health portable paths, PS1/sh invoke collect
+15. `docs/OUTPUT_CONTRACT.md` §6/§9 amendment + consumer audit note
 
 ### P0 acceptance checklist
 
 - [ ] `collect run` exports same sessions as `export --all` on fixtures.
-- [ ] Second concurrent export/collect fails or waits then fails; no torn index.
-- [ ] Dual-check: fresh `.daily-export.lock` blocks collect.
+- [ ] **Simultaneous** multi-process lock contenders: exactly one critical-section winner; no torn index.
+- [ ] Dual-lock protocol: live legacy lock blocks canonical acquire; stale reclaim works.
 - [ ] Reuse path restamps missing `machine_id`/`workload_kind`/`domain`/`agent_family`; index may dirty git when fields fill.
 - [ ] Merge tests: same session_id different sha256 → two rows; path supersede works; machine_id not in key.
+- [ ] Contract §6/§9 amendment landed; consumer audit checklist checked in PR1.
 - [ ] git_ops stages only allowlist; test fails if staging `.router-index.jsonl` attempted.
 - [ ] ps1 and sh both invoke collect (guardrails in Python).
 - [ ] Health paths are portable.
@@ -950,100 +1059,138 @@ P0: **poll only**.
 
 ---
 
+## Progress tracker (source of truth)
+
+Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated · **Deferred** (parked with issue; not Complete).
+
+| ID | Deliverable | Depends on | Gated? | Status | PR |
+|----|-------------|-----------|--------|--------|----|
+| D0 | Design + tracked project doc (this file) | — | No | ◐ | [#142](https://avis-pbook.tail651ec3.ts.net/avidullu/agent-sessions/pulls/142) |
+| SC-1 | Contract §6/§9 amendment + optional catalog fields + machine_id + restamp-on-reuse + **atomic** shared write lock + inbox gitignore + full agent_family map | D0 | No | ☐ | — |
+| SC-2a | Collector `run`/`status`/`doctor` + health (no git) | SC-1 | No | ☐ | — |
+| SC-2b | git_ops allowlist commit/push | SC-2a | No | ☐ | — |
+| SC-3 | Thin daily-export sh **and** ps1 + systemd sketches + Forgejo push note | SC-2b | No | ☐ | — |
+| SC-4 | `collect watch` poll loop + backoff | SC-2a | No | ☐ | — |
+| SC-5 | Status grouping by machine_id | SC-1 | No | ☐ | — |
+| SC-6 | Chat export inbox: expander + materialize + per-conversation identity + fixtures | SC-1 | No | ☐ | — |
+| SC-7 | Additional chat vendor adapters | SC-6 | No | ☐ | — |
+| SC-8 | session-intel docs scaffold + naming table | — (// SC-1) | No | ☐ | — |
+| SC-9 | intel suggest (catalog-only + optional body-local) | SC-1, SC-8 | No | ☐ | — |
+| SC-10 | Skill proposals + propose-only xdsync publish (new dirs only) | SC-9 | No | ☐ | — |
+| SC-11 | Optional FS watch backend | SC-4 | No | ☐ | — |
+
+Every implementation PR updates **its own row** (status + PR link) and the Changelog. A PR is not complete if the tracker update is missing.
+
+---
+
+## Definition of done (project)
+
+- [ ] All non-Deferred rows above are ☑ or explicitly **Deferred** with linked issues (not labeled Complete).
+- [ ] P0 acceptance checklist satisfied on at least one Linux host; Windows ps1 path exercised or gap filed.
+- [ ] Atomic lock proven with simultaneous multi-process test.
+- [ ] OUTPUT_CONTRACT §6/§9 amendment merged; Markdown v1 goldens still pass hub + router.
+- [ ] Inbox tree cannot be git-tracked except README; doctor warns otherwise.
+- [ ] P1 multi-conversation fixtures green; identity is per conversation.
+- [ ] session-intel proposals are propose-only; never write `avis-agents-xdsync/memory/**`.
+- [ ] Docs index / COMPOSE_STACK / ROADMAP consistent with shipped surface.
+- [ ] Completion note + archive move to `docs/archives/` when DONE.
+
+---
+
 ## PR Plan
 
-Effort: **S** &lt; ~1 day, **M** ~1–3 days, **L** multi-day. Each PR independently reviewable.
+Effort: **S** &lt; ~1 day, **M** ~1–3 days, **L** multi-day. Each PR independently reviewable. IDs match the progress tracker.
 
-### PR1 — Additive catalog fields + machine_id + restamp + shared lock on export (L)
+### SC-1 / PR1 — Contract amendment + catalog fields + restamp + atomic lock (L)
 
-- **Title:** `feat(archive): optional catalog fields, machine_id, restamp-on-reuse, shared write lock`
-- **Files:** `machine_id.py`, `archive_lock.py`, `agent_family.py`, `models.py`, `config.py`, `archive.py`, `cli.py` (export/prune lock), `default_sources.toml` (Source defaults for workload/domain), `.gitignore` (`.collector/`, **inbox/**, router-index), `inbox/README.md`, `docs/OUTPUT_CONTRACT.md` §6 optional-key language, `MULTI_MACHINE.md`, tests (merge identity, restamp, lock, agent_family)
-- **Dependencies:** none
-- **Description:** Contract remains format_version 1. Stamp + restamp fields. Shared lock on mutating export/prune. Inbox gitignore early so P1 cannot leak. Source TOML workload/domain defaults **in this PR** (schema-complete write path).
+- **Title:** `feat(archive): optional catalog fields, machine_id, restamp, atomic write lock`
+- **Files:** `OUTPUT_CONTRACT.md` (§6 optional keys + §9 additive-key carve-out), `machine_id.py`, `archive_lock.py` (O_EXCL), `agent_family.py` (hub **and** router kinds), `models.py`, `config.py`, `archive.py`, `cli.py`, `default_sources.toml`, `.gitignore`, `inbox/README.md`, `MULTI_MACHINE.md`, tests (simultaneous lock, restamp, merge, agent_family)
+- **Dependencies:** D0
+- **Description:** Amend contract policy **first**, then stamp/restamp fields. Atomic shared lock on export/prune. Inbox gitignore early. Source TOML workload/domain defaults included (schema-complete write path). Consumer audit in PR body.
 - **Effort:** L
 
-### PR2a — Collector run without git (M)
+### SC-2a / PR2a — Collector run without git (M)
 
 - **Title:** `feat(collector): collect run/status/doctor + health (no git commit)`
 - **Files:** `collector/{service,health,coverage,config,settle}.py`, `cli.py`, tests, `docs/COLLECTOR.md` (draft)
-- **Dependencies:** PR1
+- **Dependencies:** SC-1
 - **Description:** One-shot collect calling export_sources under lock; health JSON; doctor checks (incl. inbox tracked warning). No commit/push yet.
 - **Effort:** M
 
-### PR2b — git_ops allowlist commit/push (M)
+### SC-2b / PR2b — git_ops allowlist commit/push (M)
 
 - **Title:** `feat(collector): git_ops allowlist commit/push for collect run`
 - **Files:** `collector/git_ops.py`, wire into `collect run`, tests that only index+INDEX staged
-- **Dependencies:** PR2a
+- **Dependencies:** SC-2a
 - **Description:** Canonical guardrails: branch, clean tree, dual lock already held, pull --ff-only, allowlist add, commit, push, no force.
 - **Effort:** M
 
-### PR3 — Thin daily-export sh **and** ps1 + systemd sketches (S)
+### SC-3 / PR3 — Thin daily-export sh **and** ps1 + systemd sketches (S)
 
 - **Title:** `chore(automation): daily-export shells delegate to collect run; document Forgejo push`
 - **Files:** `scripts/daily-export.sh`, `scripts/daily-export.ps1`, `scripts/systemd/*`, `docs/AUTOMATION.md`, `docs/NEW_MACHINE_SETUP.md`, `docs/COLLECTOR.md`
-- **Dependencies:** PR2b
-- **Description:** Both wrappers thin; PS1 gains parity via Python git_ops. Note: push uses default remote—set Forgejo origin. Dual-check legacy lock until old cron retired.
+- **Dependencies:** SC-2b
+- **Description:** Both wrappers thin; PS1 gains parity via Python git_ops. Note: push uses default remote—set Forgejo origin. Dual-lock write can drop legacy write after this lands.
 - **Effort:** S
 
-### PR4 — collect watch poll loop + backoff (M)
+### SC-4 / PR4 — collect watch poll loop + backoff (M)
 
 - **Title:** `feat(collector): poll loop watch mode`
 - **Files:** `collector/service.py`, cli, tests, docs
-- **Dependencies:** PR2a (git optional)
+- **Dependencies:** SC-2a (git optional)
 - **Description:** Interval full export (or skip if no root activity); lock only during export cycle; backoff. **No** per-file dirty export API.
 - **Effort:** M
 
-### PR5 — Status grouping by machine_id (S)
+### SC-5 / PR5 — Status grouping by machine_id (S)
 
 - **Title:** `feat(status): group archive status by machine_id`
 - **Files:** `archive_status.py`, tests, docs
-- **Dependencies:** PR1
-- **Description:** **Only** status reporting polish—Source TOML defaults already in PR1 (no overlap).
+- **Dependencies:** SC-1
+- **Description:** **Only** status reporting polish—Source TOML defaults already in SC-1.
 - **Effort:** S
 
-### PR6 — Chat export inbox importer (M)
+### SC-6 / PR6 — Chat export inbox expander + per-conversation materialize (M)
 
-- **Title:** `feat(sources): chat_export_inbox importer`
-- **Files:** sources module, registry, sources.example.toml, fixtures, docs gap table
-- **Dependencies:** PR1 (gitignore already present)
-- **Description:** Official export JSON → sessions; workload_kind=chat; domain empty/vendor.
+- **Title:** `feat(sources): chat export inbox expander and per-conversation import`
+- **Files:** expander module, materialize under `.collector/inbox-materialized/`, `chat_export_materialized` extractor, sources.example.toml, multi-conversation fixtures, docs gap table
+- **Dependencies:** SC-1 (gitignore already present)
+- **Description:** Discover → expand → materialize → single-session extract. `session_id` = vendor conversation id; `sha256` = conversation payload digest; idempotent processed/ + receipts. **Does not** collapse bulk exports into one catalog row.
 - **Effort:** M
 
-### PR7 — Additional chat adapters (M, optional split per vendor)
+### SC-7 / PR7 — Additional chat adapters (M, optional split per vendor)
 
 - **Title:** `feat(sources): additional chat export adapters`
-- **Dependencies:** PR6
+- **Dependencies:** SC-6
 - **Effort:** M
 
-### PR8 — session-intel docs scaffold + naming table (S)
+### SC-8 / PR8 — session-intel docs scaffold + naming table (S)
 
 - **Title:** `docs(session-intel): schema, body locality, compose stack row`
 - **Files:** `session_intel/README.md`, `SCHEMA.md`, `docs/SESSION_INTEL.md`, `docs/COMPOSE_STACK.md`, `docs/README.md` one-screen baseline vs session-intel vs agentforge table, ROADMAP pointer
-- **Dependencies:** none (parallel); reference PR1 fields
+- **Dependencies:** none (parallel); reference SC-1 fields
 - **Description:** Locks KD4/KD12, redaction APIs, propose-only, catalog-only vs body-local. No mining code. CLI verb remains `intel` not `baseline`.
 - **Effort:** S
 
-### PR9 — intel suggest catalog-only + optional body-local (L)
+### SC-9 / PR9 — intel suggest catalog-only + optional body-local (L)
 
 - **Title:** `feat(intel): suggest routines/periodic tasks with redaction-safe evidence`
 - **Files:** `agent_sessions/session_intel/*`, CLI, candidates writers, tests, PII interaction note
-- **Dependencies:** PR1, PR8
+- **Dependencies:** SC-1, SC-8
 - **Description:** Catalog-only fleet miners; body-local when md present; `redact_text`/`build_preflight_report`; tracked JSON uses session_ids by default.
 - **Effort:** L
 
-### PR10 — skill proposals + new-dir publish to xdsync (M)
+### SC-10 / PR10 — skill proposals + new-dir publish to xdsync (M)
 
 - **Title:** `feat(intel): skill proposals and propose-only xdsync publish (new dirs only)`
 - **Files:** proposals layout, publish command, tests refuse overwrite / memory path
-- **Dependencies:** PR9
+- **Dependencies:** SC-9
 - **Description:** No memory writes; existing skill → refuse or SKILL.proposed.md; marker upsert stretch deferred.
 - **Effort:** M
 
-### PR11 — Optional FS watch backend (M, optional)
+### SC-11 / PR11 — Optional FS watch backend (M, optional)
 
 - **Title:** `feat(collector): optional watchdog backend`
-- **Dependencies:** PR4
+- **Dependencies:** SC-4
 - **Description:** Only if poll lag insufficient; poll remains default.
 - **Effort:** M
 
@@ -1051,26 +1198,35 @@ Effort: **S** &lt; ~1 day, **M** ~1–3 days, **L** multi-day. Each PR independe
 
 ```mermaid
 flowchart TB
-  PR1[PR1 fields+restamp+lock+gitignore]
-  PR2a[PR2a collect no-git]
-  PR2b[PR2b git_ops]
-  PR3[PR3 thin sh+ps1]
-  PR4[PR4 poll loop]
-  PR5[PR5 status by machine]
-  PR6[PR6 inbox importer]
-  PR7[PR7 adapters]
-  PR8[PR8 intel docs]
-  PR9[PR9 intel suggest]
-  PR10[PR10 skill publish]
-  PR11[PR11 optional FS watch]
+  D0[D0 design doc]
+  SC1[SC-1 fields+contract+atomic lock]
+  SC2a[SC-2a collect no-git]
+  SC2b[SC-2b git_ops]
+  SC3[SC-3 thin sh+ps1]
+  SC4[SC-4 poll loop]
+  SC5[SC-5 status by machine]
+  SC6[SC-6 inbox expander]
+  SC7[SC-7 adapters]
+  SC8[SC-8 intel docs]
+  SC9[SC-9 intel suggest]
+  SC10[SC-10 skill publish]
+  SC11[SC-11 optional FS watch]
 
-  PR1 --> PR2a --> PR2b --> PR3
-  PR2a --> PR4
-  PR1 --> PR5
-  PR1 --> PR6 --> PR7
-  PR1 --> PR8 --> PR9 --> PR10
-  PR4 --> PR11
+  D0 --> SC1
+  SC1 --> SC2a --> SC2b --> SC3
+  SC2a --> SC4
+  SC1 --> SC5
+  SC1 --> SC6 --> SC7
+  SC1 --> SC8 --> SC9 --> SC10
+  SC4 --> SC11
 ```
+
+---
+
+### Changelog
+
+- `2026-08-01` — Initial design (rev 1–2); design-review consensus; open-question defaults accepted.
+- `2026-08-01` — Address PR #142 review: atomic O_EXCL lock + dual protocol; explicit OUTPUT_CONTRACT §6/§9 policy amendment; tracked-project lifecycle + progress table + DoD; inbox multi-conversation expand/materialize identity; full router `agent_family` map (cline, continue_dev, cody, aider, tabby, codeium, amazon_q).
 
 ---
 
