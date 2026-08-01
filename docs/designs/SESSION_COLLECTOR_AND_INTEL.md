@@ -1,6 +1,6 @@
 # Session Collector, Non-Code Archive Extension, and Session-Intel
 
-> **Status:** `IN PROGRESS` — design on PR #142 (D0); final review #351 incorporated; ready for owner merge · **Owner:** `avidullu` · **Created:** `2026-08-01` · **Last updated:** `2026-08-01`
+> **Status:** `IN PROGRESS` — design on PR #142 (D0); reviews #351 and #353 incorporated; implementation not started · **Owner:** `avidullu` · **Created:** `2026-08-01` · **Last updated:** `2026-08-01`
 > **Lifecycle:** `DRAFT → IN PROGRESS → DONE → ARCHIVED` (archive to `docs/archives/` when DONE)
 > **Tracking anchors:** § Progress tracker is the **source of truth**; indexed in `docs/README.md`; pointer in avis-agents-xdsync `memory/agent-sessions/session-handoff.md`.
 > **Relation to existing docs:** extends `OUTPUT_CONTRACT.md`, `MULTI_MACHINE.md`, `AUTOMATION.md`, `COMPOSE_STACK.md`, `ENGINEERING_BASELINE.md`; peer of engineering baseline (does not replace it).
@@ -94,10 +94,10 @@ This design extends that hub—without inventing a third archive format—along 
 | NG2 | Scrape vendor web UIs when no official export/API/local log exists (document gaps honestly). |
 | NG3 | Auto-promote engineering baseline or auto-install skills without explicit owner action. |
 | NG4 | Replace or absorb `agentforge` (separate owner product / Forgejo console surface in owner topology; not verified in this workspace beyond name/role) or rename/overload engineering `baseline/`. |
-| NG5 | Continuous multi-machine real-time sync of transcript bodies (metadata git push remains eventual). |
+| NG5 | Continuous multi-machine real-time sync of transcript bodies (metadata publication through PRs remains eventual). |
 | NG6 | Solve hub #32 full backfill/regenerate in the collector P0 (may share machine_id helpers only). |
 | NG7 | Cloud-hosted collector SaaS or multi-tenant productization. |
-| NG8 | ~~Accept permanent multi-writer wedge as “manual resolve”~~ — **REJECTED as steady state** (see KD15). Interim single-publisher allowed only until shards land. |
+| NG8 | ~~Accept permanent multi-writer wedge as “manual resolve”~~ — **REJECTED as steady state** (see KD15). Interim designated-publisher branch/PR is allowed only until machine refs land. |
 
 ### Non-goals for P0 code (freeze line)
 
@@ -182,7 +182,7 @@ Skill proposals that include excerpts are **inherently machine-local**; git-trac
 | # | Decision | Rationale |
 | --- | --- | --- |
 | **KD1** | **Collector lives inside `agent-sessions`** as `agent_sessions/collector/` + CLI subcommands; **not** a third repo. | One archive format, one merge path, shared tests/contract fixtures. |
-| **KD2** | **Collector evolves daily-export; `git_ops` is the canonical guardrail implementation** (branch, clean tree, lock, allowlisted stage paths, commit, push). Both `daily-export.sh` and **`.ps1` become thin** wrappers to `collect run`. PS1 is currently under-guarded; P0 closes that gap. Stage **only** `archive/index.jsonl` + `archive/INDEX.md` (never `git add -- archive/`). | Single implementation of safety; Windows parity; avoid staging `.router-index.jsonl` or other archive noise. |
+| **KD2** | **Collector evolves daily-export; `git_ops` is the canonical guardrail implementation** (lock, snapshot, ephemeral publish worktree, exact allowlist, commit, non-default ref, PR). Both `daily-export.sh` and **`.ps1` become thin** wrappers to `collect run`. PS1 is currently under-guarded; P0 closes that gap. Never use `git add -- archive/`; never reset a collector checkout; never push the default branch. | Single implementation of safety; Windows parity; preserve local state; comply with PR-only delivery. |
 | **KD3** | **Router auto-watch and collector complement; collector does not subsume the router.** | Router owns VS Code storage parsers; collector owns CLI stores + system-wide schedule; hub merges `.router-index.jsonl` as today. |
 | **KD4** | **Synthesis subsystem name: `session-intel`** (`session_intel/`, CLI `agent-archive intel …`). | Avoids `agentforge` and engineering `baseline`. |
 | **KD5** | **Contract policy amendment, still labeled `format_version: 1` for Markdown.** Active `OUTPUT_CONTRACT.md` §9 today says any change that alters the §6 schema is a **version bump** `[verified]`. That conflicts with “just emit optional keys.” **PR1 / SC-1 must first amend §6 and §9** as follows: (1) §6 lists optional keys `machine_id`, `observed_on`, `workload_kind`, `domain`, `agent_family` as **MAY** be present; (2) §9 gains an explicit rule: *additive optional keys whose absence is equivalent to the documented read-default, and which consumers MUST ignore if unknown, do **not** require a format_version bump*; required-key changes, Markdown §2 byte changes, or feeder naming breaks **do** bump and get `v2/` goldens. **No** per-record `format_version`. **No** human “catalog v1.1” product label. **Downstream consumer audit + cross-repo conformance (blocking for SC-1 merge):** see § Schema extension + contract policy checklist (hub + router). Alternative rejected: full `format_version: 2` with required nullables — forces feeder golden churn without benefit. | Honest vs active §9; preserves feeder Markdown goldens. |
@@ -190,17 +190,17 @@ Skill proposals that include excerpts are **inherently machine-local**; git-trac
 | **KD7** | **`workload_kind` + `domain` are first-class optional catalog fields from the first schema PR.** **Read path:** missing `domain` → `""` (unknown); missing `workload_kind` → treat as `"code"` only when filtering for backward compatibility with today’s corpus. **Write path:** coding Source defaults stamp `workload_kind=code`, `domain=engineering`; chat/inbox stamps `chat` + empty or vendor domain. | Prevents dual defaults; empty domain is correct for non-code. |
 | **KD8** | **Skill/routine proposals are propose-only** (#86 D7 spirit). P2 v1 **creates new skill directories only**; marker-update of existing skills is stretch. Never write `avis-agents-xdsync/memory/**`. | Minimizes clobber risk. |
 | **KD9** | **Redaction reuses exact `baseline_redaction` APIs:** `redact_text` → `RedactionResult`; `result_to_report`; `build_preflight_report` / `RedactionPreflight`; `SCANNER_VERSION = "redaction-v1"`. Refuse publish/git of quote-bearing artifacts when any evidence has `blocked=True` or preflight `blocked > 0`. No invented `scan_text` / `status=allowed` schema. | Implementable against real code. |
-| **KD10** | **Delivery is PR-only, Forgejo-primary.** Collector `git push` uses the checkout’s default remote; operator must set Forgejo as `origin` / `pushDefault`. Hub docs that still say “GitHub” are historical; COLLECTOR/AUTOMATION updates note the invariant without rewriting all docs in P0. | Owner global rules. |
-| **KD11** | **Atomic shared archive write lock** with **owner_token** + runtime-aware stale reclaim (see lock section). Exclusive create (`O_EXCL`); release only if lock still holds caller token. PID liveness only within same runtime namespace. Simultaneous multi-process + cross-runtime reclaim tests required. | Closes TOCTOU; prevents Win/WSL false-stale and late-unlink races. |
+| **KD10** | **Delivery is PR-only, Forgejo-primary.** Collector publication uses Forgejo non-default per-machine refs and a ready aggregate PR; no collector path pushes `main`. The operator must set Forgejo as `origin` / `pushDefault`. Hub docs that still say “GitHub” are historical; COLLECTOR/AUTOMATION updates note the invariant without rewriting all docs in P0. | Owner global rules; CI and review remain the landing gate. |
+| **KD11** | **Atomic shared archive write lock** with **owner_token** and **explicit-only stale recovery** for P0 (see lock section). Exclusive create (`O_EXCL`); keep the acquisition fd for diagnostic heartbeat; release only if the pathname still carries the caller token. Normal collect/export/prune never auto-reclaims by PID, age, or lease. | Closes TOCTOU and heartbeat/reclaim races; favors fail-closed safety over unattended recovery. |
 | **KD14** | **Crash-atomic catalog publication:** temp + fsync + `os.replace` per file; **`index.jsonl` is source of truth**; `INDEX.md` is derived. **Fail-closed on corrupt jsonl** (KD18)—no silent git restore. | Always-on collect increases write frequency. |
 | **KD12** | **session-intel body locality:** fleet-wide miners are **catalog-only**; body-dependent miners run only where local Markdown (or regenerable sources) exist. No body sync in this design (NG5). | Matches OUTPUT_CONTRACT / AUTOMATION local-only policy. |
 | **KD13** | **Restamp-on-reuse is in P0 scope:** when `_can_reuse_record` returns true, shallow-copy prior and `setdefault`/union additive fields without changing sha256/markdown/imported_at. Union current machine into **`observed_on`**. | Continuous collect converges tags. |
-| **KD15** | **Multi-writer convergence (required before fleet push):** per-machine shards + **deterministic** `merge_shards` **plus** an explicit **git reconciliation state machine** (snapshot own shard → fetch → re-merge → CAS push). Shards alone do **not** make concurrent branch tips fast-forward—Git rejects the second tip regardless of disjoint paths. Two-clone test must force a push rejection and prove recovery. Single-publisher interim for P0. | Prevents permanently wedged collectors. |
+| **KD15** | **Multi-writer convergence (required before fleet publication):** each machine writes a full shard (including its router sidecar rows), pushes only its own non-default ref, and a designated aggregator opens a deterministic catalog PR from an ephemeral worktree. `merge_shards` consumes **committed shard bytes only**; no local sidecar, environment, existing derived file, or wall clock. No collector resets a checkout or pushes `main`. | Prevents non-ff wedges, local-state loss, executor drift, and PR-policy bypass. |
 | **KD16** | **Merge algebra for same identity:** content supersede rules + **`observed_on` = sorted unique union**. In **derived** `index.jsonl` / `INDEX.md`, scalar `machine_id` is **deprecated for merge output** or set **only** to `min(observed_on)` (lexicographic)—**never** the executor’s current machine. Local **shard** rows may still stamp their owning machine. Byte-identical merge under shuffled shards + two current machine ids. | Stops oscillating `index.jsonl` under multi-writer. |
 | **KD17** | **Daemon runs only from a dedicated collector checkout** (separate clone/worktree per runtime), not a human dev tree. Versioned entrypoint or restart-on-update; isolated config/state; doctor enforces. | Avoids WIP halt and code changing under a long-lived process. |
 | **KD18** | **Corrupt `index.jsonl` → fail closed.** Preserve final + temp bytes; hard health error; stop. Git restore only via explicit `doctor --repair-index --from-git` (dry-run/diff/confirm). Auto path may only rebuild **INDEX.md** from a **valid** jsonl. | Dirty catalog may be valid uncommitted work—must not clobber. |
 | **KD19** | **Export ZIPs are untrusted.** Streaming validation; reject path escape/links; size/count/ratio caps; clean temp always. SC-6 fixtures for traversal/link/bomb. | “Unzip to temp” is not a security boundary. |
-| **KD20** | **Stable import identity map** for inbox: persistent `.collector/inbox-identity-map.json` + versioned canonicalization; fallback ids must not depend on mutable title/`update_time`/full-body hash alone across edits. | Prevents duplicate rows when no-vendor-id conversations are edited. |
+| **KD20** | **Stable import identity map** for inbox: persistent `.collector/inbox-identity-map.json` + versioned canonicalization. Candidate buckets use vendor + creation anchor; mutable message count, attachment names, title, `update_time`, and body digest are evidence only. Ambiguous/no-anchor cases quarantine for explicit mapping rather than silently merge or allocate a duplicate. | Preserves identity across ordinary edits and fails closed when no stable match exists. |
 | **KD21** | **P0 poll always runs full reuse-aware export**—no root-directory mtime shortcut. Nested session edits do not advance ancestor mtimes. Optional future: per-file fingerprints (separate design + tests). | Root watermark skip is incorrect and can skip forever. |
 
 ---
@@ -322,11 +322,11 @@ Check-then-write is a TOCTOU race: two processes can both observe “no fresh lo
 
 1. Ensure `.collector/` exists (`mkdir -p`, ignore EEXIST).
 2. Attempt **exclusive create** of the lock file:
-   - `fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)` then write payload and `os.close(fd)` (or keep fd open until release if preferred).
+   - `fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_RDWR)`; write + fsync the payload and **keep this acquisition fd open until release**.
    - On Windows this is supported by Python’s `os.open` with `O_EXCL`.
 3. If `FileExistsError`:
-   - Read payload (best-effort). If **stale** (see below), reclaim only via token-safe protocol and **retry exclusive create** (bounded retries).
-   - If **live / unknown**, sleep briefly and retry until `lock_timeout_seconds`, then fail non-zero (**fail closed**—do not steal).
+   - Read payload only for diagnostics. **Never unlink or replace it from normal `collect` / `export` / `prune`, regardless of PID, age, or heartbeat.**
+   - Sleep briefly and retry until `lock_timeout_seconds`, then fail non-zero with owner diagnostics (**fail closed**).
 4. Payload (UTF-8 JSON object):
 
 ```json
@@ -337,40 +337,31 @@ Check-then-write is a TOCTOU race: two processes can both observe “no fresh lo
   "pid": 12345,
   "process_start": "<boot_id or process create time token>",
   "started_at": "2026-08-01T12:00:00+00:00",
-  "expires_at": "2026-08-01T12:05:00+00:00",
+  "heartbeat_at": "2026-08-01T12:01:00+00:00",
   "owner": "collect|export|prune"
 }
 ```
 
-**Owner token (KD11 / #3940 / #3974):**
+**Owner token and diagnostic heartbeat (KD11 / #3940 / #3974 / #3994):**
 
 - On acquire, generate a fresh random `owner_token` and remember it in process memory (contextvar).
-- **Release:** re-read lock file; **unlink only if** `owner_token` still matches the caller. If another process reclaimed and rewrote the lock, **do not unlink**.
-- Never release by path alone.
+- **Heartbeat:** update `heartbeat_at` only through the acquisition fd: seek to 0, truncate, write the same token payload, fsync. **Never** renew with `os.replace(path)` or by reopening/truncating the pathname. If an operator explicitly removes the lock, a late heartbeat can touch only the old/unlinked inode and cannot overwrite a successor lock.
+- **Release:** close the acquisition fd, re-read the pathname, and **unlink only if** `owner_token` still matches the caller. If the file is missing, unreadable, or carries another token, do not unlink.
+- `pid`, `process_start`, `runtime_id`, mtime, and `heartbeat_at` are diagnostics—not automatic ownership proofs across Windows/WSL namespaces.
 
-**Renewable lease (not a fixed wall-clock steal):**
+**P0 stale-owner policy — explicit-only break:**
 
-A fixed `started_at + lock_timeout_seconds` reclaim is **unsafe**: a valid foreign-runtime export longer than the timeout can be stolen mid-critical-section, after which two writers run concurrently (token only stops the old owner’s `finally`, not dual writers).
+Normal commands **never auto-reclaim**. This deliberately chooses safety over unattended recovery: a filesystem lease implemented as “read token, then unlink/replace” has no cross-platform conditional-CAS primitive. A heartbeat and a reclaimer can otherwise cross at expiry and both enter.
 
-| Rule | Spec |
-| --- | --- |
-| Payload | Write `expires_at = now + lease_ttl` (default `lease_ttl = lock_timeout_seconds`, e.g. 300s). |
-| Heartbeat | While holding the lock, **renew** under the same token: rewrite payload with a later `expires_at` (atomic replace of lock file content or O_TRUNC rewrite of payload only while holding exclusive ownership). Renew at ≤ `lease_ttl / 3`. |
-| Same-runtime reclaim | Allowed only if PID dead **and** `process_start` proves reuse **or** `expires_at` is in the past **and** no successful renewal (missed heartbeats). |
-| **Foreign-runtime reclaim** | **Default: never auto-reclaim** based on age alone. Wait until `expires_at` is past **and** heartbeat renewals have stopped (same rule: reclaim only if `now > expires_at`). Prefer: if `runtime_id` differs, require **`doctor --break-lock`** (explicit, logged) instead of auto-steal for P0 if implementation wants maximum safety. |
-| P0 chosen policy | **Renewable `expires_at` + heartbeat** for all owners; reclaim only when `now > expires_at`. Foreign PID death **without** expired lease is **not** sufficient. |
-| Test | Active foreign owner holds lock, sleeps past nominal 300s **but renews heartbeat** → second process **must not** enter critical section. After heartbeats stop and lease expires → reclaim allowed. |
+`agent-archive collect doctor --break-lock` is a separate, explicit operator action:
 
-**Stale-owner recovery (runtime-aware):**
+1. Require `--expect-owner-token <token>` and `--i-have-stopped-all-writers`.
+2. Re-read immediately before unlink; refuse if the token changed, payload is unreadable, or either dual-lock file has a different token.
+3. Write an audit record (time, runtime, hostname slug, prior token, reason) under `.collector/`; never log secrets or usernames.
+4. Unlink both canonical and legacy names only after the operator has stopped collector/export/prune on **every runtime sharing the checkout**. Reacquisition still goes through `O_EXCL`.
+5. If Windows/open-handle semantics refuse deletion, fail with instructions to stop the owning process; never fall back to path replacement.
 
-| Situation | Behavior |
-| --- | --- |
-| Same `runtime_id` + same `hostname` + PID dead + `process_start` shows reuse **and/or** `now > expires_at` | Reclaim |
-| Foreign `runtime_id` + `now <= expires_at` (heartbeats current) | **Never reclaim** — wait or fail |
-| Foreign `runtime_id` + `now > expires_at` | Reclaim (lease expired); optional doctor-only if config `foreign_lock_policy=doctor` |
-| PID “alive” but `process_start` differs (PID reuse) + lease expired | Reclaim |
-| Payload missing/unreadable | Treat as expired only if mtime age ≥ lease_ttl; else wait |
-| Live owner, lease current | Never reclaim |
+Automatic stale recovery may be reconsidered only with a separately reviewed fencing/CAS design that protects the catalog writes themselves—not merely the lock-file payload.
 
 **Dual-lock transition protocol (one acquire, both names):**
 
@@ -378,9 +369,9 @@ Until all automation uses thin wrappers (through PR3), acquire as **one protocol
 
 1. Atomically exclusive-create **canonical** `.collector/collect.lock` with full payload.
 2. Atomically exclusive-create **legacy** `.daily-export.lock` with the **same** `owner_token` payload.
-3. If step 2 fails because legacy is held by a **live** non-us owner: release canonical **only if token still matches**, then wait/retry.
-4. If step 2 fails because legacy is **stale** under rules above: reclaim legacy, retry step 2.
-5. Hold **both** until release; each release is token-checked independently.
+3. If step 2 finds any pre-existing legacy lock, release canonical **only if token still matches**, then wait/retry; normal acquisition never classifies or reclaims the legacy file.
+4. Hold **both** until release; heartbeat each through its own acquisition fd and token-check each release independently.
+5. Explicit break validates that both names still carry the expected token before unlinking either; a mismatch fails closed for operator inspection.
 
 **Who acquires (exclusive, write):**
 
@@ -401,11 +392,13 @@ Until all automation uses thin wrappers (through PR3), acquire as **one protocol
 
 1. **Simultaneous contenders** (≥2 processes): exactly one critical-section winner.
 2. Sequential second writer alone is **not** sufficient.
-3. Same-runtime dead PID + matching process_start rules → reclaimable; live PID is not.
-4. **Cross-runtime:** foreign-runtime lock is **not** reclaimed by PID death alone; lease expiry works; after reclaim, original owner's `finally` **must not** unlink successor (token check).
-5. Dual-lock: holding only legacy blocks canonical acquire.
+3. Dead PID, old mtime, expired-looking heartbeat, foreign runtime, and unreadable payload each remain **non-reclaimable by normal commands**.
+4. A long-running foreign owner that heartbeats past `lock_timeout_seconds` retains exclusion; a contender times out non-zero.
+5. Adversarial barrier: pause owner heartbeat before its fd write, run explicit break + successor acquire, resume heartbeat/release; neither operation overwrites or unlinks the successor pathname.
+6. Explicit break rejects token changes and missing acknowledgement; after a verified dead owner it removes both names and a fresh `O_EXCL` acquisition succeeds.
+7. Dual-lock: holding only legacy blocks canonical acquire.
 
-**Success metric wording:** Catalog corruption zero **requires** this atomic, token-checked lock on index writers.
+**Success metric wording:** Catalog corruption zero **requires** this atomic, token-checked lock plus explicit-only P0 stale recovery on index writers.
 
 #### Crash-atomic catalog writes (mutual exclusion is not enough)
 
@@ -453,9 +446,11 @@ class CollectorConfig:
     max_backoff_seconds: int = 900
     export_pdf: bool = False
     commit_metadata: bool = True
-    push: bool = True
-    branch: str = "main"
-    require_clean_tree: bool = True
+    publish: bool = True
+    publication_mode: str = "pr"  # only supported mode
+    machine_ref_prefix: str = "collector/machines"
+    aggregate_ref_prefix: str = "collector/catalog"
+    aggregate: bool = False  # enabled on exactly one designated runtime
     lock_timeout_seconds: int = 300
     health_path: str = ".collector/health.json"
     machine_id: str | None = None  # optional config override
@@ -473,8 +468,11 @@ def load_collector_config(repo_root: Path, toml_data: dict) -> CollectorConfig:
 | Env | Effect |
 | --- | --- |
 | `AGENT_ARCHIVE_MACHINE_ID` | Wins over config `machine_id` |
-| `DAILY_EXPORT_BRANCH` | Overrides `branch` (existing shell convention) |
-| `AGENT_ARCHIVE_COLLECT_PUSH=0` | Forces `push=false` |
+| `AGENT_ARCHIVE_COLLECT_PUBLISH=0` | Forces `publish=false` |
+| `AGENT_ARCHIVE_COLLECT_PUSH=0` | Deprecated compatibility kill switch; also forces `publish=false`. Any other value is ignored and cannot enable publication. |
+| `AGENT_ARCHIVE_AGGREGATOR=1` | Enables aggregate-PR publication only on the designated runtime; doctor rejects more than one registered aggregator. |
+
+`DAILY_EXPORT_BRANCH` is intentionally not consumed by the collector. Publication refs are derived from the validated machine id or shard digest, and no configuration or environment value may select the default branch.
 | `AGENT_ARCHIVE_COLLECT_COMMIT=0` | Forces `commit_metadata=false` |
 
 **Export path stays free of collector deps** except: shared `archive_lock` + optional field stamping helpers live in `archive.py` / `machine_id.py` / `agent_family` map—not under `collector/git_ops`.
@@ -495,9 +493,11 @@ settle_checks = 2
 max_backoff_seconds = 900
 export_pdf = false
 commit_metadata = true
-push = true
-branch = "main"
-require_clean_tree = true
+publish = true
+publication_mode = "pr"
+machine_ref_prefix = "collector/machines"
+aggregate_ref_prefix = "collector/catalog"
+aggregate = false  # true on exactly one designated runtime after SC-MW
 lock_timeout_seconds = 300
 health_path = ".collector/health.json"
 # machine_id = "toofan"
@@ -505,14 +505,13 @@ health_path = ".collector/health.json"
 
 **`collect run` (one-shot)** — replaces daily-export **body** (git_ops is Python):
 
-1. Acquire shared archive write lock (dual-check legacy).
-2. Resolve `machine_id`.
-3. If `commit_metadata`: require branch + clean tree (canonical git_ops); `git pull --ff-only`. On non-ff: write health error, release lock, exit non-zero (**no force**).
-4. Call `export_sources(...)` (under same lock; do not double-lock if export detects held lock by same process — use re-entrant or “already held” token).
-5. **Restamp:** every record emitted (including reuse path) gets `setdefault` for additive fields (see below).
-6. Update health (portable paths only).
-7. If metadata changed and `commit_metadata`: stage **only** allowlist paths; commit `archive: collect <date> [<machine_id>]`; push if enabled.
-8. Release lock; exit codes as today (0 nothing-to-do / success).
+1. Acquire shared archive write lock (dual-check legacy); normal acquisition never reclaims stale files.
+2. Resolve `machine_id`; call `export_sources(...)` under the same token (re-entrant library path).
+3. **Restamp:** every record emitted (including reuse path) gets additive defaults/unions below. Atomically write catalog/shard + portable health state.
+4. Snapshot the exact publish payload to memory/temp outside a publish worktree; release both archive locks before any network/git/CI work.
+5. If metadata changed and publication is enabled, invoke canonical git_ops: build an ephemeral worktree, stage the exact allowlist, run gates, and publish a non-default branch/ref + ready PR according to SC-2b/SC-MW.
+6. Never pull/reset/rebase/clean the collector checkout, never force-push, and never push/merge `main`. Publication failure updates health and exits non-zero without altering local archive bytes.
+7. Exit codes as today (0 nothing-to-do / success; non-zero on lock/export/publication failure).
 
 **`collect watch` (P0 = poll loop):**
 
@@ -560,7 +559,7 @@ def resolve_machine_id(config_value: str | None = None) -> str:
 3. **Derived catalog:** `machine_id := observed_on[0]` if non-empty else `""`. **Forbidden:** stamping `current_machine_id` of the process running `merge_shards`.
 4. **Local shard write / restamp on this machine’s export:** set shard row `machine_id = current`; **union** current into `observed_on`.
 
-**Determinism test (#3973):** same set of shard files, shuffled order, run `merge_shards` under `AGENT_ARCHIVE_MACHINE_ID=alice` and `=bob` → **byte-identical** `index.jsonl` and `INDEX.md` (normalize Generated timestamp in INDEX if needed via stable clock injection in tests).
+**Determinism test (#3973 / #3996):** same committed shard bytes, shuffled discovery order, run the **production** `merge_shards` + render path under `AGENT_ARCHIVE_MACHINE_ID=alice` and `=bob` → byte-identical `index.jsonl` and `INDEX.md` without clock injection or output normalization. SC-MW replaces the wall-clock `Generated:` line in derived `INDEX.md` with a deterministic `Shard set: sha256:<digest>` computed from sorted `(<shard_path>, <raw_bytes>)` inputs. The local `.router-index.jsonl` is folded into its owning machine shard before publication and is never a direct merge input.
 
 **P0 acceptance — multi-machine merge regression:**
 
@@ -586,7 +585,7 @@ Markdown §2 **unchanged** (existing `tests/fixtures/contract/v1/` Markdown gold
 | # | Consumer / repo | Check | Pass criterion |
 | --- | --- | --- | --- |
 | C1 | Hub `merge_index_records` / `read_jsonl_dicts` | Extra JSON keys round-trip | Unknown keys preserved or ignored without crash; merge identity unchanged |
-| C2 | Hub `archive_status` / status CLI | Reads catalog | No KeyError on missing optional keys; grouping by `machine_id` treats absent as unknown |
+| C2 | Hub `archive_status` / status CLI | Reads catalog | No KeyError on missing optional keys; group fleet coverage by `observed_on`, falling back to scalar `machine_id` only for legacy rows; absent values are unknown |
 | C3 | Hub baseline / rules ledger / redaction paths | Index iteration | Only required keys assumed; optional keys ignored if unused |
 | C4 | Hub `tests/test_output_contract.py` + `tests/fixtures/contract/v1/` | Markdown §2 goldens | **Byte-identical** after §6/§9 doc change (Markdown unchanged) |
 | C5 | Hub unit tests for optional keys | Stamp/restamp | Present when written; absent rows still valid |
@@ -600,7 +599,7 @@ SC-1 is **not mergeable** until C1–C8 are checked (or explicitly waived with o
 
 | Key | Type | Read default if absent | Write behavior | Notes |
 | --- | --- | --- | --- | --- |
-| `machine_id` | string | omit / treat as unknown | Last writer stamp | Not in merge key; not provenance SoT |
+| `machine_id` | string | omit / treat as unknown | Local shard: current machine; derived index: `min(observed_on)` or `""` | Not in merge key; legacy compatibility only, not provenance SoT |
 | `observed_on` | string[] | `[]` / treat missing as `{machine_id}` if scalar present | Sorted unique union on merge/restamp | **Provenance SoT** (KD16) |
 | `workload_kind` | string enum | treat as `"code"` for filters | Source default or classifier | Closed enum below |
 | `domain` | string | `""` (unknown) | Coding sources: `"engineering"`; chat/inbox: `""` or vendor | **Not** forced to engineering on read |
@@ -738,34 +737,48 @@ Introduce an explicit **bundle expander** stage (not a silent overload of single
 **Vendor-ID resolution + persistent identity map:**
 
 1. **If vendor id present** (`conversation_id` / `id` / `uuid` first non-empty): `session_id = "{vendor}:{vendor_id}"` (stable). Record in map.
-2. **Else** look up **composite import fingerprint** in `.collector/inbox-identity-map.json` (KD20 / #3976):
-   - Fingerprint is a **tuple**, not bare `create_time` alone (second-level timestamps collide):
-     `fingerprint = canon_v1({vendor, create_time?, first_user_msg_prefix_hash, message_count_at_import?, attachment_names_hash?})`
-   - **Never** use `update_time` or full evolving body.
-   - If map hit → reuse prior `session_id` (title/body may change).
-3. **Else** allocate `session_id = "import-{vendor}-{uuid4}"` once, **persist** fingerprint→session_id **plus ambiguity anchors** (create_time, prefix hash, count) in the map.
-4. **Ambiguity detection:** before treating a map hit as definitive, compare stored anchors to the candidate conversation. If create_time matches but prefix hash / count disagree beyond threshold → **not** a hit; allocate a new session_id and store a second entry (do not silently merge two no-id chats that share a timestamp).
-5. **Cross-machine map (#3976):** local maps assign different UUIDs if the same export is imported on two machines. **Before SC-6 ships:** either (a) document **single designated inbox importer** machine (recommended for v1), or (b) include a stable **content-derived** secondary key that does not change on title edits (create_time + first-message prefix only) so two machines converge on the same synthetic id without UUID. Prefer (a) for SC-6 v1; (b) as SC-6.1 if multi-importer is required. Fixtures: same-timestamp distinct conversations; cross-machine replay under chosen policy.
+2. **Else** compute a stable **candidate bucket**, not a full evolving fingerprint (KD20 / #3976 / #3995):
+   - `creation_anchor = create_time` else first-message timestamp. Normalize it under canonicalization v1.
+   - `bucket_key = canon_v1({vendor, creation_anchor})`.
+   - `first_user_prefix_sha` is a **disambiguator inside the bucket**, not part of the bucket key. `message_count`, attachment names, title, `update_time`, and full-body digest are mutable evidence only and never participate in candidate lookup.
+3. **Resolve a bucket:**
+   - One candidate with the same prefix → reuse its `session_id`, even when message count, attachments, title, or body changed.
+   - Multiple candidates with exactly one matching prefix → reuse that candidate.
+   - Prefix mismatch, multiple matches, or any otherwise non-unique result → write a `needs_identity` quarantine record and materialize nothing. Do **not** silently merge and do **not** allocate another UUID.
+4. **First sighting:** when the bucket is empty and a creation anchor exists, allocate `session_id = "import-{vendor}-{uuid4}"` once and append a candidate containing the stable prefix plus diagnostic first-seen evidence. A later same-timestamp/different-prefix conversation is quarantined until the operator explicitly adds a second candidate/alias, after which replays resolve deterministically.
+5. **No creation anchor:** quarantine for explicit mapping; do not invent a supposedly stable id from mutable body content. The operator may assign a durable alias in the map, with an audit reason.
+6. **Cross-machine policy (#3976):** SC-6 v1 has exactly one designated inbox-importer machine. Other machines refuse inbox materialization and report the designation. Multi-importer deterministic synthetic ids require a separate SC-6.1 design; local UUID maps are not claimed to converge.
 
 **Map file (local-only, gitignored under `.collector/`):**
 
 ```json
 {
   "version": 1,
-  "entries": {
-    "chatgpt:vendor:abc-123": {
+  "vendor_ids": {
+    "chatgpt:abc-123": {
       "session_id": "chatgpt:abc-123",
-      "vendor": "chatgpt",
-      "anchors": {"create_time": null, "prefix_sha": null}
-    },
-    "chatgpt:fp:<canon_hash>": {
+      "vendor": "chatgpt"
+    }
+  },
+  "buckets": {
+    "chatgpt:create:1690000000": [
+      {
+        "session_id": "import-chatgpt-…",
+        "first_user_prefix_sha": "…",
+        "first_seen_evidence": {"msg_count": 12, "attachment_names": []}
+      }
+    ]
+  },
+  "manual_aliases": {
+    "<operator-chosen-stable-key>": {
       "session_id": "import-chatgpt-…",
-      "vendor": "chatgpt",
-      "anchors": {"create_time": "1690000000", "prefix_sha": "…", "msg_count": 12}
+      "reason": "resolved needs_identity quarantine"
     }
   }
 }
 ```
+
+**Required identity fixtures:** adding messages or attachments keeps the same `session_id`; title/`update_time`/body edits keep the same id when stable anchors match; two conversations sharing a timestamp never auto-merge; prefix ambiguity and missing creation anchors quarantine without a catalog row; a manual alias makes replay deterministic; a non-designated machine refuses import.
 
 **Canonicalization v1** (for digests and fingerprint hashes—must be cross-platform byte-identical):
 
@@ -1056,7 +1069,7 @@ Reject — cost/privacy/nondeterminism; deterministic first.
 
 ### 10. Check-then-write lock files
 
-**Reject** — TOCTOU lets two writers both pass. **Chosen:** `O_CREAT|O_EXCL` exclusive create, stale recovery, simultaneous multi-process tests.
+**Reject** — TOCTOU lets two writers both pass. **Chosen:** `O_CREAT|O_EXCL` exclusive create, token-checked release, explicit-only P0 stale break, simultaneous/adversarial multi-process tests.
 
 ### 11. Global multi-session `Extractor` signature in PR6
 
@@ -1068,7 +1081,7 @@ Change registry to `Callable[[Path], Iterable[ExtractedSession]]` for all source
 
 ### 13. Accept multi-writer wedge (NG8) as steady state
 
-**Reject.** Backoff cannot unwedge non-ff local divergence. **Chosen:** KD15 shard topology + two-clone acceptance test before fleet `push=true`.
+**Reject.** Backoff cannot unwedge non-ff local divergence. **Chosen:** KD15 per-machine refs + deterministic aggregate PR topology and two-clone acceptance before fleet publication.
 
 ### 14. Root-mtime export skip
 
@@ -1080,66 +1093,83 @@ Change registry to `Callable[[Path], Iterable[ExtractedSession]]` for all source
 
 ---
 
-### Multi-writer convergent topology (KD15 / #3938 / #3972)
+### Multi-writer convergent topology (KD15 / #3938 / #3972 / #3996 / #3997 / #3999)
 
-**Problem:** Two machines at base A each commit → tips B and C. After B pushes, C’s push is rejected; C is diverged so plain `pull --ff-only` fails. Collect wedges.
+**Problem:** Two machines at base A that both commit to `main` create tips B and C. Git decides the **branch ref**, not “files touched,” so even disjoint shard paths leave the loser non-fast-forward and `pull --ff-only` cannot recover. Resetting a long-lived checkout to recover can also destroy local tracked or untracked state.
 
-**Critical correction (#3972):** Git decides the **branch ref**, not “files touched.” Concurrent commits from A that change **different** shard paths still produce **two non-ff tips**. Shards alone do **not** make the second push fast-forward. (Reproduced in two clean clones: second push `rc=1`, follow-up ff-only pull `rc=128`.)
-
-**Chosen topology — shards + deterministic merge + reconciliation state machine:**
+**Chosen topology — committed machine refs + deterministic aggregate PR:**
 
 ```text
 archive/
   shards/
-    {machine_id}.jsonl   # this machine's export snapshot (crash-atomic replace)
-  index.jsonl            # pure merge_shards output (executor-independent)
-  INDEX.md               # pure derived view
+    {machine_id}.jsonl   # full machine snapshot, including that machine's router rows
+  index.jsonl            # pure merge_shards output
+  INDEX.md               # pure derived view with deterministic shard-set fingerprint
+
+Forgejo refs:
+  refs/heads/collector/machines/{machine_id}   # exactly one owning runtime
+  refs/heads/collector/catalog/{shard_digest}  # immutable aggregate PR branch
 ```
 
 | Rule | Spec |
 | --- | --- |
-| Write set per machine | Working tree may update `archive/shards/{M}.jsonl` + local markdown + derived index for local use. |
-| `merge_shards` | Pure function of shard **bytes** only (+ router sidecar if present). Sort shard paths. Apply KD16. **No** dependence on `AGENT_ARCHIVE_MACHINE_ID` of the runner (#3973). |
-| Derived index | `machine_id` field on merged rows = `min(observed_on)` only. |
+| Machine shard input | Under the archive lock, merge this machine's hub extractor records **and local `.router-index.jsonl` rows** into one complete `shards/{M}.jsonl` snapshot. The sidecar remains local/gitignored and is never read by fleet merge. |
+| `merge_shards` | Pure function of sorted committed `(shard_path, raw_bytes)` only. Apply KD16. No environment, hostname, live sidecar, existing `index.jsonl`/`INDEX.md`, config, filesystem discovery order, or wall clock. |
+| Derived view | `machine_id = min(observed_on)`; `INDEX.md` carries `Shard set: sha256:<digest>`, not a wall-clock `Generated:` value. |
+| Checkout safety | Publication uses a fresh ephemeral worktree outside the collector checkout. No `reset --hard`, rebase, clean, or checkout operation runs against the daemon/human tree. |
+| Landing | Machines push non-default refs; aggregator opens a ready Forgejo PR. Only green-CI, reviewed PR merge changes `main`. |
 
-#### Git reconciliation state machine (required for SC-MW)
+#### Per-machine ref publication
 
-Collector git commit/push **must not** be “commit everything and hope for ff.” After a local export of machine M:
+After export on machine M:
 
-1. **Snapshot** the intended shard payload for M in memory / temp (post-export `shards/{M}.jsonl` bytes + deterministic merge inputs).
-2. `git fetch origin`.
-3. If local `main` is behind: verify every **local unpushed commit** (if any) only touches **allowlisted collector paths** (`archive/shards/*`, `archive/index.jsonl`, `archive/INDEX.md`). If not allowlisted → hard fail (human WIP in daemon checkout).
-4. **Reset working merge base** to `origin/main` (e.g. `git reset --hard origin/main` **only** in dedicated collector checkout after allowlist check—never in a human dev tree).
-5. Re-apply: write `shards/{M}.jsonl` from snapshot; run `merge_shards` → crash-atomic `index.jsonl` + `INDEX.md`.
-6. Commit allowlisted paths only; message `archive: collect <date> [<M>]`.
-7. **Compare-and-swap push:** `git push origin HEAD:main`. On rejection (non-ff): **loop** from step 2 with bounded retries/backoff—not a permanent health error wedge.
-8. Never force-push. Never rebase non-allowlisted history.
+1. Snapshot the crash-atomic `shards/{M}.jsonl` bytes to process memory or a temp file **outside any publish worktree**.
+2. Fetch `refs/heads/collector/machines/{M}`. If absent, use `origin/main` as the first parent; otherwise use the fetched machine-ref tip.
+3. Create a fresh detached ephemeral worktree from that tip; verify it starts clean.
+4. Write only `archive/shards/{M}.jsonl` from the snapshot. Stage that exact path; assert the staged/unstaged/untracked set contains no other path.
+5. If bytes are unchanged, remove the worktree and succeed without a commit. Otherwise commit `archive: collect <date> [<M>]` and push `HEAD:refs/heads/collector/machines/{M}`.
+6. If a duplicate publisher for the same M wins first, discard the ephemeral worktree, refetch, recreate, and reapply the latest snapshot with bounded retries/backoff. Never force-push.
+7. Remove the ephemeral worktree on success/failure. The dedicated collector checkout and its local Markdown/config/inbox remain untouched.
 
-**Alternative (also acceptable for SC-MW):** **per-machine refs** `refs/collectors/{M}` push always ff on that ref; one **aggregator** job/machine merges all collector refs into `main` deterministically. Document which alternative is implemented; tests must match.
+`machine_id` ownership is exclusive: doctor fails if two configured runtimes claim the same machine ref.
+
+#### Aggregate PR publication
+
+A single designated aggregator runs on a bounded cadence:
+
+1. Fetch `origin/main` and all `refs/heads/collector/machines/*`; validate machine-id/path ownership and parse every shard fail-closed.
+2. Read each shard blob from its ref tip into memory; compute `shard_digest = sha256(sorted(path + NUL + raw_bytes))`.
+3. If `origin/main` already contains that digest, or an open aggregate PR for it exists, exit idempotently.
+4. Create a fresh ephemeral worktree from `origin/main`; materialize the exact shard set; run production `merge_shards` to generate `index.jsonl` + `INDEX.md`.
+5. Stage only `archive/shards/*.jsonl`, `archive/index.jsonl`, and `archive/INDEX.md`; hard-fail on any other dirty/staged/untracked path. Run the repository gate before publication.
+6. Commit `archive: aggregate <shard_digest>`; push the new immutable branch `collector/catalog/<shard_digest>`; open a **ready** Forgejo PR targeting `main` with shard refs/digest and gate evidence.
+7. CI + review + merge follow the normal PR gate. The aggregator never calls a merge API and never pushes the default branch. If `main` moves first, close/supersede the stale aggregate PR and regenerate a new immutable branch from the new base; do not rewrite it.
 
 | Rollout | Spec |
 | --- | --- |
-| Gate | Fleet multi-machine `push=true` **forbidden** until SC-MW + tests green. |
-| P0 interim | Single publisher only. |
+| Gate | Fleet machine-ref publication is forbidden until SC-MW + adversarial tests are green. |
+| P0 interim | SC-2b may have one designated publisher, but it still publishes a non-default branch + ready PR; all other machines remain `push=false`. |
 
-**Acceptance (SC-MW) — must assert recovery after forced rejection:**
+**Acceptance (SC-MW):**
 
-1. Two clones at A; both export different sessions; both attempt push.
-2. Exactly one push wins; loser gets rejection.
-3. Loser runs reconciliation loop → succeeds; `origin/main` contains **both** shards.
-4. `merge_shards` on either clone after pull → identical `index.jsonl` (byte-stable, #3973).
-5. Shared session identity → `observed_on` has both machines.
+1. Two clones at A export different sessions and push different machine refs; both refs retain their shards without a default-branch push.
+2. Two simulated publishers race on the **same** machine ref; loser receives non-ff, retries from the new tip, and succeeds without reset/force.
+3. Seed arbitrary dirty tracked and untracked files in the collector checkout; publication leaves their bytes and branch/HEAD unchanged.
+4. Aggregator reads both committed refs, creates one aggregate PR branch from current `origin/main`, and its tree contains both shards.
+5. Same shard blobs on two machines under different environment ids and clocks produce byte-identical `index.jsonl` + `INDEX.md`; router-only records are present because they were folded into the owning shard.
+6. Shared session identity yields one row with both machines in `observed_on`; scalar `machine_id = min(observed_on)`.
+7. Test transport rejects any attempted `HEAD:main` push and asserts the aggregator cannot call merge; only the normal reviewed PR path lands the catalog.
 
 ### Dedicated collector checkout (KD17 / #3942)
 
-**Problem:** Daemon `WorkingDirectory` on a human dev tree: feature branch / dirty WIP fails `require_clean_tree` / branch check; `git pull` can change code under a long-lived process.
+**Problem:** A daemon `WorkingDirectory` on a human dev tree couples service code and local state to feature-branch switches, dirty WIP, and pulls that can change code under a long-lived process. Publication safety no longer depends on that tree being clean, but service reproducibility still requires a dedicated checkout.
 
 **Spec:**
 
 | Item | Requirement |
 | --- | --- |
 | Path | Per runtime, e.g. `~/collector/agent-sessions` (or `%USERPROFILE%\collector\agent-sessions`) — **not** `Projects/...` workspaces |
-| Git | Tracks `main` only; clean tree for commit path; no human feature branches |
+| Git | Tracks `main` only; no human feature branches. Collection never commits, resets, cleans, or publishes from this checkout; updates are explicit and followed by a service restart. |
 | Install | `pip install -e .` or pinned console script from that tree; **restart service on update** (systemd `ExecStart` + `systemctl restart` after pull, or version file watch) |
 | State | `.collector/`, `inbox/`, local `sources.toml` live here (or XDG paths pointed here) |
 | Dev | Humans develop in a separate clone; never run long-lived `collect watch` from WIP trees |
@@ -1158,11 +1188,11 @@ Service unit `WorkingDirectory=` **must** point at the dedicated checkout.
 | Secrets in intel proposals | High | `redact_text` / preflight; default session_id-only evidence in git |
 | Health file absolute user paths | Medium | **Require** `portable_path` on all paths in health.json |
 | Concurrent catalog writers (process) | High | Atomic O_EXCL lock + **owner_token** release; dual legacy protocol |
-| Concurrent catalog writers (git multi-machine) | High | **KD15 shards** + deterministic merge; fleet push gated on two-clone test |
+| Concurrent catalog writers (git multi-machine) | High | **KD15 machine refs** + committed-only deterministic merge + aggregate PR; fleet publication gated on adversarial tests |
 | Crash mid-catalog write / torn pair | High | Temp+fsync+`os.replace`; fail-closed corrupt jsonl (KD18) |
 | Silent git restore of dirty catalog | High | **Forbidden** on collect; explicit doctor only |
-| Win/WSL lock false-stale / late unlink | High | Runtime-aware reclaim; token-checked release |
-| Dirty/wrong branch push | Medium | git_ops branch + clean tree; dedicated checkout |
+| Win/WSL lock false-stale / late unlink | High | No normal reclaim; acquisition-fd heartbeat; token-checked release; explicit break + barrier tests |
+| Dirty/wrong branch publication | High | Snapshot + fresh ephemeral worktree + exact allowlist; collector checkout never reset; non-default ref + PR only |
 | Export ZIP path traversal / bombs | High | KD19 safe extract + caps + fixtures |
 | Unstable import session_id on edit | High | KD20 identity map; no mutable title/update_time as id |
 | Skill publish clobber | High | New skill dir only; never memory/ |
@@ -1213,17 +1243,18 @@ All path-like fields **must** pass through `portable_path`.
 | `collect.export.sessions` | Count |
 | `collect.export.errors` | Count |
 | `collect.lock.wait_ms` / `collect.lock.busy` | Lock contention |
-| `collect.git.push` | success/fail |
-| `collect.git.ff_fail` | Concurrent multi-machine push |
+| `collect.git.machine_ref_push` | success/fail/unchanged |
+| `collect.git.ff_retry` | Same-machine ref publication race |
+| `collect.git.aggregate_pr` | opened/already-open/merged/failed |
 
 Logs: paths (portable) + counts only for collect **and** intel CLIs.
 
-### Multi-machine concurrent push
+### Multi-machine publication
 
-1. `git pull --ff-only` before commit.
-2. On non-ff or push rejection: record health error, backoff, **no force-push**.
-3. **Before SC-MW:** only one machine has `push=true` (single-publisher interim).
-4. **After SC-MW (KD15):** machines commit **shards**; merge rebuilds `index.jsonl` deterministically; two-clone test required before enabling multi-machine push. Permanent wedge is **not** accepted.
+1. Machines publish only `collector/machines/{machine_id}` through ephemeral worktrees; never pull/reset the collector checkout and never push `main`.
+2. Same-machine ref non-ff → discard ephemeral worktree, refetch, reapply the latest snapshot, bounded retry; no force-push.
+3. **Before SC-MW:** one designated publisher may open a normal non-default-branch catalog PR; all other machines are `push=false`.
+4. **After SC-MW (KD15):** distinct machine refs carry shards; the aggregator rebuilds deterministic derived files and opens a ready aggregate PR. Permanent wedge and direct-default landing are both rejected.
 
 ---
 
@@ -1231,12 +1262,12 @@ Logs: paths (portable) + counts only for collect **and** intel CLIs.
 
 | Stage | Action |
 | --- | --- |
-| 0 | SC-1: fields + observed_on + token lock + crash-safe + fail-closed |
-| 1 | SC-2a/2b: collect + single-publisher git_ops |
+| 0 | SC-1: fields + observed_on + token lock + explicit break + crash-safe + fail-closed |
+| 1 | SC-2a/2b: collect + designated publisher branch/PR git_ops |
 | 2 | SC-3: thin shells; **dedicated checkout** systemd on toofan |
 | 3 | Observe single-machine poll 1 week |
-| 4 | **SC-MW** shards + two-clone test **before** multi-machine push |
-| 5 | Other machines with distinct `AGENT_ARCHIVE_MACHINE_ID` + push |
+| 4 | **SC-MW** machine refs + aggregate PR + adversarial tests **before** fleet publication |
+| 5 | Other machines with distinct `AGENT_ARCHIVE_MACHINE_ID` + machine-ref publication |
 | 6 | SC-6 inbox (safe ZIP + identity map) |
 | 7 | P2 session-intel |
 
@@ -1300,7 +1331,7 @@ Synced with **KD5–KD21** (#3977). This checklist is the **only** P0/SC-1 accep
 ### Files to add/change (SC-1 / early P0)
 
 1. `agent_sessions/machine_id.py` — resolve machine id
-2. `agent_sessions/archive_lock.py` — O_EXCL, **owner_token**, **expires_at heartbeat**, runtime-aware reclaim, dual legacy
+2. `agent_sessions/archive_lock.py` — O_EXCL, **owner_token**, acquisition-fd diagnostic heartbeat, explicit-only stale break, dual legacy
 3. `agent_sessions/agent_family.py` — hub + all router kinds + tests
 4. `agent_sessions/archive.py` — restamp + **`observed_on` union**; crash-atomic `write_indexes`; **fail-closed** corrupt jsonl (no auto git restore); merge algebra for derived fields
 5. `agent_sessions/cli.py` — export/prune take lock; collect stubs later
@@ -1315,8 +1346,8 @@ Synced with **KD5–KD21** (#3977). This checklist is the **only** P0/SC-1 accep
 
 - [ ] `collect run` / `export --all` parity on fixtures (when collect exists; else export path).
 - [ ] **Lock:** simultaneous multi-process contenders → one winner.
-- [ ] **Lock:** owner_token release; late-release after reclaim does not unlink successor.
-- [ ] **Lock:** foreign-runtime owner with **renewed** lease past nominal timeout **retains** exclusion (#3974).
+- [ ] **Lock:** owner_token release; late acquisition-fd heartbeat/release after explicit break does not overwrite or unlink successor (#3994).
+- [ ] **Lock:** normal commands never auto-reclaim by PID/age/heartbeat; long foreign-runtime owner past timeout retains exclusion; explicit break requires expected token + stopped-writers acknowledgement.
 - [ ] **Lock:** dual-check legacy `.daily-export.lock`.
 - [ ] **Crash-atomic** write_indexes: temp+fsync+replace; between-file fault rebuilds INDEX only.
 - [ ] **Fail-closed:** corrupt jsonl → hard error, bytes preserved; **no** git checkout of index on collect start (#3941).
@@ -1331,9 +1362,9 @@ Synced with **KD5–KD21** (#3977). This checklist is the **only** P0/SC-1 accep
 
 ### SC-2+ checklist pointers (not SC-1)
 
-- Dedicated checkout doctor (KD17); full export every poll no root-mtime (KD21); single-publisher git until SC-MW.
-- SC-MW: reconciliation state machine + forced push-reject recovery (#3972); byte-identical merge under two machine ids (#3973).
-- SC-6: identity map ambiguity anchors (#3976); ZIP ratio `uncompressed/compressed` (#3975).
+- Dedicated checkout doctor (KD17); full export every poll no root-mtime (KD21); designated publisher uses a normal branch/PR until SC-MW.
+- SC-MW: ephemeral machine-ref publication + deterministic aggregate PR; forced same-ref rejection recovery; dirty collector checkout preserved; no `main` push (#3972/#3996/#3997/#3999).
+- SC-6: stable candidate buckets, ambiguity quarantine, designated importer (#3976/#3995); ZIP ratio `uncompressed/compressed` (#3975).
 
 ### Service unit sketch (Linux)
 
@@ -1365,11 +1396,11 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated · **Deferr
 
 | ID | Deliverable | Depends on | Gated? | Status | PR |
 |----|-------------|-----------|--------|--------|----|
-| D0 | Design + tracked project doc (this file) | — | No | ◐ | #142 (Forgejo PR on this repo) |
+| D0 | Design + tracked project doc (this file) | — | No | ☑ | #142 (Forgejo PR on this repo) |
 | SC-1 | Contract §6/§9 + optional fields (`observed_on`) + restamp + **tokenized atomic lock** + **crash-atomic** writes + **fail-closed** corrupt recovery + inbox gitignore + agent_family map + observation merge algebra | D0 | No | ☐ | — |
 | SC-2a | Collector `run`/`status`/`doctor` + health (no git); doctor dedicated-checkout checks | SC-1 | No | ☐ | — |
-| SC-2b | git_ops allowlist; **default single-publisher**; document push=false for non-publishers | SC-2a | No | ☐ | — |
-| SC-MW | **Multi-writer shards** + deterministic merge + two-clone concurrent push test (KD15) | SC-2b | Gate: before fleet push | ☐ | — |
+| SC-2b | git_ops allowlist; designated publisher uses ephemeral worktree + non-default branch/ready PR; others `push=false` | SC-2a | No | ☐ | — |
+| SC-MW | **Machine shard refs** + committed-only deterministic merge + immutable aggregate PR + adversarial tests (KD15) | SC-2b | Gate: before fleet publication | ☐ | — |
 | SC-3 | Thin daily-export sh/ps1 + systemd on **dedicated checkout** + Forgejo push note | SC-2b | No | ☐ | — |
 | SC-4 | `collect watch` poll: **full export every interval** (no root-mtime); backoff | SC-2a | No | ☐ | — |
 | SC-5 | Status grouping by `observed_on` / machine coverage | SC-1 | No | ☐ | — |
@@ -1388,10 +1419,10 @@ Every implementation PR updates **its own row** (status + PR link) and the Chang
 
 - [ ] All non-Deferred rows above are ☑ or explicitly **Deferred** with linked issues (not labeled Complete).
 - [ ] P0 acceptance checklist satisfied on at least one Linux host; Windows ps1 path exercised or gap filed.
-- [ ] Atomic lock + owner_token + cross-runtime reclaim tests green.
+- [ ] Atomic lock + owner_token + explicit-break + heartbeat/release race tests green; normal commands never reclaim.
 - [ ] Crash-atomic writes + fail-closed corrupt jsonl (no auto git restore) tested.
 - [ ] Observation merge: same identity two machines → `observed_on` has both.
-- [ ] Multi-writer shards: two-clone concurrent push does not wedge (SC-MW).
+- [ ] Multi-writer: machine refs + aggregate PR converge without resetting collector checkouts or pushing `main` (SC-MW).
 - [ ] Dedicated checkout doctor checks documented and implemented.
 - [ ] OUTPUT_CONTRACT §6/§9 amendment merged; Markdown v1 goldens still pass hub + router.
 - [ ] Inbox: identity map edit fixtures + ZIP attack fixtures green.
@@ -1409,7 +1440,7 @@ Effort: **S** &lt; ~1 day, **M** ~1–3 days, **L** multi-day. Each PR independe
 ### SC-1 / PR1 — Contract + fields + lock + crash-safe + observation merge (L)
 
 - **Title:** `feat(archive): optional catalog fields, observed_on merge, token lock, crash-safe indexes`
-- **Files:** `OUTPUT_CONTRACT.md`, `machine_id.py`, `archive_lock.py` (O_EXCL + owner_token + runtime reclaim), `agent_family.py`, `models.py`, `config.py`, `archive.py` (write_indexes temp+replace; merge algebra; fail-closed), `cli.py`, `default_sources.toml`, `.gitignore`, `inbox/README.md`, tests
+- **Files:** `OUTPUT_CONTRACT.md`, `machine_id.py`, `archive_lock.py` (O_EXCL + owner_token + explicit-only stale break), `agent_family.py`, `models.py`, `config.py`, `archive.py` (write_indexes temp+replace; merge algebra; fail-closed), `cli.py`, `default_sources.toml`, `.gitignore`, `inbox/README.md`, tests
 - **Dependencies:** D0
 - **Description:** KD5/11/14/16/18. C1–C8 evidence in PR body. Cross-runtime lock tests. Observation union tests.
 - **Effort:** L
@@ -1421,20 +1452,20 @@ Effort: **S** &lt; ~1 day, **M** ~1–3 days, **L** multi-day. Each PR independe
 - **Dependencies:** SC-1
 - **Effort:** M
 
-### SC-2b / PR2b — git_ops single-publisher path (M)
+### SC-2b / PR2b — git_ops designated-publisher PR path (M)
 
-- **Title:** `feat(collector): git_ops allowlist commit/push (single-publisher default)`
-- **Files:** `collector/git_ops.py`, docs: fleet push gated on SC-MW
+- **Title:** `feat(collector): publish catalog through allowlisted branch and PR`
+- **Files:** `collector/git_ops.py`, Forgejo PR client, ephemeral-worktree tests, docs: fleet publication gated on SC-MW
 - **Dependencies:** SC-2a
-- **Description:** Allowlist stage; no force; `push` default true only for designated publisher machines.
+- **Description:** One designated publisher snapshots outputs, builds a non-default branch in an ephemeral worktree, runs gates, and opens a ready PR. No reset/force/default-branch push; others default `push=false`.
 - **Effort:** M
 
-### SC-MW / PR — Multi-writer shards + reconciliation + convergence test (L)
+### SC-MW / PR — Machine refs + deterministic aggregate PR (L)
 
-- **Title:** `feat(archive): catalog shards, deterministic merge, git reconciliation loop`
-- **Files:** shard write/merge, `git_ops` reconciliation state machine (fetch/reset-allowlist/re-apply/CAS push), allowlist `archive/shards/*`, two-clone integration test with **forced push rejection**, MULTI_MACHINE.md
+- **Title:** `feat(archive): machine shard refs and deterministic aggregate PR`
+- **Files:** router-to-shard fold, pure shard merge/render, machine-ref publisher, aggregate PR builder, ephemeral worktrees, allowlists, same-ref rejection + dirty-checkout + no-main-push integration tests, MULTI_MACHINE.md
 - **Dependencies:** SC-2b
-- **Description:** KD15 + #3972/#3973. Shards alone are insufficient—must recover after non-ff. Byte-identical merge under two executor machine ids.
+- **Description:** KD15 + #3972/#3973/#3996/#3997/#3999. Each runtime owns one non-default ref; aggregate output is committed-shard-only and byte-identical; normal PR gate is the sole path to `main`.
 - **Effort:** L
 
 ### SC-3 / PR3 — Thin shells + dedicated-checkout systemd (S)
@@ -1511,8 +1542,8 @@ flowchart TB
   D0[D0 design doc]
   SC1[SC-1 fields+lock+observed_on]
   SC2a[SC-2a collect no-git]
-  SC2b[SC-2b git single-publisher]
-  SCMW[SC-MW shards multi-writer]
+  SC2b[SC-2b designated publisher PR]
+  SCMW[SC-MW machine refs + aggregate PR]
   SC3[SC-3 thin shells+daemon checkout]
   SC4[SC-4 poll full export]
   SC5[SC-5 status observed_on]
@@ -1543,7 +1574,8 @@ flowchart TB
 - `2026-08-01` — Tighten residual review gaps: SC-1 cross-repo conformance checklist C1–C8 (hub + router goldens); vendor-ID fallback chain + numbered multi-file export handling; Review findings disposition matrix.
 - `2026-08-01` — PII: remove tailnet hostname from progress tracker link.
 - `2026-08-01` — Review #349 (8 P1s): multi-writer shards (KD15); `observed_on` merge algebra (KD16); owner_token locks (KD11); fail-closed recovery (KD18); dedicated checkout (KD17); safe ZIP (KD19); stable identity map (KD20); no root-mtime skip (KD21).
-- `2026-08-01` — Review #351 final pass: git reconciliation state machine (#3972); deterministic merge_shards independent of executor (#3973); renewable lock lease/heartbeat (#3974); zip bomb ratio formula (#3975); identity-map ambiguity + importer policy (#3976); P0 checklist resynced to KD15–KD21 (#3977).
+- `2026-08-01` — Review #351 final pass: git reconciliation state machine (#3972); deterministic merge_shards independent of executor (#3973); long-owner lock safety (#3974); zip bomb ratio formula (#3975); identity-map ambiguity + importer policy (#3976); P0 checklist resynced to KD15–KD21 (#3977).
+- `2026-08-01` — Review #353 takeover hardening: explicit-only P0 stale-lock break and acquisition-fd heartbeat (#3994); stable identity buckets + quarantine (#3995); router rows folded into committed shards and clock-free deterministic render (#3996); ephemeral publish worktrees (#3997); `observed_on` contract/C2 alignment (#3998); per-machine refs + aggregate PR with no default-branch push (#3999).
 
 ---
 
@@ -1580,14 +1612,25 @@ Maps each Forgejo review finding to the design text that incorporates it. Inline
 
 | Finding ID | Severity | Ask | Incorporated in | Status |
 | --- | --- | --- | --- | --- |
-| **#3972** | P1 | Shards ≠ ff; need reconciliation state machine | KD15 rewrite; SC-MW steps 1–8; forced-reject acceptance | **In design** |
+| **#3972** | P1 | Shards ≠ ff; need reconciliation state machine | KD15 machine refs + aggregate PR; same-ref non-ff retry and default-push rejection acceptance | **In design** |
 | **#3973** | P1 | merge_shards must not stamp executor machine_id | KD16; derived `machine_id=min(observed_on)`; byte-identical test | **In design** |
-| **#3974** | P1 | Fixed timeout not a lease; heartbeat | KD11 `expires_at` + renew; foreign reclaim rules | **In design** |
+| **#3974** | P1 | Fixed timeout must not steal a long owner | KD11 explicit-only P0 stale recovery; heartbeat is diagnostic only | **In design** (strengthened by #3994) |
 | **#3975** | P1 | Zip bomb ratio direction | KD19 formula `uncompressed/max(1,compressed) <= max_ratio` | **In design** |
 | **#3976** | P2 | Identity map ambiguity / multi-importer | Composite fingerprint + anchors; designated importer v1 | **In design** |
 | **#3977** | P2 | P0 checklist drift vs KD15–21 | Implementation notes + checklist rewritten | **In design** |
 
-Implementation remains out of scope for #142 (docs-only). D0 is ready to merge when CI/process allows; SC-* implement the design.
+### Pass 4 (review #353 @ `e477df9` — takeover hardening)
+
+| Finding ID | Severity | Ask | Incorporated in | Status |
+| --- | --- | --- | --- | --- |
+| **#3994** | P1 | Heartbeat/reclaim needs fencing; path replace/held-fd races | KD11 + lock protocol: normal commands never reclaim; heartbeat uses acquisition fd; explicit break only + barrier tests | **In design** |
+| **#3995** | P1 | Mutable count/attachments cannot key identity | KD20 + inbox resolution: stable creation buckets; mutable evidence only; ambiguity/no-anchor quarantine | **In design** |
+| **#3996** | P1 | Merge inputs must be committed/executor-independent | KD15: router rows folded into owner shard; pure committed-shard merge; deterministic shard digest in INDEX | **In design** |
+| **#3997** | P1 | `reset --hard` can destroy dirty local state | KD2/KD15: all publication in fresh ephemeral worktrees; dirty collector checkout preservation test | **In design** |
+| **#3998** | P1 | Scalar provenance text contradicts `observed_on` | C2 + schema table: group by `observed_on`; derived scalar is `min(observed_on)` only | **In design** |
+| **#3999** | P1 | Direct `HEAD:main` violates PR-only policy | KD10/KD15: per-machine non-default refs + immutable aggregate ready PR; no default push/auto-merge | **In design** |
+
+Implementation remains out of scope for #142 (docs-only). D0 is complete on merge; SC-* implement the reviewed design.
 
 ---
 
