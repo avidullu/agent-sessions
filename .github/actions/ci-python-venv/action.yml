@@ -1,0 +1,44 @@
+name: Set up isolated CI Python environment
+description: Create a disposable virtual environment for this job and activate it for later steps.
+
+inputs:
+  python-command:
+    description: Python executable selected by setup-python or supplied by the runner image.
+    required: false
+    default: python
+
+runs:
+  using: composite
+  steps:
+    - name: Create and activate the job virtual environment
+      shell: bash
+      env:
+        CI_VENV_PYTHON: ${{ inputs.python-command }}
+      run: |
+        set -euo pipefail
+        "$CI_VENV_PYTHON" -m venv "$RUNNER_TEMP/ci-python-venv"
+        "$CI_VENV_PYTHON" - <<'PY'
+        import os
+
+        venv = os.path.join(os.environ["RUNNER_TEMP"], "ci-python-venv")
+        scripts = os.path.join(venv, "Scripts" if os.name == "nt" else "bin")
+        with open(os.environ["GITHUB_PATH"], "a", encoding="utf-8") as stream:
+            stream.write(scripts + os.linesep)
+        with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as stream:
+            stream.write("VIRTUAL_ENV=" + venv + os.linesep)
+        PY
+
+    - name: Verify the isolated interpreter is active
+      shell: bash
+      run: |
+        set -euo pipefail
+        python - <<'PY'
+        import os
+        import sys
+
+        expected = os.path.realpath(os.environ["VIRTUAL_ENV"])
+        actual = os.path.realpath(sys.prefix)
+        if actual != expected:
+            raise SystemExit(f"virtual environment is not active: {actual} != {expected}")
+        print(f"isolated Python: {sys.executable}")
+        PY

@@ -53,6 +53,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
+      - name: Create isolated Python environment
+        uses: ./.github/actions/ci-python-venv
+
       - name: Install
         # -c pins the gate toolchain so the verdict on a commit does not depend
         # on which day it was checked. See constraints-dev.txt.
@@ -76,6 +79,9 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+
+      - name: Create isolated Python environment
+        uses: ./.github/actions/ci-python-venv
 
       - name: Install
         # -c pins the gate toolchain so the verdict on a commit does not depend
