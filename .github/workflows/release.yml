@@ -26,6 +26,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Create isolated Python environment
+        uses: ./.github/actions/ci-python-venv
+
       - name: Build sdist and wheel
         run: |
           python -m pip install build twine
