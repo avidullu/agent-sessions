@@ -111,14 +111,16 @@ ci_pytest=(python -m pytest --cov=agent_sessions --cov-report=term-missing --cov
 ci_linkcheck=(python -m tools.check_md_links)
 ci_pii=(python -m tools.check_pii)
 
-# The install line appears once per job; the workflow has four jobs now
-# (test, lint, link-check, pii-check). The link-check and pii-check jobs have
-# no install step — they only need Python stdlib.
+# The install line appears once per Python job; the Windows job is defined
+# separately so Forgejo can skip its unavailable runner labels before matrix
+# expansion. Link and PII checks need only the standard library.
 expected_runs=(
+  "${ci_install[*]}"
   "${ci_install[*]}"
   "${ci_install[*]}"
   "${ci_ruff[*]}"
   "${ci_mypy[*]}"
+  "${ci_pytest[*]}"
   "${ci_pytest[*]}"
   "${ci_linkcheck[*]}"
   "${ci_pii[*]}"
@@ -131,7 +133,7 @@ expected_python_versions=(3.11 3.13)
 # than hardcoded, so deleting the Windows leg can no longer leave this script
 # claiming coverage CI stopped providing.
 expected_os=(ubuntu-latest windows-latest)
-expected_matrix_include=("windows-latest 3.11" "windows-latest 3.13")
+expected_matrix_include=()
 
 # ── Drift guard ─────────────────────────────────────────────────────
 #
@@ -237,7 +239,14 @@ fi
 # the gate off, and a workflow- or job-level `env:` block can change what a run
 # line does (PYTEST_ADDOPTS). None of these exist today, so their appearance is
 # by definition a change this script does not mirror.
-neutering="$(grep -nE '^[[:space:]]*(-[[:space:]]*)?(if|continue-on-error|env):' "$workflow" || true)"
+github_only_jobs="$(grep -cE "^[[:space:]]*if:[[:space:]]*github.server_url == 'https://github.com'$" "$workflow" || true)"
+if [[ "$github_only_jobs" != "1" ]]; then
+  drift_fail "the one native-Windows job must remain explicitly GitHub-only while Forgejo has no Windows runner."
+fi
+neutering="$(
+  grep -nE '^[[:space:]]*(-[[:space:]]*)?(if|continue-on-error|env):' "$workflow" |
+    grep -vE "if:[[:space:]]*github.server_url == 'https://github.com'$" || true
+)"
 if [[ -n "$neutering" ]]; then
   drift_fail "$workflow now uses if:/continue-on-error:/env:, which can disable or alter a gate without changing its 'run:' line." \
     "$(printf '%s' "$neutering" | sed 's/^/  /')" \
