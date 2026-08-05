@@ -52,7 +52,26 @@ See [Getting Started](GETTING_STARTED.md) for detailed setup.
 
 To the `archive/` directory inside the agent-sessions repo (configurable via `sources.toml`). Files are organized by source: `archive/claude-windows/`, `archive/codex-macos/`, etc.
 
-By default, Git tracks only the catalog metadata (`archive/index.jsonl` and `archive/INDEX.md`). Rendered transcript bodies are local-only files — they stay on your machine unless you explicitly configure Git tracking.
+By default:
+
+- **Transcript bodies** (`archive/**/*.md`, optional PDFs) are **gitignored** — local only.
+- **Catalog metadata** (`archive/index.jsonl`, `archive/INDEX.md`) is **not** gitignored, so a **private** archive remote can share “what is indexed” across machines without uploading full transcripts.
+
+If you cloned the **public** product repo, keep personal catalogs on disk and use
+[`scripts/local-export`](AUTOMATION.md) (no commit/push). Do not push personal
+`index.jsonl` to public remotes.
+
+## How do I run a daily export on one machine?
+
+Preferred (local-only, no git):
+
+```bash
+./scripts/install-local-export-schedule.sh   # user crontab
+# Windows: .\scripts\install-local-export-schedule.ps1
+```
+
+Private multi-machine catalog sync (commit + push) uses `scripts/daily-export.*`
+against a private remote only — see [AUTOMATION.md](AUTOMATION.md).
 
 ## How do I add support for a new AI agent?
 

@@ -88,6 +88,12 @@ Expected behavior:
 If defaults miss local paths, copy `sources.example.toml` to `sources.toml` and
 edit roots for this machine. Keep `sources.toml` uncommitted.
 
+If this machine will be the **only** archive host (for example WSL that can also
+see Windows stores under `/mnt/c/Users/...`), install local-only daily export
+after the first successful export — see [AUTOMATION.md](AUTOMATION.md)
+(`install-local-export-schedule`). Do not point `daily-export` at public product
+remotes.
+
 ## 5. Dry-Run Export
 
 ```powershell

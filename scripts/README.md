@@ -6,7 +6,9 @@
 | `ci-python-venv.ps1` | Select the requested native-Windows tool-cache interpreter and expose an explicit isolated CI Python. | [docs/LOCAL_CI.md](../docs/LOCAL_CI.md) |
 | `local_ci.sh` | Run the CI gate set locally in a pinned, throwaway venv, with a drift guard against `.github/workflows/ci.yml`. | [docs/LOCAL_CI.md](../docs/LOCAL_CI.md) |
 | `pre-push` | Opt-in git hook that runs `local_ci.sh` before a push and aborts it if a gate is red. | [docs/LOCAL_CI.md](../docs/LOCAL_CI.md) |
-| `daily-export.sh` / `daily-export.ps1` | Scheduled archive export, commit, and push. | [docs/AUTOMATION.md](../docs/AUTOMATION.md) |
+| `local-export.sh` / `local-export.ps1` | Local-only archive export (no git). Preferred on a single primary host or public product clones. | [docs/AUTOMATION.md](../docs/AUTOMATION.md) |
+| `install-local-export-schedule.sh` / `.ps1` | Install/remove daily user cron (POSIX) or Scheduled Task (Windows) for local-export. | [docs/AUTOMATION.md](../docs/AUTOMATION.md) |
+| `daily-export.sh` / `daily-export.ps1` | Export + commit catalog + optional push to a **private** archive remote. | [docs/AUTOMATION.md](../docs/AUTOMATION.md) |
 
 ## Before pushing
 

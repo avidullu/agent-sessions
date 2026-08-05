@@ -1,12 +1,25 @@
 # Multi-Machine Archive Model
 
-> **Status:** `Active (reference)` · **Owner:** `avidullu` · **Last updated:** `2026-07-22`
+> **Status:** `Active (reference)` · **Owner:** `avidullu` · **Last updated:** `2026-08-05`
 > Describes the per-machine local-store + shared-tracked-catalog model.
 
-This repo is the shared user-level archive. Each computer keeps its own local
-agent stores, exports the sessions it can see, and pushes Markdown archive
-metadata back to the private GitHub repo. Rendered Markdown/PDF transcript
-artifacts are local-only by default.
+This repo can be a shared user-level archive. Each computer keeps its own local
+agent stores, exports the sessions it can see, and (for private remotes) may push
+catalog metadata back. Rendered Markdown/PDF transcript artifacts are local-only
+by default.
+
+### Single primary host (simplest)
+
+If one machine can see every store you care about (for example WSL with both
+`$HOME` and `/mnt/c/Users/...` Windows roots), keep **one** clone as the archive
+source of truth and schedule **local-only** export:
+
+```bash
+./scripts/install-local-export-schedule.sh
+```
+
+Do not run `daily-export` against public product remotes. See
+[AUTOMATION.md](AUTOMATION.md).
 
 ### Planned: SSH fleet collect (primary pulls remotes)
 

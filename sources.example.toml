@@ -8,12 +8,20 @@
 #   {home}              — User home directory (cross-platform)
 #   {appdata}           — Windows APPDATA
 #   {localappdata}      — Windows LOCALAPPDATA
-#   {wsl_home}          — \\wsl.localhost\<distro>\home\<user>
+#   {wsl_home}          — \\wsl.localhost\<distro>\home\<user> (from Windows)
 #   {wsl_vscode_server} — {wsl_home}\.vscode-server
 #
 # Override WSL detection with environment variables:
 #   AGENT_ARCHIVE_WSL_DISTRO
 #   AGENT_ARCHIVE_WSL_USER
+#
+# Tip (single primary archive host on WSL/Linux): keep one clone as source of
+# truth, point [[sources]] at both {home}/... and Windows mounts under
+# /mnt/c/Users/<you>/..., and schedule scripts/local-export.sh (see
+# docs/AUTOMATION.md). Do not maintain a second catalog on a Windows checkout
+# of the public product repo.
+
+# ── Windows-native roots (also used as defaults in config/default_sources.toml)
 
 [[sources]]
 name = "codex-windows"
@@ -33,6 +41,7 @@ glob = "**/*.jsonl"
 [[sources]]
 name = "claude-wsl-ubuntu"
 kind = "claude"
+description = "From Windows: Claude sessions inside the default WSL distro."
 roots = ["{wsl_home}/.claude/projects"]
 glob = "**/*.jsonl"
 
@@ -45,6 +54,7 @@ glob = "**/transcript*.jsonl"
 [[sources]]
 name = "grok-wsl-ubuntu"
 kind = "grok"
+description = "From Windows: Grok sessions inside the default WSL distro."
 roots = ["{wsl_home}/.grok/sessions"]
 glob = "**/chat_history.jsonl"
 
@@ -68,6 +78,23 @@ glob = "**/*.msg*.txt"
 name = "copilot-vscode-windows-inventory"
 kind = "inventory"
 roots = ["{appdata}/Code/User/globalStorage/github.copilot-chat"]
+glob = "**/*"
+
+[[sources]]
+name = "copilot-vscode-wsl-ubuntu-inventory"
+kind = "inventory"
+roots = [
+  "{wsl_vscode_server}/data/User/globalStorage/github.copilot-chat",
+]
+glob = "**/*"
+
+[[sources]]
+name = "zai-vscode-wsl-ubuntu-inventory"
+kind = "inventory"
+roots = [
+  "{wsl_vscode_server}/extensions/ltmoerdani.zai-copilot-chat-0.3.1",
+]
+glob = "**/*"
 
 # ── macOS ──────────────────────────────────────────────────────────
 # Uncomment and adjust for your macOS setup.
@@ -101,8 +128,8 @@ roots = ["{appdata}/Code/User/globalStorage/github.copilot-chat"]
 # ]
 # glob = "**/*.msg*.txt"
 
-# ── Linux ──────────────────────────────────────────────────────────
-# Uncomment and adjust for your Linux setup.
+# ── Linux / native WSL home ────────────────────────────────────────
+# Uncomment on Ubuntu, Debian, Fedora, or WSL when agents write under $HOME.
 
 # [[sources]]
 # name = "claude-linux"
@@ -132,20 +159,37 @@ roots = ["{appdata}/Code/User/globalStorage/github.copilot-chat"]
 #   "{home}/.config/Code/User/globalStorage/vizards.deepseek-v4-for-copilot/request-dumps",
 # ]
 # glob = "**/*.msg*.txt"
-glob = "**/*"
 
-[[sources]]
-name = "copilot-vscode-wsl-ubuntu-inventory"
-kind = "inventory"
-roots = [
-  "{wsl_vscode_server}/data/User/globalStorage/github.copilot-chat",
-]
-glob = "**/*"
+# ── WSL reading Windows-native agent stores ────────────────────────
+# When the primary archive host is WSL/Linux, you can ingest Windows Claude,
+# Codex, etc. through the /mnt/c mount without maintaining a second catalog.
+# Replace <you> with the Windows username (e.g. avidu).
 
-[[sources]]
-name = "zai-vscode-wsl-ubuntu-inventory"
-kind = "inventory"
-roots = [
-  "{wsl_vscode_server}/extensions/ltmoerdani.zai-copilot-chat-0.3.1",
-]
-glob = "**/*"
+# [[sources]]
+# name = "claude-windows-via-wsl"
+# kind = "claude"
+# roots = ["/mnt/c/Users/<you>/.claude/projects"]
+# glob = "**/*.jsonl"
+
+# [[sources]]
+# name = "codex-windows-via-wsl"
+# kind = "codex"
+# roots = [
+#   "/mnt/c/Users/<you>/.codex/sessions",
+#   "/mnt/c/Users/<you>/.codex/archived_sessions",
+# ]
+# glob = "**/*.jsonl"
+
+# [[sources]]
+# name = "deepseek-vscode-windows-via-wsl"
+# kind = "deepseek_request_dump"
+# roots = [
+#   "/mnt/c/Users/<you>/AppData/Roaming/Code/User/globalStorage/vizards.deepseek-v4-for-copilot/request-dumps",
+# ]
+# glob = "**/*.msg*.txt"
+
+# [[sources]]
+# name = "gemini-antigravity-windows-via-wsl"
+# kind = "gemini_antigravity"
+# roots = ["/mnt/c/Users/<you>/.gemini/antigravity/brain"]
+# glob = "**/transcript*.jsonl"
