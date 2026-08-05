@@ -83,7 +83,25 @@ Shows archive freshness, new/changed files, and cross-machine convergence.
 
 ## 7. (Optional) Set up daily automation
 
-See [AUTOMATION.md](AUTOMATION.md) for cron/scheduled-task scripts that auto-export daily.
+On one primary machine, install a **local-only** daily export (no git push):
+
+```bash
+# Linux / WSL / macOS
+./scripts/install-local-export-schedule.sh
+# or run once:
+./scripts/local-export.sh
+```
+
+```powershell
+# Windows
+.\scripts\install-local-export-schedule.ps1
+# or run once:
+.\scripts\local-export.ps1
+```
+
+Use `daily-export` (commit + push catalog) only against a **private** archive
+remote. See [AUTOMATION.md](AUTOMATION.md) for both modes, privacy notes, and
+Task Scheduler / cron details.
 
 ## What next?
 

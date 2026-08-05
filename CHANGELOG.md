@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Local-only export + schedule installers** for a single primary archive host:
+  - `scripts/local-export.sh` / `scripts/local-export.ps1` — export + status, no git
+  - `scripts/install-local-export-schedule.sh` / `.ps1` — user crontab or Windows Task Scheduler
+- Docs: two automation modes (local-only vs private catalog sync) in `docs/AUTOMATION.md`,
+  Getting Started, FAQ; WSL→Windows `/mnt/c` source examples in `sources.example.toml`
+
+- **`ci-gate` job and `scripts/ci-gate.sh`** — the single honest required check. It
+  asserts on `needs.<job>.result`, where `skipped` is distinct from `success`, so a job
+  that never ran can no longer pass as one. Branch protection should require `ci-gate`
+  and nothing else.
+- `tests/test_ci_gate.py` — pins the gate's behaviour and the workflow wiring.
+
 ### Fixed
+- Local-only exports now use an atomic, ownership-checked cross-shell lock without
+  time-based eviction; PowerShell propagates failed native commands; and installed
+  cron commands safely quote paths containing spaces, apostrophes, or percent signs.
+- `sources.example.toml`: remove the orphaned top-level `glob`, retain the Z.AI WSL
+  inventory example, and clarify Linux / WSL-mounted Windows sections.
 - **CI reported native-Windows tests as passing when they never ran.** Forgejo maps a
   skipped job to `success` in the commit-status API. `test-windows` carried
   `if: github.server_url == 'https://github.com'`, and because GitHub Actions is
@@ -20,13 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   virtual-environment interpreter explicitly, avoiding two runner-specific failures:
   an incompatible action-clone path on one runner and delayed composite-action PATH
   propagation on the other.
-
-### Added
-- **`ci-gate` job and `scripts/ci-gate.sh`** — the single honest required check. It
-  asserts on `needs.<job>.result`, where `skipped` is distinct from `success`, so a job
-  that never ran can no longer pass as one. Branch protection should require `ci-gate`
-  and nothing else.
-- `tests/test_ci_gate.py` — pins the gate's behaviour and the workflow wiring.
 
 ### Changed
 - `scripts/local_ci.sh` drift guard no longer *requires* a GitHub-only job (that rule was

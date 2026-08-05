@@ -224,7 +224,9 @@ Value preview:
 - Evidence breadcrumbs:
 ```
 
-See [docs/AUTOMATION.md](docs/AUTOMATION.md) for scheduled export details and
+See [docs/AUTOMATION.md](docs/AUTOMATION.md) for scheduled export (local-only
+primary host via `scripts/local-export` / `install-local-export-schedule`, or
+private catalog sync via `daily-export`) and
 [docs/MULTI_MACHINE.md](docs/MULTI_MACHINE.md) for how indexes converge across
 computers. For a step-by-step manual checklist, see
 [docs/NEW_MACHINE_SETUP.md](docs/NEW_MACHINE_SETUP.md).
@@ -298,8 +300,9 @@ This repo owns durable export and baseline generation. Search, Claude-specific
 browsing, live capture, and runtime memory are delegated to external tools where
 they are already stronger. See [docs/COMPOSE_STACK.md](docs/COMPOSE_STACK.md).
 
-Daily export automation is documented in [docs/AUTOMATION.md](docs/AUTOMATION.md).
-Multi-machine indexing is documented in [docs/MULTI_MACHINE.md](docs/MULTI_MACHINE.md).
+Daily export automation (local-only schedule or private catalog push) is
+documented in [docs/AUTOMATION.md](docs/AUTOMATION.md). Multi-machine indexing is
+documented in [docs/MULTI_MACHINE.md](docs/MULTI_MACHINE.md).
 
 ## Reusable Plugins
 
