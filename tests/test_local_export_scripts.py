@@ -11,15 +11,20 @@ from pathlib import Path
 
 import pytest
 
+from tests.bash_support import BASH, requires_bash
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
+@requires_bash
 def test_local_export_sh_help() -> None:
     script = REPO_ROOT / "scripts" / "local-export.sh"
     assert script.is_file()
-    assert script.stat().st_mode & stat.S_IXUSR
+    if os.name != "nt":
+        assert script.stat().st_mode & stat.S_IXUSR
+    assert BASH is not None
     completed = subprocess.run(
-        ["bash", str(script), "--help"],
+        [BASH, str(script), "--help"],
         check=False,
         capture_output=True,
         text=True,
@@ -32,9 +37,11 @@ def test_local_export_sh_help() -> None:
 
 
 @pytest.mark.parametrize("option", ["--python", "--source", "--log-dir"])
+@requires_bash
 def test_local_export_sh_rejects_missing_option_value(option: str) -> None:
+    assert BASH is not None
     completed = subprocess.run(
-        ["bash", str(REPO_ROOT / "scripts" / "local-export.sh"), option],
+        [BASH, str(REPO_ROOT / "scripts" / "local-export.sh"), option],
         check=False,
         capture_output=True,
         text=True,
@@ -44,12 +51,15 @@ def test_local_export_sh_rejects_missing_option_value(option: str) -> None:
     assert f"{option} requires a value" in completed.stderr
 
 
+@requires_bash
 def test_install_local_export_schedule_sh_help() -> None:
     script = REPO_ROOT / "scripts" / "install-local-export-schedule.sh"
     assert script.is_file()
-    assert script.stat().st_mode & stat.S_IXUSR
+    if os.name != "nt":
+        assert script.stat().st_mode & stat.S_IXUSR
+    assert BASH is not None
     completed = subprocess.run(
-        ["bash", str(script), "--help"],
+        [BASH, str(script), "--help"],
         check=False,
         capture_output=True,
         text=True,
