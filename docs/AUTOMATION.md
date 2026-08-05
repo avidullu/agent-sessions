@@ -116,5 +116,6 @@ workflows mature.
 
 A future **primary-host** job will lightly probe allowlisted SSH hosts each hour,
 pull only new/changed agent session files, and index them on the primary. Ship-back
-of catalog/artifacts to remotes will be **opt-in and approval-gated**, never part
-of the default hourly path. See [SSH_FLEET_COLLECT_PLAN.md](SSH_FLEET_COLLECT_PLAN.md).
+of a catalog snapshot will be a separate manual command with scoped, single-use
+approval, never part of the hourly path. See
+[SSH_FLEET_COLLECT_PLAN.md](SSH_FLEET_COLLECT_PLAN.md).

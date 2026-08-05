@@ -12,7 +12,8 @@ artifacts are local-only by default.
 
 When other machines are only reachable over SSH, a **primary host** can pull
 session stores on a lightweight hourly schedule, index them locally, and
-optionally ship finalized catalog artifacts back only after explicit approval.
+optionally ship one exact catalog snapshot back with a separate manual command
+and scoped, single-use approval.
 Design and PR-sized tracker (not implemented yet):
 
 → [SSH_FLEET_COLLECT_PLAN.md](SSH_FLEET_COLLECT_PLAN.md) (**DRAFT**).
