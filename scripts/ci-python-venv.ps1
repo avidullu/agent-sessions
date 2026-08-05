@@ -37,7 +37,7 @@ function Find-CiPython {
 }
 
 $basePython = Find-CiPython -Version $PythonVersion
-$actualVersion = (& $basePython -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")').Trim()
+$actualVersion = (& $basePython -c 'import sys; print(sys.version_info.major, sys.version_info.minor, sep=chr(46))').Trim()
 if ($LASTEXITCODE -ne 0 -or $actualVersion -ne $PythonVersion) {
     throw "Selected interpreter '$basePython' is Python $actualVersion, expected $PythonVersion."
 }

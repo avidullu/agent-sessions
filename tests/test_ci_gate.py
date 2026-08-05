@@ -185,6 +185,8 @@ def test_windows_job_bootstraps_without_reusable_actions() -> None:
     body = WORKFLOW.read_text(encoding="utf-8")
     windows = workflow_job_block(body, "test-windows")
     assert "uses:" not in windows
+    assert "shell: pwsh" not in windows
+    assert windows.count("shell: powershell") == 4
     assert body.count("\n        env:\n") == 1
     assert "CI_REPOSITORY_TOKEN: ${{ github.token }}" in windows
     assert "fetch --no-tags --depth=1 origin $env:GITHUB_SHA" in windows

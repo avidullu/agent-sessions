@@ -75,7 +75,7 @@ jobs:
       # invokes `git --config-env` incompatibly. The repository checkout is
       # intentionally explicit and the short-lived token is never persisted.
       - name: Check out without reusable actions
-        shell: pwsh
+        shell: powershell
         env:
           CI_REPOSITORY_TOKEN: ${{ github.token }}
         run: |
@@ -98,15 +98,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Cleaning the CI workspace failed.' }
 
       - name: Select Python and create isolated environment
-        shell: pwsh
+        shell: powershell
         run: ./scripts/ci-python-venv.ps1 -PythonVersion "${{ matrix.python-version }}"
 
       - name: Install
-        shell: pwsh
+        shell: powershell
         run: '& $env:CI_PYTHON -m pip install -e ".[dev]" -c constraints-dev.txt'
 
       - name: Test with coverage
-        shell: pwsh
+        shell: powershell
         run: '& $env:CI_PYTHON -m pytest --cov=agent_sessions --cov-report=term-missing --cov-fail-under=92'
 
   lint:
