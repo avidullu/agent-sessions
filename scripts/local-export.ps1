@@ -13,6 +13,7 @@ param(
     [switch]$Pdf,
     [switch]$NoStatus,
     [switch]$WritePrimaryMarker,
+    [switch]$BreakLock,
     [string[]]$Source = @(),
     [string]$Python = "",
     [string]$LogDir = ""
@@ -35,17 +36,21 @@ if (-not $LogDir -and $env:AGENT_SESSIONS_LOG_DIR) {
     $LogDir = $env:AGENT_SESSIONS_LOG_DIR
 }
 
-$lockFile = Join-Path $RepoRoot ".local-export.lock"
-$lockTimeoutSec = 300
-if (Test-Path $lockFile) {
-    $age = [int]((Get-Date) - (Get-Item $lockFile).LastWriteTime).TotalSeconds
-    if ($age -lt $lockTimeoutSec) {
-        throw "local-export: lock file exists (age=${age}s) — another export may be running"
-    }
-    Write-Host "local-export: stale lock file (age=${age}s), removing"
-    Remove-Item -Force $lockFile
+$lockDir = Join-Path $RepoRoot ".local-export.lock"
+$lockToken = [Guid]::NewGuid().ToString("N")
+if ($BreakLock -and (Test-Path -LiteralPath $lockDir)) {
+    Remove-Item -LiteralPath $lockDir -Recurse -Force
 }
-Set-Content -Path $lockFile -Value $PID
+try {
+    New-Item -ItemType Directory -Path $lockDir -ErrorAction Stop | Out-Null
+} catch {
+    throw "local-export: lock exists at $lockDir — another export may be running. After confirming no export is active, retry with -BreakLock."
+}
+Set-Content -LiteralPath (Join-Path $lockDir "token") -Value $lockToken -Encoding ascii
+@(
+    "pid=$PID"
+    "started=$(Get-Date -Format o)"
+) | Set-Content -LiteralPath (Join-Path $lockDir "owner") -Encoding utf8
 try {
     $exportArgs = @(".\tools\agent_archive.py", "export")
     if ($Source.Count -gt 0) {
@@ -63,8 +68,14 @@ try {
         param($Python, $exportArgs, $NoStatus, $WritePrimaryMarker, $RepoRoot)
         Write-Host "local-export: $(Get-Date -Format o) starting in $RepoRoot"
         & $Python @exportArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "local-export: export failed with exit code $LASTEXITCODE"
+        }
         if (-not $NoStatus) {
             & $Python ".\tools\agent_archive.py" "status"
+            if ($LASTEXITCODE -ne 0) {
+                throw "local-export: status failed with exit code $LASTEXITCODE"
+            }
         }
         if ($WritePrimaryMarker) {
             $archiveDir = Join-Path $RepoRoot "archive"
@@ -90,5 +101,9 @@ try {
     }
 }
 finally {
-    Remove-Item -Force $lockFile -ErrorAction SilentlyContinue
+    $tokenPath = Join-Path $lockDir "token"
+    if ((Test-Path -LiteralPath $tokenPath) -and
+        ((Get-Content -LiteralPath $tokenPath -Raw).Trim() -eq $lockToken)) {
+        Remove-Item -LiteralPath $lockDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }

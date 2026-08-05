@@ -30,13 +30,37 @@ archive host, especially if remotes are a public product repository.
 EOF
 }
 
+require_value() {
+  local option="$1"
+  local count="$2"
+  local value="${3:-}"
+  if [[ "$count" -lt 2 || "$value" == --* ]]; then
+    echo "$option requires a value" >&2
+    usage >&2
+    exit 2
+  fi
+}
+
+cron_quote() {
+  local value="$1"
+  if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+    echo "cron paths must not contain newlines" >&2
+    exit 2
+  fi
+  value=${value//\'/\'\\\'\'}
+  value=${value//%/\\%}
+  printf "'%s'" "$value"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --hour)
+      require_value "$1" "$#" "${2:-}"
       hour="$2"
       shift 2
       ;;
     --minute)
+      require_value "$1" "$#" "${2:-}"
       minute="$2"
       shift 2
       ;;
@@ -45,6 +69,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --log-dir)
+      require_value "$1" "$#" "${2:-}"
       log_dir="$2"
       shift 2
       ;;
@@ -109,8 +134,10 @@ if [[ "$pdf" -eq 1 ]]; then
   pdf_flag=" --pdf"
 fi
 
-# Use absolute path so cron does not depend on cwd.
-cron_line="$minute $hour * * * $export_script --log-dir $(printf %q "$log_dir") --write-primary-marker$pdf_flag"
+# Use portable single-quoted absolute paths so cron does not depend on cwd.
+# Cron consumes unescaped percent signs before invoking /bin/sh, even inside
+# shell quotes, so cron_quote also protects them.
+cron_line="$minute $hour * * * $(cron_quote "$export_script") --log-dir $(cron_quote "$log_dir") --write-primary-marker$pdf_flag"
 
 {
   printf '%s\n' "$filtered"
@@ -128,4 +155,4 @@ echo "  logs:   $log_dir"
 echo "  mode:   local-only (no git commit/push)"
 echo
 echo "Verify with: crontab -l"
-echo "Run once now: $export_script --log-dir $(printf %q "$log_dir") --write-primary-marker$pdf_flag"
+echo "Run once now: $(printf %q "$export_script") --log-dir $(printf %q "$log_dir") --write-primary-marker$pdf_flag"

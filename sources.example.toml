@@ -88,6 +88,14 @@ roots = [
 ]
 glob = "**/*"
 
+[[sources]]
+name = "zai-vscode-wsl-ubuntu-inventory"
+kind = "inventory"
+roots = [
+  "{wsl_vscode_server}/extensions/ltmoerdani.zai-copilot-chat-0.3.1",
+]
+glob = "**/*"
+
 # ── macOS ──────────────────────────────────────────────────────────
 # Uncomment and adjust for your macOS setup.
 

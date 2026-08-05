@@ -15,7 +15,7 @@ write_marker=0
 python_cmd="${PYTHON:-python3}"
 sources=()
 log_dir=""
-lock_timeout=300
+break_lock=0
 
 usage() {
   cat <<'EOF'
@@ -29,6 +29,7 @@ Options:
   --python CMD          Python interpreter (default: python3, or $PYTHON)
   --log-dir DIR         Append a dated log under DIR (creates DIR if needed)
   --no-status           Skip `agent_archive status` after export
+  --break-lock          Remove an abandoned export lock before starting
   --write-primary-marker
                         Write archive/.primary-host (gitignored machine marker)
   -h, --help            Show this help
@@ -38,6 +39,17 @@ Environment:
   AGENT_SESSIONS_LOG_DIR
                         Default for --log-dir when set
 EOF
+}
+
+require_value() {
+  local option="$1"
+  local count="$2"
+  local value="${3:-}"
+  if [[ "$count" -lt 2 || "$value" == --* ]]; then
+    echo "local-export: $option requires a value" >&2
+    usage >&2
+    exit 2
+  fi
 }
 
 while [[ $# -gt 0 ]]; do
@@ -54,15 +66,22 @@ while [[ $# -gt 0 ]]; do
       write_marker=1
       shift
       ;;
+    --break-lock)
+      break_lock=1
+      shift
+      ;;
     --python)
+      require_value "$1" "$#" "${2:-}"
       python_cmd="$2"
       shift 2
       ;;
     --source)
+      require_value "$1" "$#" "${2:-}"
       sources+=("$2")
       shift 2
       ;;
     --log-dir)
+      require_value "$1" "$#" "${2:-}"
       log_dir="$2"
       shift 2
       ;;
@@ -94,18 +113,27 @@ if ! command -v "$python_cmd" >/dev/null 2>&1; then
   fi
 fi
 
-lock_file="$repo_root/.local-export.lock"
-if [[ -f "$lock_file" ]]; then
-  lock_age=$(($(date +%s) - $(stat -c %Y "$lock_file" 2>/dev/null || echo 0)))
-  if [[ $lock_age -lt $lock_timeout ]]; then
-    echo "local-export: lock file exists (age=${lock_age}s) — another export may be running" >&2
-    exit 1
-  fi
-  echo "local-export: stale lock file (age=${lock_age}s > timeout=${lock_timeout}s), removing" >&2
-  rm -f "$lock_file"
+lock_dir="$repo_root/.local-export.lock"
+lock_token="$$-$(date +%s)-${RANDOM:-0}"
+if [[ "$break_lock" -eq 1 && -e "$lock_dir" ]]; then
+  rm -rf -- "$lock_dir"
 fi
-trap 'rm -f "$lock_file"' EXIT
-echo $$ >"$lock_file"
+if ! mkdir -- "$lock_dir" 2>/dev/null; then
+  echo "local-export: lock exists at $lock_dir — another export may be running" >&2
+  echo "local-export: after confirming no export is active, retry with --break-lock" >&2
+  exit 1
+fi
+printf '%s\n' "$lock_token" >"$lock_dir/token"
+{
+  printf 'pid=%s\n' "$$"
+  printf 'started=%s\n' "$(date -Iseconds 2>/dev/null || date)"
+} >"$lock_dir/owner"
+release_lock() {
+  if [[ -f "$lock_dir/token" ]] && [[ "$(cat "$lock_dir/token")" == "$lock_token" ]]; then
+    rm -rf -- "$lock_dir"
+  fi
+}
+trap release_lock EXIT
 
 run_export() {
   local export_args=(tools/agent_archive.py export)

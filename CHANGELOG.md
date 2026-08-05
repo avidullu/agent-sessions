@@ -14,8 +14,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docs: two automation modes (local-only vs private catalog sync) in `docs/AUTOMATION.md`,
   Getting Started, FAQ; WSL→Windows `/mnt/c` source examples in `sources.example.toml`
 
+- **`ci-gate` job and `scripts/ci-gate.sh`** — the single honest required check. It
+  asserts on `needs.<job>.result`, where `skipped` is distinct from `success`, so a job
+  that never ran can no longer pass as one. Branch protection should require `ci-gate`
+  and nothing else.
+- `tests/test_ci_gate.py` — pins the gate's behaviour and the workflow wiring.
+
 ### Fixed
-- `sources.example.toml`: remove orphaned top-level `glob` and clarify Linux / WSL-mounted Windows sections
+- Local-only exports now use an atomic, ownership-checked cross-shell lock without
+  time-based eviction; PowerShell propagates failed native commands; and installed
+  cron commands safely quote paths containing spaces, apostrophes, or percent signs.
+- `sources.example.toml`: remove the orphaned top-level `glob`, retain the Z.AI WSL
+  inventory example, and clarify Linux / WSL-mounted Windows sections.
+- **CI reported native-Windows tests as passing when they never ran.** Forgejo maps a
+  skipped job to `success` in the commit-status API. `test-windows` carried
+  `if: github.server_url == 'https://github.com'`, and because GitHub Actions is
+  disabled on the backup mirror that condition was never true on either forge — so the
+  Windows legs executed nowhere while every PR showed
+  `CI / test (py 3.11, windows-latest) — success`. The guard's stated premise ("every
+  registered Forgejo runner is Linux") was also already false: Forgejo has two
+  `windows-latest` runners. The condition is removed and Windows now runs on both forges.
+- The Windows job now bootstraps without reusable actions and invokes its selected
+  virtual-environment interpreter explicitly, avoiding two runner-specific failures:
+  an incompatible action-clone path on one runner and delayed composite-action PATH
+  propagation on the other.
+
+### Changed
+- `scripts/local_ci.sh` drift guard no longer *requires* a GitHub-only job (that rule was
+  mandating the false green). It now positively asserts that `ci-gate` exists, carries
+  `if: ${{ always() }}`, lists every job in `needs:`, and passes every job's result to the
+  assertion — so a new job cannot be added outside the gate. Gate checks are scoped to
+  the `ci-gate` block so a decoy `needs:` or `always()` on another job cannot satisfy them.
 
 ## [0.2.0] — 2026-07-23
 

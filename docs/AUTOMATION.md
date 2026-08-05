@@ -55,6 +55,15 @@ Useful flags:
 - `--write-primary-marker` / `-WritePrimaryMarker` — write gitignored `archive/.primary-host`
 - `--no-status` / `-NoStatus` — skip the post-export status summary
 - `--source` / `-Source` — limit to named source(s)
+- `--break-lock` / `-BreakLock` — remove an abandoned lock after confirming no export is active
+
+Local-only exports share the atomic `.local-export.lock` directory across Bash
+and PowerShell, so overlapping cron, Scheduled Task, or manual runs fail instead
+of writing the catalog concurrently. The lock is deliberately not expired by
+age: a large valid export can run for more than a few minutes. If a host crash
+leaves the lock behind, first confirm that no export process is active, then run
+once with `--break-lock` (Bash) or `-BreakLock` (PowerShell). Lock cleanup is
+ownership-checked so an older process cannot delete a newer process's lock.
 
 ### Install a daily schedule
 
