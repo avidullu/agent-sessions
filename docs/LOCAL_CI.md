@@ -48,16 +48,41 @@ same three on Windows; the script prints which ones it did not prove (derived
 from the workflow matrix, not hardcoded). If the local interpreter is not one CI
 tests, it warns.
 
-**Windows is GitHub-only (H6, D7).** Every registered Forgejo runner is Linux, so
-the three Windows legs execute on GitHub Actions only. Forgejo's review-time
-verdict on a PR is therefore Linux-only, even though the same `ci.yml` file
-drives both. This is accepted rather than fixed: registering and maintaining a
-Windows runner is more operational surface than the gap warrants for a tool whose
-Windows-specific logic is already exercised by unit tests. The consequence to
-remember is that a Windows-only regression is caught by the GitHub checks, not by
-Forgejo — do not read a green Forgejo PR as full matrix coverage. Adding a
-`.forgejo/workflows/` file is *not* the answer and the drift guard rejects it
-(D7).
+**Windows now runs on both forges (supersedes H6/D7's GitHub-only decision).**
+The Windows legs are unconditional. They previously carried
+`if: github.server_url == 'https://github.com'` on the premise that every
+registered Forgejo runner was Linux. That premise was false — Forgejo has
+`avis-msi-win-runner` and `avis-surface-win-runner`, both advertising
+`windows-latest` — and because GitHub Actions is disabled on the backup mirror
+under the Forgejo-primary invariant, the condition was never true on *either*
+forge. The result was the worst of both worlds: the native-Windows legs
+executed nowhere, while Forgejo's skipped-to-success status mapping reported
+`CI / test (py 3.11, windows-latest) — success` on every pull request. Adding a
+`.forgejo/workflows/` file is still *not* the answer and the drift guard still
+rejects it (D7).
+
+### The `ci-gate` job — read this one, not the individual checks
+
+**Forgejo reports a SKIPPED job as `success` in the commit-status API.** A job
+carrying `if:` therefore renders a green check even when it never executed, and
+the combined status stays green. No individual status context can distinguish
+"passed" from "never ran", which is precisely how the Windows gap above stayed
+invisible for weeks.
+
+`ci-gate` is the one context that can tell the difference. It depends on every
+other job, runs with `if: ${{ always() }}` so a failed dependency cannot skip
+it into a false pass, and calls `scripts/ci-gate.sh` to assert on
+`needs.<job>.result` — where `skipped` is a distinct value from `success` and is
+rejected. Branch protection should require **`ci-gate` and nothing else**.
+
+The drift guard enforces this structurally, so it cannot rot: it fails if
+`ci-gate` disappears, if it loses `always()`, if any job is missing from its
+`needs:` list, or if a job is in `needs:` but its result is never passed to the
+assertion. Job-level `if:` is permitted for `ci-gate` alone.
+
+A genuinely optional leg can be declared with
+`scripts/ci-gate.sh --allow-skipped <job>`; the skip is then still surfaced as
+`NOT RUN` and the gate refuses to claim full coverage. Prefer not needing it.
 
 **Shell scripts are not linted.** `scripts/` contains `local_ci.sh`,
 `daily-export.sh`, `pre-push` and `daily-export.ps1` — no Python, so ruff has

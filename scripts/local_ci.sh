@@ -111,9 +111,15 @@ ci_pytest=(python -m pytest --cov=agent_sessions --cov-report=term-missing --cov
 ci_linkcheck=(python -m tools.check_md_links)
 ci_pii=(python -m tools.check_pii)
 
+# The ci-gate assertion. Held as one string, not an array, because it carries
+# literal Actions `${{ }}` expressions that bash must not expand. This gate has
+# no local equivalent — `needs.<job>.result` only exists inside CI — so it is
+# mirrored for drift detection but never executed by this script.
+ci_gate='bash scripts/ci-gate.sh "test=${{ needs.test.result }}" "test-windows=${{ needs.test-windows.result }}" "lint=${{ needs.lint.result }}" "link-check=${{ needs.link-check.result }}" "pii-check=${{ needs.pii-check.result }}"'
+
 # The install line appears once per Python job; the Windows job is defined
-# separately so Forgejo can skip its unavailable runner labels before matrix
-# expansion. Link and PII checks need only the standard library.
+# separately so its `runs-on` label is not entangled with the Linux matrix.
+# Link and PII checks need only the standard library.
 expected_runs=(
   "${ci_install[*]}"
   "${ci_install[*]}"
@@ -124,6 +130,7 @@ expected_runs=(
   "${ci_pytest[*]}"
   "${ci_linkcheck[*]}"
   "${ci_pii[*]}"
+  "$ci_gate"
 )
 
 expected_python_versions=(3.11 3.13)
@@ -237,21 +244,76 @@ fi
 # A `run:` line only means "enforced gate" while nothing neuters it. `if: false`
 # and `continue-on-error: true` leave the run lines byte-identical while turning
 # the gate off, and a workflow- or job-level `env:` block can change what a run
-# line does (PYTEST_ADDOPTS). None of these exist today, so their appearance is
-# by definition a change this script does not mirror.
-github_only_jobs="$(grep -cE "^[[:space:]]*if:[[:space:]]*github.server_url == 'https://github.com'$" "$workflow" || true)"
-if [[ "$github_only_jobs" != "1" ]]; then
-  drift_fail "the one native-Windows job must remain explicitly GitHub-only while Forgejo has no Windows runner."
-fi
+# line does (PYTEST_ADDOPTS).
+#
+# This check previously *required* exactly one
+# `if: github.server_url == 'https://github.com'` job, on the premise that
+# Forgejo had no Windows runner. That premise was false — Forgejo has
+# registered `windows-latest` runners — and since GitHub Actions is disabled on
+# the backup mirror, the condition was never true anywhere. The native-Windows
+# legs ran on no forge at all, and Forgejo's skipped-to-success status mapping
+# reported them green. The guard against neutered gates was itself mandating a
+# neutered gate. Job-level `if:` is now allowed for exactly one job — ci-gate,
+# which needs `always()` to observe its dependencies' results — and nowhere else.
 neutering="$(
   grep -nE '^[[:space:]]*(-[[:space:]]*)?(if|continue-on-error|env):' "$workflow" |
-    grep -vE "if:[[:space:]]*github.server_url == 'https://github.com'$" || true
+    grep -vE 'if:[[:space:]]*\$\{\{[[:space:]]*always\(\)[[:space:]]*\}\}$' || true
 )"
 if [[ -n "$neutering" ]]; then
   drift_fail "$workflow now uses if:/continue-on-error:/env:, which can disable or alter a gate without changing its 'run:' line." \
     "$(printf '%s' "$neutering" | sed 's/^/  /')" \
-    "This guard compares run: lines; it cannot see a gate that CI no longer enforces."
+    "This guard compares run: lines; it cannot see a gate that CI no longer enforces." \
+    "Only 'if: \${{ always() }}' on ci-gate is permitted."
 fi
+
+# The honest-gate invariant, asserted positively.
+#
+# Forgejo reports a skipped job as `success`, so no individual status context
+# can be trusted to mean "this ran". ci-gate is the one context that can: it
+# asserts on needs.<job>.result, where `skipped` != `success`. Two ways that
+# protection can rot, both checked here:
+#   1. ci-gate stops existing, or stops running when a dependency fails.
+#   2. A new job is added to the workflow but not wired into ci-gate's needs,
+#      so its failure or skip never reaches the gate.
+if ! grep -qE '^[[:space:]]*ci-gate:[[:space:]]*$' "$workflow"; then
+  drift_fail "the ci-gate job is gone from $workflow." \
+    "Without it, a skipped job still reports 'success' to the commit-status API" \
+    "and both reviewers and merge automation read that as tested."
+fi
+if ! grep -qE '^[[:space:]]*if:[[:space:]]*\$\{\{[[:space:]]*always\(\)[[:space:]]*\}\}$' "$workflow"; then
+  drift_fail "ci-gate no longer carries 'if: \${{ always() }}'." \
+    "Without always(), the gate is itself skipped when a dependency fails," \
+    "and a skipped gate reports success. That is the bug it exists to prevent."
+fi
+
+# Every job defined in the workflow, except the gate itself, must appear in
+# ci-gate's needs: list AND in the arguments it passes to scripts/ci-gate.sh.
+mapfile -t workflow_jobs < <(
+  sed -n '/^jobs:[[:space:]]*$/,$p' "$workflow" |
+    sed -n 's/^  \([A-Za-z0-9_-]\{1,\}\):[[:space:]]*$/\1/p' |
+    grep -v '^ci-gate$' |
+    sort -u
+)
+if [[ ${#workflow_jobs[@]} -eq 0 ]]; then
+  drift_fail "no job names could be parsed from $workflow." \
+    "The workflow changed shape and this guard can no longer verify gate coverage."
+fi
+gate_needs_line="$(grep -E '^[[:space:]]*needs:[[:space:]]*\[' "$workflow" || true)"
+if [[ -z "$gate_needs_line" ]]; then
+  drift_fail "ci-gate has no 'needs: [...]' list in $workflow."
+fi
+for job in "${workflow_jobs[@]}"; do
+  if [[ "$gate_needs_line" != *"$job"* ]]; then
+    drift_fail "job '$job' is not in ci-gate's needs: list." \
+      "A job outside the gate can fail or be skipped without failing CI." \
+      "ci-gate needs: $gate_needs_line"
+  fi
+  if ! grep -qE "\"$job=\\\$\{\{ needs\.$job\.result \}\}\"" "$workflow"; then
+    drift_fail "job '$job' is in ci-gate's needs: but its result is never asserted." \
+      "Add \"$job=\${{ needs.$job.result }}\" to the scripts/ci-gate.sh arguments." \
+      "A job in needs: whose result is not passed to the gate is not actually gated."
+  fi
+done
 
 # Runner coverage. The Python matrix is guarded above; the OS matrix is the other
 # half, and it is the half the closing summary makes a claim about.

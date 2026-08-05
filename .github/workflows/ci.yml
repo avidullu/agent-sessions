@@ -53,9 +53,15 @@ jobs:
         run: python -m pytest --cov=agent_sessions --cov-report=term-missing --cov-fail-under=92
 
   test-windows:
-    # Every registered Forgejo runner is Linux. Keep native-Windows coverage in
-    # the portable workflow without asking Forgejo to schedule impossible labels.
-    if: github.server_url == 'https://github.com'
+    # These legs run on BOTH forges and are unconditional by design.
+    #
+    # They previously carried `if: github.server_url == 'https://github.com'`,
+    # on the premise that every registered Forgejo runner was Linux. That
+    # premise was already false (avis-msi-win-runner and avis-surface-win-runner
+    # both advertise `windows-latest`), and because GitHub Actions is disabled
+    # on the backup mirror the condition was never true on any forge either.
+    # The result: native-Windows tests executed nowhere, while Forgejo's
+    # skipped-to-success status mapping reported them green. See ci-gate below.
     name: test (py ${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -140,3 +146,28 @@ jobs:
           python-version: "3.13"
       - name: Scan tracked files for private paths and identifiers
         run: python -m tools.check_pii
+
+  # The single honest required check. Branch protection should require THIS
+  # context and no other.
+  #
+  # Forgejo maps a SKIPPED job to `success` in the commit-status API, so a job
+  # that never ran still renders a green check on the PR. Reading the individual
+  # contexts therefore cannot distinguish "passed" from "never executed".
+  # scripts/ci-gate.sh asserts on `needs.<job>.result`, where `skipped` is a
+  # distinct value from `success` and is rejected.
+  #
+  # `if: ${{ always() }}` is required: without it this job would itself be
+  # skipped whenever a dependency failed, and would then report success — the
+  # exact bug it exists to prevent.
+  ci-gate:
+    name: ci-gate
+    if: ${{ always() }}
+    needs: [test, test-windows, lint, link-check, pii-check]
+    # Never a conditional runner label here. A gate that cannot be scheduled on
+    # some forge queues forever or resolves green, which is another false pass.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Assert every required job ran and succeeded
+        run: bash scripts/ci-gate.sh "test=${{ needs.test.result }}" "test-windows=${{ needs.test-windows.result }}" "lint=${{ needs.lint.result }}" "link-check=${{ needs.link-check.result }}" "pii-check=${{ needs.pii-check.result }}"
