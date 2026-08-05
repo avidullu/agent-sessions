@@ -15,19 +15,16 @@ script's behaviour and the workflow wiring that makes it meaningful.
 from __future__ import annotations
 
 import re
-import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
+from tests.bash_support import BASH, requires_bash
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GATE = REPO_ROOT / "scripts" / "ci-gate.sh"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
-
-# The gate is bash; skip rather than fail on a host without it.
-BASH = shutil.which("bash")
-requires_bash = pytest.mark.skipif(BASH is None, reason="bash is not available")
 
 
 def run_gate(*args: str) -> subprocess.CompletedProcess[str]:
