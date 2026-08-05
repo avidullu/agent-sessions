@@ -61,6 +61,16 @@ executed nowhere, while Forgejo's skipped-to-success status mapping reported
 `.forgejo/workflows/` file is still *not* the answer and the drift guard still
 rejects it (D7).
 
+The native-Windows job deliberately avoids reusable actions. One registered
+Windows runner cannot clone action repositories with its current runner/Git
+combination, and Forgejo's Windows execution does not reliably apply a
+composite action's PATH update between the action's inner steps. The workflow
+therefore performs an authenticated, exact-SHA checkout without persisting the
+short-lived token, then `scripts/ci-python-venv.ps1` selects the requested
+tool-cache interpreter and exposes the venv's interpreter explicitly as
+`CI_PYTHON`. The install and test commands invoke that exact executable rather
+than trusting ambient PATH state.
+
 ### The `ci-gate` job — read this one, not the individual checks
 
 **Forgejo reports a SKIPPED job as `success` in the commit-status API.** A job
@@ -78,7 +88,9 @@ rejected. Branch protection should require **`ci-gate` and nothing else**.
 The drift guard enforces this structurally, so it cannot rot: it fails if
 `ci-gate` disappears, if it loses `always()`, if any job is missing from its
 `needs:` list, or if a job is in `needs:` but its result is never passed to the
-assertion. Job-level `if:` is permitted for `ci-gate` alone.
+assertion. Those checks are scoped to the `ci-gate` block, so a similarly named
+key on another job cannot satisfy them. Job-level `if:` is permitted for
+`ci-gate` alone.
 
 A genuinely optional leg can be declared with
 `scripts/ci-gate.sh --allow-skipped <job>`; the skip is then still surfaced as

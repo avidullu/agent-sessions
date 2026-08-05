@@ -107,6 +107,15 @@ def workflow_jobs() -> list[str]:
     return re.findall(r"^  ([A-Za-z0-9_-]+):[ \t]*$", jobs_section, flags=re.MULTILINE)
 
 
+def workflow_job_block(body: str, job: str) -> str:
+    """Return one top-level job block without matching sibling jobs."""
+    start = re.search(rf"^  {re.escape(job)}:[ \t]*$", body, flags=re.MULTILINE)
+    assert start is not None, f"workflow has no {job!r} job"
+    sibling = re.search(r"^  [A-Za-z0-9_-]+:[ \t]*$", body[start.end() :], flags=re.MULTILINE)
+    end = start.end() + sibling.start() if sibling is not None else len(body)
+    return body[start.start() : end]
+
+
 def test_workflow_has_a_ci_gate_job() -> None:
     assert "ci-gate" in workflow_jobs()
 
@@ -114,13 +123,16 @@ def test_workflow_has_a_ci_gate_job() -> None:
 def test_ci_gate_runs_always() -> None:
     """Without always(), a failed dependency skips the gate - which reports success."""
     body = WORKFLOW.read_text(encoding="utf-8")
-    assert re.search(r"^\s*if:\s*\$\{\{\s*always\(\)\s*\}\}\s*$", body, flags=re.MULTILINE)
+    gate = workflow_job_block(body, "ci-gate")
+    assert re.search(r"^\s*if:\s*\$\{\{\s*always\(\)\s*\}\}\s*$", gate, flags=re.MULTILINE)
+    assert len(re.findall(r"^\s*if:\s*\$\{\{\s*always\(\)\s*\}\}\s*$", body, flags=re.MULTILINE)) == 1
 
 
 def test_every_job_is_covered_by_the_gate() -> None:
     """A job outside the gate can fail or be skipped without failing CI."""
     body = WORKFLOW.read_text(encoding="utf-8")
-    needs = re.search(r"^\s*needs:\s*\[(?P<jobs>[^\]]*)\]", body, flags=re.MULTILINE)
+    gate = workflow_job_block(body, "ci-gate")
+    needs = re.search(r"^\s*needs:\s*\[(?P<jobs>[^\]]*)\]", gate, flags=re.MULTILINE)
     assert needs is not None, "ci-gate has no needs: list"
     gated = {name.strip() for name in needs.group("jobs").split(",") if name.strip()}
 
@@ -129,9 +141,18 @@ def test_every_job_is_covered_by_the_gate() -> None:
             continue
         assert job in gated, f"job {job!r} is not in ci-gate's needs: list"
         # Being in needs: is not enough - the result must reach the assertion.
-        assert f'"{job}=${{{{ needs.{job}.result }}}}"' in body, (
+        assert f'"{job}=${{{{ needs.{job}.result }}}}"' in gate, (
             f"job {job!r} is in needs: but its result is never passed to ci-gate.sh"
         )
+
+
+def test_gate_inspection_ignores_decoy_needs_on_another_job() -> None:
+    """A sibling's needs:/always() stanza must never satisfy gate checks."""
+    body = WORKFLOW.read_text(encoding="utf-8")
+    mutated = body.replace("  test:\n", "  test:\n    needs: [decoy]\n    if: ${{ always() }}\n", 1)
+    gate = workflow_job_block(mutated, "ci-gate")
+    assert "needs: [decoy]" not in gate
+    assert gate.count("if: ${{ always() }}") == 1
 
 
 def test_no_job_is_silently_forge_conditional() -> None:
@@ -151,9 +172,21 @@ def test_no_job_is_silently_forge_conditional() -> None:
 def test_gate_runner_label_is_unconditional() -> None:
     """A gate that cannot be scheduled on some forge is itself a false green."""
     body = WORKFLOW.read_text(encoding="utf-8")
-    gate_block = body[body.index("  ci-gate:") :]
+    gate_block = workflow_job_block(body, "ci-gate")
     runs_on = re.search(r"^\s*runs-on:\s*(?P<label>.+)$", gate_block, flags=re.MULTILINE)
     assert runs_on is not None
     assert "${{" not in runs_on.group("label"), (
         "ci-gate must use a literal runner label, not a conditional expression"
     )
+
+
+def test_windows_job_bootstraps_without_reusable_actions() -> None:
+    """The older Windows runner cannot clone action repositories."""
+    body = WORKFLOW.read_text(encoding="utf-8")
+    windows = workflow_job_block(body, "test-windows")
+    assert "uses:" not in windows
+    assert body.count("\n        env:\n") == 1
+    assert "CI_REPOSITORY_TOKEN: ${{ github.token }}" in windows
+    assert "fetch --no-tags --depth=1 origin $env:GITHUB_SHA" in windows
+    assert 'ci-python-venv.ps1 -PythonVersion "${{ matrix.python-version }}"' in windows
+    assert windows.count("$env:CI_PYTHON -m") == 2

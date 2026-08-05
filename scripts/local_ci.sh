@@ -111,23 +111,34 @@ ci_pytest=(python -m pytest --cov=agent_sessions --cov-report=term-missing --cov
 ci_linkcheck=(python -m tools.check_md_links)
 ci_pii=(python -m tools.check_pii)
 
+# Windows must bootstrap without reusable actions because one registered runner
+# cannot clone action repositories. The multi-line checkout body is not a gate,
+# so only its YAML block marker is counted here; the Python selector and the two
+# actual gate commands are mirrored exactly.
+ci_windows_checkout='|'
+ci_windows_setup='./scripts/ci-python-venv.ps1 -PythonVersion "${{ matrix.python-version }}"'
+ci_windows_install='& $env:CI_PYTHON -m pip install -e ".[dev]" -c constraints-dev.txt'
+ci_windows_pytest='& $env:CI_PYTHON -m pytest --cov=agent_sessions --cov-report=term-missing --cov-fail-under=92'
+
 # The ci-gate assertion. Held as one string, not an array, because it carries
 # literal Actions `${{ }}` expressions that bash must not expand. This gate has
 # no local equivalent — `needs.<job>.result` only exists inside CI — so it is
 # mirrored for drift detection but never executed by this script.
 ci_gate='bash scripts/ci-gate.sh "test=${{ needs.test.result }}" "test-windows=${{ needs.test-windows.result }}" "lint=${{ needs.lint.result }}" "link-check=${{ needs.link-check.result }}" "pii-check=${{ needs.pii-check.result }}"'
 
-# The install line appears once per Python job; the Windows job is defined
-# separately so its `runs-on` label is not entangled with the Linux matrix.
-# Link and PII checks need only the standard library.
+# The portable Python install line appears in the Linux test and lint jobs.
+# Windows uses the explicit interpreter selected by ci-python-venv.ps1. Link
+# and PII checks need only the standard library.
 expected_runs=(
-  "${ci_install[*]}"
   "${ci_install[*]}"
   "${ci_install[*]}"
   "${ci_ruff[*]}"
   "${ci_mypy[*]}"
   "${ci_pytest[*]}"
-  "${ci_pytest[*]}"
+  "$ci_windows_checkout"
+  "$ci_windows_setup"
+  "$ci_windows_install"
+  "$ci_windows_pytest"
   "${ci_linkcheck[*]}"
   "${ci_pii[*]}"
   "$ci_gate"
@@ -167,6 +178,15 @@ drift_fail() {
 # `-e ".[dev]"` while the bash array holds `.[dev]`. Compare the tokens.
 normalize_cmd() {
   tr -d "\"'" | tr -s '[:space:]' ' ' | sed -e 's/^ //' -e 's/ $//'
+}
+
+job_block() {
+  local job="$1"
+  awk -v job="$job" '
+    $0 ~ "^  " job ":[[:space:]]*$" { inside = 1; print; next }
+    inside && $0 ~ /^  [A-Za-z0-9_-]+:[[:space:]]*$/ { exit }
+    inside { print }
+  ' "$workflow"
 }
 
 [[ -f "$workflow" ]] || drift_fail "$workflow is missing." \
@@ -255,9 +275,18 @@ fi
 # reported them green. The guard against neutered gates was itself mandating a
 # neutered gate. Job-level `if:` is now allowed for exactly one job — ci-gate,
 # which needs `always()` to observe its dependencies' results — and nowhere else.
+# The one step-level env block injects github.token into the manual Windows
+# checkout; it is scoped and asserted positively below.
+windows_job_block="$(job_block test-windows)"
+checkout_env_count="$(grep -cE '^        env:[[:space:]]*$' "$workflow" || true)"
+if [[ "$checkout_env_count" != "1" ]] ||
+   ! grep -qE '^          CI_REPOSITORY_TOKEN:[[:space:]]*\$\{\{[[:space:]]*github\.token[[:space:]]*\}\}[[:space:]]*$' <<<"$windows_job_block"; then
+  drift_fail "$workflow must contain exactly one step env block: the test-windows checkout's read-only repository token."
+fi
 neutering="$(
   grep -nE '^[[:space:]]*(-[[:space:]]*)?(if|continue-on-error|env):' "$workflow" |
-    grep -vE 'if:[[:space:]]*\$\{\{[[:space:]]*always\(\)[[:space:]]*\}\}$' || true
+    grep -vE 'if:[[:space:]]*\$\{\{[[:space:]]*always\(\)[[:space:]]*\}\}$' |
+    grep -vE '^[0-9]+:        env:[[:space:]]*$' || true
 )"
 if [[ -n "$neutering" ]]; then
   drift_fail "$workflow now uses if:/continue-on-error:/env:, which can disable or alter a gate without changing its 'run:' line." \
@@ -275,15 +304,20 @@ fi
 #   1. ci-gate stops existing, or stops running when a dependency fails.
 #   2. A new job is added to the workflow but not wired into ci-gate's needs,
 #      so its failure or skip never reaches the gate.
-if ! grep -qE '^[[:space:]]*ci-gate:[[:space:]]*$' "$workflow"; then
+ci_gate_block="$(job_block ci-gate)"
+if [[ -z "$ci_gate_block" ]]; then
   drift_fail "the ci-gate job is gone from $workflow." \
     "Without it, a skipped job still reports 'success' to the commit-status API" \
     "and both reviewers and merge automation read that as tested."
 fi
-if ! grep -qE '^[[:space:]]*if:[[:space:]]*\$\{\{[[:space:]]*always\(\)[[:space:]]*\}\}$' "$workflow"; then
+if ! grep -qE '^    if:[[:space:]]*\$\{\{[[:space:]]*always\(\)[[:space:]]*\}\}$' <<<"$ci_gate_block"; then
   drift_fail "ci-gate no longer carries 'if: \${{ always() }}'." \
     "Without always(), the gate is itself skipped when a dependency fails," \
     "and a skipped gate reports success. That is the bug it exists to prevent."
+fi
+always_count="$(grep -cE '^[[:space:]]*if:[[:space:]]*\$\{\{[[:space:]]*always\(\)[[:space:]]*\}\}$' "$workflow" || true)"
+if [[ "$always_count" != "1" ]]; then
+  drift_fail "$workflow must contain exactly one 'if: \${{ always() }}', on ci-gate (found $always_count)."
 fi
 
 # Every job defined in the workflow, except the gate itself, must appear in
@@ -298,7 +332,7 @@ if [[ ${#workflow_jobs[@]} -eq 0 ]]; then
   drift_fail "no job names could be parsed from $workflow." \
     "The workflow changed shape and this guard can no longer verify gate coverage."
 fi
-gate_needs_line="$(grep -E '^[[:space:]]*needs:[[:space:]]*\[' "$workflow" || true)"
+gate_needs_line="$(grep -E '^    needs:[[:space:]]*\[' <<<"$ci_gate_block" || true)"
 if [[ -z "$gate_needs_line" ]]; then
   drift_fail "ci-gate has no 'needs: [...]' list in $workflow."
 fi
@@ -308,7 +342,7 @@ for job in "${workflow_jobs[@]}"; do
       "A job outside the gate can fail or be skipped without failing CI." \
       "ci-gate needs: $gate_needs_line"
   fi
-  if ! grep -qE "\"$job=\\\$\{\{ needs\.$job\.result \}\}\"" "$workflow"; then
+  if ! grep -qE "\"$job=\\\$\{\{ needs\.$job\.result \}\}\"" <<<"$ci_gate_block"; then
     drift_fail "job '$job' is in ci-gate's needs: but its result is never asserted." \
       "Add \"$job=\${{ needs.$job.result }}\" to the scripts/ci-gate.sh arguments." \
       "A job in needs: whose result is not passed to the gate is not actually gated."

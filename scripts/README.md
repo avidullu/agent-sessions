@@ -2,6 +2,8 @@
 
 | Script | Purpose | Docs |
 | --- | --- | --- |
+| `ci-gate.sh` | Fail closed unless every required Actions job reports that it ran and succeeded. | [docs/LOCAL_CI.md](../docs/LOCAL_CI.md#the-ci-gate-job--read-this-one-not-the-individual-checks) |
+| `ci-python-venv.ps1` | Select the requested native-Windows tool-cache interpreter and expose an explicit isolated CI Python. | [docs/LOCAL_CI.md](../docs/LOCAL_CI.md) |
 | `local_ci.sh` | Run the CI gate set locally in a pinned, throwaway venv, with a drift guard against `.github/workflows/ci.yml`. | [docs/LOCAL_CI.md](../docs/LOCAL_CI.md) |
 | `pre-push` | Opt-in git hook that runs `local_ci.sh` before a push and aborts it if a gate is red. | [docs/LOCAL_CI.md](../docs/LOCAL_CI.md) |
 | `daily-export.sh` / `daily-export.ps1` | Scheduled archive export, commit, and push. | [docs/AUTOMATION.md](../docs/AUTOMATION.md) |
