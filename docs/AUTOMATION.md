@@ -111,3 +111,10 @@ Recommended starting point: daily morning on each active machine, Markdown-only
 by default. Enable PDFs only if the extra runtime and diff volume are acceptable.
 A weekly baseline review can be added later after promotion and calibration
 workflows mature.
+
+### Planned: hourly SSH fleet collect
+
+A future **primary-host** job will lightly probe allowlisted SSH hosts each hour,
+pull only new/changed agent session files, and index them on the primary. Ship-back
+of catalog/artifacts to remotes will be **opt-in and approval-gated**, never part
+of the default hourly path. See [SSH_FLEET_COLLECT_PLAN.md](SSH_FLEET_COLLECT_PLAN.md).
