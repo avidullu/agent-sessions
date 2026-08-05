@@ -16,6 +16,7 @@
 | [PROJECT_DOC_TEMPLATE.md](PROJECT_DOC_TEMPLATE.md) | Tracked project doc skeleton (from `badminton-highlight-indexer`) |
 | [COMPOSE_STACK.md](COMPOSE_STACK.md) | What this repo owns vs external tools |
 | [AUTOMATION.md](AUTOMATION.md) | Daily export scripts |
+| [SSH_FLEET_COLLECT_PLAN.md](SSH_FLEET_COLLECT_PLAN.md) | **DRAFT** — primary-host SSH fleet collect (hourly light pull from other machines; approval-gated ship-back) |
 | [LOCAL_CI.md](LOCAL_CI.md) | **Active** — `scripts/local_ci.sh`, the drift guard, and the opt-in pre-push hook (H3, #63) |
 | [ENGINEERING_BASELINE.md](ENGINEERING_BASELINE.md) | Baseline architecture |
 | [BASELINE_PLANNING.md](BASELINE_PLANNING.md) | PR-sized implementation plan |

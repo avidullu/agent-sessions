@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that never ran can no longer pass as one. Branch protection should require `ci-gate`
   and nothing else.
 - `tests/test_ci_gate.py` — pins the gate's behaviour and the workflow wiring.
+- **SSH fleet collect tracked design** — a PR-sized roadmap for a primary host to
+  pull session deltas from allowlisted, host-key-verified SSH remotes, with
+  contained private staging and manual exact-approval catalog ship-back.
 
 ### Fixed
 - Local-only exports now use an atomic, ownership-checked cross-shell lock without

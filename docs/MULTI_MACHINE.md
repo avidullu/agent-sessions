@@ -21,6 +21,16 @@ source of truth and schedule **local-only** export:
 Do not run `daily-export` against public product remotes. See
 [AUTOMATION.md](AUTOMATION.md).
 
+### Planned: SSH fleet collect (primary pulls remotes)
+
+When other machines are only reachable over SSH, a **primary host** can pull
+session stores on a lightweight hourly schedule, index them locally, and
+optionally ship one exact catalog snapshot back with a separate manual command
+and scoped, single-use approval.
+Design and PR-sized tracker (not implemented yet):
+
+→ [SSH_FLEET_COLLECT_PLAN.md](SSH_FLEET_COLLECT_PLAN.md) (**DRAFT**).
+
 ## How Machines Converge
 
 For a practical bootstrap checklist, see

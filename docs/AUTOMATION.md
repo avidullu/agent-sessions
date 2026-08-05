@@ -208,3 +208,11 @@ Markdown-only by default. Enable PDFs only if the extra runtime is acceptable.
 Add private catalog push only when you have a private remote and want
 cross-machine catalog merge. A weekly baseline review can be added later after
 promotion and calibration workflows mature.
+
+### Planned: hourly SSH fleet collect
+
+A future **primary-host** job will lightly probe allowlisted SSH hosts each hour,
+pull only new/changed agent session files, and index them on the primary. Ship-back
+of a catalog snapshot will be a separate manual command with scoped, single-use
+approval, never part of the hourly path. See
+[SSH_FLEET_COLLECT_PLAN.md](SSH_FLEET_COLLECT_PLAN.md).
