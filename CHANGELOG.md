@@ -5,6 +5,18 @@ All notable changes to the agent-sessions project.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Local-only export + schedule installers** for a single primary archive host:
+  - `scripts/local-export.sh` / `scripts/local-export.ps1` — export + status, no git
+  - `scripts/install-local-export-schedule.sh` / `.ps1` — user crontab or Windows Task Scheduler
+- Docs: two automation modes (local-only vs private catalog sync) in `docs/AUTOMATION.md`,
+  Getting Started, FAQ; WSL→Windows `/mnt/c` source examples in `sources.example.toml`
+
+### Fixed
+- `sources.example.toml`: remove orphaned top-level `glob` and clarify Linux / WSL-mounted Windows sections
+
 ## [0.2.0] — 2026-07-23
 
 ### Added
