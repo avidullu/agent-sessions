@@ -5,6 +5,36 @@ All notable changes to the agent-sessions project.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **CI reported native-Windows tests as passing when they never ran.** Forgejo maps a
+  skipped job to `success` in the commit-status API. `test-windows` carried
+  `if: github.server_url == 'https://github.com'`, and because GitHub Actions is
+  disabled on the backup mirror that condition was never true on either forge — so the
+  Windows legs executed nowhere while every PR showed
+  `CI / test (py 3.11, windows-latest) — success`. The guard's stated premise ("every
+  registered Forgejo runner is Linux") was also already false: Forgejo has two
+  `windows-latest` runners. The condition is removed and Windows now runs on both forges.
+- The Windows job now bootstraps without reusable actions and invokes its selected
+  virtual-environment interpreter explicitly, avoiding two runner-specific failures:
+  an incompatible action-clone path on one runner and delayed composite-action PATH
+  propagation on the other.
+
+### Added
+- **`ci-gate` job and `scripts/ci-gate.sh`** — the single honest required check. It
+  asserts on `needs.<job>.result`, where `skipped` is distinct from `success`, so a job
+  that never ran can no longer pass as one. Branch protection should require `ci-gate`
+  and nothing else.
+- `tests/test_ci_gate.py` — pins the gate's behaviour and the workflow wiring.
+
+### Changed
+- `scripts/local_ci.sh` drift guard no longer *requires* a GitHub-only job (that rule was
+  mandating the false green). It now positively asserts that `ci-gate` exists, carries
+  `if: ${{ always() }}`, lists every job in `needs:`, and passes every job's result to the
+  assertion — so a new job cannot be added outside the gate. Gate checks are scoped to
+  the `ci-gate` block so a decoy `needs:` or `always()` on another job cannot satisfy them.
+
 ## [0.2.0] — 2026-07-23
 
 ### Added
