@@ -93,6 +93,48 @@ class TestBuildParser:
         assert args.source == ["codex"]
         assert args.json is True
 
+    def test_provenance_sync(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "provenance",
+                "--database",
+                "state.sqlite3",
+                "--forgejo-url",
+                "https://forge.example.test",
+                "sync",
+                "--token-file",
+                "token",
+                "--repo",
+                "Example/project",
+                "--pr",
+                "7",
+            ]
+        )
+        assert args.cmd == "provenance"
+        assert args.provenance_cmd == "sync"
+        assert args.pull_numbers == [7]
+        assert args.database == Path("state.sqlite3")
+
+    def test_provenance_who(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "provenance",
+                "--forgejo-url",
+                "https://forge.example.test",
+                "who",
+                "--repo",
+                "Example/project",
+                "--pr",
+                "7",
+                "--json",
+            ]
+        )
+        assert args.provenance_cmd == "who"
+        assert args.pull_number == 7
+        assert args.json is True
+
     def test_baseline_scaffold(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["baseline", "scaffold"])

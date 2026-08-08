@@ -1,8 +1,18 @@
 # Session Handoff
 
-Updated: 2026-07-30 11:05 IST (🚀 LAUNCHED — tracker archived; L16/L17 honestly Deferred)
+Updated: 2026-08-08 IST (AP0 Forgejo agent provenance is in review; public launch remains historical)
 
 ## You Are Here
+
+**Active implementation:** AP0 in
+`docs/FORGEJO_AGENT_PROVENANCE.md` adds a local metadata-only SQLite index so
+agents can query who submitted, committed, reviewed, commented on, and merged a
+Forgejo PR without pretending old `avidullu` activity proves a model identity.
+The feature branch is open as private Forgejo PR #158 for owner review; do not
+stack AP1 scheduling or automatic session linkage on it. The forge-service
+FS-114 companion PR #56 owns the distinct Forgejo accounts, verified signing
+keys, and worktree identity verifier. Both PRs remain intentionally unmerged
+for Avi's review.
 
 **🚀 PUBLIC LAUNCH IS COMPLETE** and the launch tracker is **DONE / HISTORICAL**
 (`docs/archives/PUBLIC_LAUNCH_TRACKER.md`; fleet table `docs/PROJECT_TRACKER.md`

@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Local Forgejo agent-provenance index** — bounded metadata-only sync into a
+  mode-0600 SQLite database, exact actor mapping from a versioned identity
+  policy, `who`/`list` queries, and append-only owner/session attestations.
+  PR/comment bodies, commit messages, signature payloads, file lists, tokens,
+  prompts, and transcripts are excluded.
 - **Local-only export + schedule installers** for a single primary archive host:
   - `scripts/local-export.sh` / `scripts/local-export.ps1` — export + status, no git
   - `scripts/install-local-export-schedule.sh` / `.ps1` — user crontab or Windows Task Scheduler

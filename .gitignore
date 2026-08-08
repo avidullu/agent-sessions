@@ -36,6 +36,12 @@ sources.toml
 .daily-export.lock
 .local-export.lock
 
+# Local rebuildable Forgejo attribution index. It may name private repositories
+# and must never be committed; the default lives outside the checkout.
+.agent-sessions/
+*.sqlite3
+*.sqlite3-journal
+
 # Agent evidence bundles can contain raw excerpts from private/client code or sessions.
 baseline/evidence/*.json
 baseline/evidence/*.prompt.md
