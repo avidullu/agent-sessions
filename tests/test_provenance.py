@@ -401,6 +401,20 @@ def test_windows_acl_probe_fails_closed_on_unexpected_principal(tmp_path: Path) 
     assert str(path) not in run.call_args.args[0]
 
 
+def test_windows_acl_hardener_fails_closed_without_path_in_argv(tmp_path: Path) -> None:
+    path = tmp_path / "private"
+    path.mkdir()
+    completed = mock.Mock(returncode=5)
+    with (
+        mock.patch.object(os, "name", "nt"),
+        mock.patch("agent_sessions.provenance.subprocess.run", return_value=completed) as run,
+        pytest.raises(ProvenanceError, match="cannot harden"),
+    ):
+        _harden_private_access(path)
+    assert run.call_args.kwargs["env"]["AGENT_SESSIONS_PRIVATE_PATH"] == str(path)
+    assert str(path) not in run.call_args.args[0]
+
+
 def test_forgejo_client_get_pages_and_errors(tmp_path: Path) -> None:
     token = tmp_path / "token"
     token.write_text("opaque\n", encoding="utf-8")

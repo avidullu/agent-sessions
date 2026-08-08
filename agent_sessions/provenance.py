@@ -71,34 +71,21 @@ WINDOWS_ACL_HARDEN = """
 $ErrorActionPreference = 'Stop'
 $path = $env:AGENT_SESSIONS_PRIVATE_PATH
 $item = Get-Item -LiteralPath $path -Force
-$current = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
-$system = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-18')
-$administrators = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
-$acl = Get-Acl -LiteralPath $path
-$acl.SetOwner($current)
-$acl.SetAccessRuleProtection($true, $false)
-foreach ($rule in @($acl.Access)) {
-    [void]$acl.RemoveAccessRuleSpecific($rule)
+$current = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+$rights = if ($item.PSIsContainer) { '(OI)(CI)F' } else { 'F' }
+$arguments = @(
+    $path,
+    '/inheritance:r',
+    '/grant:r',
+    "*$current`:$rights",
+    "*S-1-5-18`:$rights",
+    "*S-1-5-32-544`:$rights",
+    '/q'
+)
+& icacls.exe @arguments | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    exit 5
 }
-foreach ($identity in @($current, $system, $administrators)) {
-    if ($item.PSIsContainer) {
-        $rule = [System.Security.AccessControl.FileSystemAccessRule]::new(
-            $identity,
-            [System.Security.AccessControl.FileSystemRights]::FullControl,
-            [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
-            [System.Security.AccessControl.PropagationFlags]::None,
-            [System.Security.AccessControl.AccessControlType]::Allow
-        )
-    } else {
-        $rule = [System.Security.AccessControl.FileSystemAccessRule]::new(
-            $identity,
-            [System.Security.AccessControl.FileSystemRights]::FullControl,
-            [System.Security.AccessControl.AccessControlType]::Allow
-        )
-    }
-    [void]$acl.AddAccessRule($rule)
-}
-Set-Acl -LiteralPath $path -AclObject $acl
 """
 
 
