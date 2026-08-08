@@ -19,6 +19,7 @@ from agent_sessions.provenance import (
     ForgejoClient,
     ProvenanceError,
     Store,
+    _harden_private_access,
     format_summary,
     sync_repository,
 )
@@ -176,8 +177,9 @@ def test_schema_is_private_versioned_and_contains_no_body_columns(tmp_path: Path
 
 
 def test_store_rejects_symlink_and_unknown_schema(tmp_path: Path) -> None:
-    target = tmp_path / "target.sqlite3"
-    sqlite3.connect(target).close()
+    target = tmp_path / "private" / "target.sqlite3"
+    with Store(target):
+        pass
     link = tmp_path / "link.sqlite3"
     link.symlink_to(target)
     with pytest.raises(ProvenanceError, match="non-symlink"):
@@ -374,7 +376,11 @@ def test_token_must_be_private_and_https(tmp_path: Path) -> None:
         token.chmod(0o644)
         with pytest.raises(ProvenanceError, match="group/world"):
             ForgejoClient(FORGE, token)
-    token.chmod(0o600)
+    if os.name == "nt":
+        _harden_private_access(token)
+        assert ForgejoClient(FORGE, token).base_url == FORGE
+    else:
+        token.chmod(0o600)
     with pytest.raises(ProvenanceError, match="HTTPS"):
         ForgejoClient("http://forge.example.test", token)
 
@@ -398,7 +404,10 @@ def test_windows_acl_probe_fails_closed_on_unexpected_principal(tmp_path: Path) 
 def test_forgejo_client_get_pages_and_errors(tmp_path: Path) -> None:
     token = tmp_path / "token"
     token.write_text("opaque\n", encoding="utf-8")
-    token.chmod(0o600)
+    if os.name == "nt":
+        _harden_private_access(token)
+    else:
+        token.chmod(0o600)
     client = ForgejoClient(FORGE, token)
 
     class Response:

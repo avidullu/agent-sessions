@@ -67,6 +67,39 @@ if ($unexpected.Count -ne 0) {
     exit 3
 }
 """
+WINDOWS_ACL_HARDEN = """
+$ErrorActionPreference = 'Stop'
+$path = $env:AGENT_SESSIONS_PRIVATE_PATH
+$item = Get-Item -LiteralPath $path -Force
+$current = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+$system = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-18')
+$administrators = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
+$acl = Get-Acl -LiteralPath $path
+$acl.SetOwner($current)
+$acl.SetAccessRuleProtection($true, $false)
+foreach ($rule in @($acl.Access)) {
+    [void]$acl.RemoveAccessRuleSpecific($rule)
+}
+foreach ($identity in @($current, $system, $administrators)) {
+    if ($item.PSIsContainer) {
+        $rule = [System.Security.AccessControl.FileSystemAccessRule]::new(
+            $identity,
+            [System.Security.AccessControl.FileSystemRights]::FullControl,
+            [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
+            [System.Security.AccessControl.PropagationFlags]::None,
+            [System.Security.AccessControl.AccessControlType]::Allow
+        )
+    } else {
+        $rule = [System.Security.AccessControl.FileSystemAccessRule]::new(
+            $identity,
+            [System.Security.AccessControl.FileSystemRights]::FullControl,
+            [System.Security.AccessControl.AccessControlType]::Allow
+        )
+    }
+    [void]$acl.AddAccessRule($rule)
+}
+Set-Acl -LiteralPath $path -AclObject $acl
+"""
 
 
 class ProvenanceError(RuntimeError):
@@ -159,6 +192,27 @@ def _require_private_access(path: Path, info: os.stat_result | None = None) -> N
         raise ProvenanceError(f"secret file ACL grants an unexpected Windows principal: {path}")
 
 
+def _harden_private_access(path: Path) -> None:
+    """Replace inherited Windows access with current-user/system/admin rules."""
+    if os.name != "nt":
+        return
+    environment = os.environ.copy()
+    environment["AGENT_SESSIONS_PRIVATE_PATH"] = str(path)
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", _powershell_encoded(WINDOWS_ACL_HARDEN)],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+            timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ProvenanceError(f"cannot harden the current-user Windows ACL: {path}") from exc
+    if result.returncode != 0:
+        raise ProvenanceError(f"cannot harden the current-user Windows ACL: {path}")
+
+
 def _powershell_encoded(script: str) -> str:
     return base64.b64encode(script.encode("utf-16-le")).decode("ascii")
 
@@ -197,19 +251,25 @@ class Store:
     def open(self) -> None:
         if self._connection is not None:
             return
-        self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        self.path.parent.chmod(0o700)
-        _require_private_access(self.path.parent)
-        if self.path.exists():
+        if self.path.exists() or self.path.is_symlink():
             info = self.path.lstat()
             if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
                 raise ProvenanceError(f"database must be a regular non-symlink file: {self.path}")
+        self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if os.name == "nt":
+            _harden_private_access(self.path.parent)
+        else:
+            self.path.parent.chmod(0o700)
+        _require_private_access(self.path.parent)
         connection = sqlite3.connect(self.path)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA journal_mode = DELETE")
         connection.execute("PRAGMA secure_delete = ON")
-        self.path.chmod(0o600)
+        if os.name == "nt":
+            _harden_private_access(self.path)
+        else:
+            self.path.chmod(0o600)
         _require_private_access(self.path)
         version = int(connection.execute("PRAGMA user_version").fetchone()[0])
         if version not in {0, SCHEMA_VERSION}:

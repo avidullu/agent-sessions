@@ -66,6 +66,13 @@ The default DB is
 `~/.local/share/agent-sessions/forgejo-provenance.sqlite3`. Set
 `AGENT_SESSIONS_FORGEJO_URL` or pass `--forgejo-url`.
 
+The store creates its parent with owner-only POSIX permissions. On Windows it
+removes inherited access from the store directory and database, then grants
+full control only to the current user, SYSTEM, and Administrators before it
+accepts the path. Token files are read-only inputs and are never rewritten;
+they must already have the same private ACL (the agent-identity installer
+creates them that way).
+
 ```console
 # Exact selected PRs; safe while bootstrapping.
 agent-archive provenance --forgejo-url https://forge.example.test sync \
@@ -118,6 +125,7 @@ unknown as primary agent until stronger evidence exists.
 | Stale API state | each PR carries `synced_at`; sync is idempotent | no webhook/daemon in AP0 |
 | Corrupt/ambiguous DB | schema version, constraints, FK checks, bounded values | backup is rebuild-by-sync plus reapplying local attestations |
 | Concurrent writers | SQLite transactions; DELETE journal | v1 is a single-user local CLI, not a multi-host server |
+| Windows permission drift | native ACL hardening for the DB plus a fail-closed ACL probe for DB and token | the token installer remains responsible for creating a private token ACL |
 
 ## 7. Deliverables and progress tracker
 
@@ -169,3 +177,7 @@ existing primary-host scheduling decision rather than creating a second writer.
 - 2026-08-08 — AP0 entered implementation with a local-only schema, read-only
   Forgejo client, policy-seeded identifiers, evidence-preserving attribution,
   and CLI/query tests; review is open as PR #158 alongside forge-service PR #56.
+- 2026-08-08 — Windows CI exposed that POSIX mode bits do not secure inherited
+  NTFS access. AP0 now hardens the database directory/file with native ACLs and
+  verifies token ACLs without mutating the token; the same path passed a live
+  Surface Windows directory-and-file probe.
