@@ -1,6 +1,6 @@
 # Forgejo agent provenance
 
-> **Status:** `IN PROGRESS` · **Owner:** Avi Dullu · **Created:** 2026-08-08 · **Last updated:** 2026-08-08
+> **Status:** `IN PROGRESS` · **Owner:** Avi Dullu · **Created:** 2026-08-08 · **Last updated:** 2026-08-09
 >
 > **Lifecycle:** `DRAFT → IN PROGRESS → DONE → archived`
 > **Tracking anchor:** §7 is the source of truth. This project extends the
@@ -142,23 +142,24 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated.
 
 | ID | Deliverable | Depends on | Gated? | Status | PR |
 | --- | --- | --- | --- | --- | --- |
-| AP0 | SQLite schema, bounded Forgejo sync, identity-policy mapping, `who`/`list`/`attest` CLI, adversarial tests | forge-service FS-114 | No | ◐ | private Forgejo PR #158 |
+| AP0 | SQLite schema, bounded Forgejo sync, identity-policy mapping, `who`/`list`/`attest` CLI, adversarial tests | forge-service FS-114 | No | ☑ | private Forgejo PR #158 |
+| AP0.1 | Split provenance internals behind the stable facade; reject URL userinfo; remove orphan commit metadata | AP0 | No | ◐ | private Forgejo PR #159 |
 | AP1 | Link exact archived session IDs automatically when repo/ref/commit evidence agrees | AP0 | Yes—private-session fixtures | ☐ | — |
 | AP2 | Read-only scheduled refresh on the primary archive host | AP0, SSH fleet collect decision | Yes—schedule/retention review | ☐ | — |
 | AP3 | Portable redacted aggregate/export, if useful | AP0 | Yes—privacy review | ☐ | — |
 
-AP0 is one independently shippable PR. Later rows must not be stacked on it
-before review/merge.
+AP0 shipped as one independently reviewable PR. AP0.1 is a hardening follow-up;
+AP1–AP3 must not be stacked on it before review/merge.
 
 ## 8. Open questions
 
-No owner decision blocks AP0. AP1 will need a reviewed definition of what
+No owner decision blocks AP0.1. AP1 will need a reviewed definition of what
 session evidence is sufficient for automatic linkage. AP2 must follow the
 existing primary-host scheduling decision rather than creating a second writer.
 
 ## 9. Definition of done
 
-- [ ] AP0 PR is reviewed, all local gates and Forgejo CI are green, and it is
+- [x] AP0 PR is reviewed, all local gates and Forgejo CI are green, and it is
   merged by Avi.
 - [ ] A live read-only sync of PRs 889–892 succeeds using the dedicated
   provenance account.
@@ -175,7 +176,11 @@ existing primary-host scheduling decision rather than creating a second writer.
 
 ## 10. References
 
-- `agent_sessions/provenance.py`
+- `agent_sessions/provenance.py` (stable public facade)
+- `agent_sessions/_provenance_common.py`
+- `agent_sessions/_provenance_store.py`
+- `agent_sessions/_provenance_forgejo.py`
+- `agent_sessions/_provenance_format.py`
 - `tests/test_provenance.py`
 - forge-service `docs/AGENT_IDENTITY_AND_PROVENANCE.md`, D-045, and companion
   private Forgejo PR #56
@@ -198,3 +203,7 @@ existing primary-host scheduling decision rather than creating a second writer.
   out the ASCII `local-export.ps1` lock text: native Windows PowerShell 5.1
   corrupts the prior em dash under the runner's script encoding, causing a
   parser failure before the export command runs.
+- 2026-08-09 — AP0 merged as PR #158. AP0.1 began as a compatibility-preserving
+  split of the 1,151-line implementation into focused storage, Forgejo sync,
+  private-file, and formatting modules; it also rejects URL userinfo and
+  removes commit/co-author rows left orphaned by force-push SHA churn.

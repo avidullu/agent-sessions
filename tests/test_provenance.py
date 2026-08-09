@@ -32,6 +32,7 @@ FORGE = "https://forge.example.test"
 REPO = "Example/project"
 SHA_A = "a" * 40
 SHA_B = "b" * 40
+SHA_C = "c" * 40
 
 
 def identity_policy(path: Path) -> Path:
@@ -208,7 +209,7 @@ def test_database_is_private_before_sqlite_opens_it(tmp_path: Path) -> None:
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
         return real_connect(database)
 
-    with mock.patch("agent_sessions.provenance.sqlite3.connect", side_effect=inspected_connect):
+    with mock.patch("agent_sessions._provenance_store.sqlite3.connect", side_effect=inspected_connect):
         with Store(path):
             pass
 
@@ -230,7 +231,7 @@ def test_database_open_rejects_symlink_replacement_after_descriptor_check(tmp_pa
             candidate.symlink_to(replacement)
 
     with (
-        mock.patch("agent_sessions.provenance._require_private_access", side_effect=replace_database),
+        mock.patch("agent_sessions._provenance_store._require_private_access", side_effect=replace_database),
         pytest.raises(ProvenanceError, match="regular non-symlink"),
     ):
         Store(path).open()
@@ -451,6 +452,45 @@ def test_sync_is_idempotent_and_refreshes_details(store: Store, tmp_path: Path) 
     assert store.db.execute("SELECT COUNT(*) FROM sync_runs WHERE status='success'").fetchone()[0] == 2
 
 
+def test_sync_removes_orphaned_commits_and_coauthors_after_sha_churn(store: Store) -> None:
+    trailer = "Co-Authored-By: Old Agent <old-agent@example.test>"
+    client = FakeClient([pull()], {7: [commit(message=f"change\n\n{trailer}")]})
+    sync_repository(store, client, REPO, [7])
+
+    client.commits[7] = [commit(sha=SHA_C)]
+    sync_repository(store, client, REPO, [7])
+
+    repository_id = store.repository_id(FORGE, REPO, create=False)
+    assert [
+        row["sha"]
+        for row in store.db.execute(
+            "SELECT sha FROM commits WHERE repository_id=?", (repository_id,)
+        ).fetchall()
+    ] == [SHA_C]
+    assert store.db.execute(
+        "SELECT COUNT(*) FROM commit_coauthors WHERE repository_id=?", (repository_id,)
+    ).fetchone()[0] == 0
+
+
+def test_sync_preserves_commit_still_linked_to_another_pull(store: Store) -> None:
+    client = FakeClient(
+        [pull(7), pull(8)],
+        {7: [commit()], 8: [commit()]},
+    )
+    sync_repository(store, client, REPO)
+
+    client.commits[7] = [commit(sha=SHA_C)]
+    sync_repository(store, client, REPO, [7])
+
+    repository_id = store.repository_id(FORGE, REPO, create=False)
+    assert [
+        row["sha"]
+        for row in store.db.execute(
+            "SELECT sha FROM commits WHERE repository_id=? ORDER BY sha", (repository_id,)
+        ).fetchall()
+    ] == [SHA_A, SHA_C]
+
+
 def test_failed_sync_is_recorded_without_partial_pull_state(store: Store) -> None:
     class BrokenClient(FakeClient):
         def pages(self, path: str, *, maximum: int | None = None) -> list[Any]:
@@ -533,6 +573,10 @@ def test_token_must_be_private_and_https(tmp_path: Path) -> None:
         token.chmod(0o600)
     with pytest.raises(ProvenanceError, match="HTTPS"):
         ForgejoClient("http://forge.example.test", token)
+    for url in ("https://user@forge.example.test", "https://user:secret@forge.example.test"):
+        with pytest.raises(ProvenanceError, match="without userinfo") as error:
+            ForgejoClient(url, token)
+        assert "secret" not in str(error.value)
 
 
 @pytest.mark.skipif(os.name == "nt", reason="symlink replacement requires POSIX semantics")
@@ -550,7 +594,7 @@ def test_secret_read_rejects_symlink_replacement_after_descriptor_open(tmp_path:
         path.symlink_to(replacement)
 
     with (
-        mock.patch("agent_sessions.provenance._require_private_access", side_effect=replace_path),
+        mock.patch("agent_sessions._provenance_common._require_private_access", side_effect=replace_path),
         pytest.raises(ProvenanceError, match="regular non-symlink"),
     ):
         _read_regular(token, maximum=4096, secret=True)
@@ -562,7 +606,7 @@ def test_windows_acl_probe_fails_closed_on_unexpected_principal(tmp_path: Path) 
     completed = mock.Mock(returncode=3)
     with (
         mock.patch.object(os, "name", "nt"),
-        mock.patch("agent_sessions.provenance.subprocess.run", return_value=completed) as run,
+        mock.patch("agent_sessions._provenance_common.subprocess.run", return_value=completed) as run,
         pytest.raises(ProvenanceError, match="unexpected Windows principal"),
     ):
         from agent_sessions.provenance import _require_private_access
@@ -578,7 +622,7 @@ def test_windows_acl_hardener_fails_closed_without_path_in_argv(tmp_path: Path) 
     completed = mock.Mock(returncode=5)
     with (
         mock.patch.object(os, "name", "nt"),
-        mock.patch("agent_sessions.provenance.subprocess.run", return_value=completed) as run,
+        mock.patch("agent_sessions._provenance_common.subprocess.run", return_value=completed) as run,
         pytest.raises(ProvenanceError, match="cannot harden"),
     ):
         _harden_private_access(path)
