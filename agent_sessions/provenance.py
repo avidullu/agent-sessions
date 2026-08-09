@@ -164,7 +164,9 @@ def _same_file(path: Path, opened: os.stat_result, description: str) -> None:
         current = path.lstat()
     except OSError as exc:
         raise ProvenanceError(f"cannot stat {path}: {exc}") from exc
-    if stat.S_ISLNK(current.st_mode) or not stat.S_ISREG(current.st_mode) or not os.path.samestat(opened, current):
+    if stat.S_ISLNK(current.st_mode) or not stat.S_ISREG(current.st_mode):
+        raise ProvenanceError(f"expected a regular non-symlink file: {path}")
+    if not os.path.samestat(opened, current):
         raise ProvenanceError(f"{description} changed while it was open: {path}")
 
 

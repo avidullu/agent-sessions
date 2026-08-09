@@ -194,5 +194,7 @@ existing primary-host scheduling decision rather than creating a second writer.
   descriptor-based secret reads, private pre-SQLite database creation,
   network-outside-lock per-PR transactions, strict JSON integer identities,
   bounded pull pagination, policy-alias replacement, honest mixed-actor
-  attribution, and clean expected CLI failures. Removed the unrelated
-  `local-export.ps1` punctuation drive-by from AP0.
+  attribution, and clean expected CLI failures. Retained and explicitly called
+  out the ASCII `local-export.ps1` lock text: native Windows PowerShell 5.1
+  corrupts the prior em dash under the runner's script encoding, causing a
+  parser failure before the export command runs.

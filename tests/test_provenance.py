@@ -214,7 +214,7 @@ def test_database_is_private_before_sqlite_opens_it(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(os.name == "nt", reason="symlink replacement requires POSIX semantics")
-def test_database_open_fails_if_path_changes_after_descriptor_check(tmp_path: Path) -> None:
+def test_database_open_rejects_symlink_replacement_after_descriptor_check(tmp_path: Path) -> None:
     path = tmp_path / "private" / "index.sqlite3"
     replacement = tmp_path / "replacement.sqlite3"
     path.parent.mkdir()
@@ -231,7 +231,7 @@ def test_database_open_fails_if_path_changes_after_descriptor_check(tmp_path: Pa
 
     with (
         mock.patch("agent_sessions.provenance._require_private_access", side_effect=replace_database),
-        pytest.raises(ProvenanceError, match="database changed while it was open"),
+        pytest.raises(ProvenanceError, match="regular non-symlink"),
     ):
         Store(path).open()
 
@@ -536,7 +536,7 @@ def test_token_must_be_private_and_https(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(os.name == "nt", reason="symlink replacement requires POSIX semantics")
-def test_secret_read_fails_if_path_is_replaced_after_descriptor_open(tmp_path: Path) -> None:
+def test_secret_read_rejects_symlink_replacement_after_descriptor_open(tmp_path: Path) -> None:
     token = tmp_path / "token"
     replacement = tmp_path / "replacement"
     token.write_text("original", encoding="utf-8")
@@ -551,7 +551,7 @@ def test_secret_read_fails_if_path_is_replaced_after_descriptor_open(tmp_path: P
 
     with (
         mock.patch("agent_sessions.provenance._require_private_access", side_effect=replace_path),
-        pytest.raises(ProvenanceError, match="secret file changed while it was open"),
+        pytest.raises(ProvenanceError, match="regular non-symlink"),
     ):
         _read_regular(token, maximum=4096, secret=True)
 
