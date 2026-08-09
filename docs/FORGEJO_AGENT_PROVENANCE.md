@@ -143,7 +143,7 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated.
 | ID | Deliverable | Depends on | Gated? | Status | PR |
 | --- | --- | --- | --- | --- | --- |
 | AP0 | SQLite schema, bounded Forgejo sync, identity-policy mapping, `who`/`list`/`attest` CLI, adversarial tests | forge-service FS-114 | No | ☑ | private Forgejo PR #158 |
-| AP0.1 | Split provenance internals behind the stable facade; reject URL userinfo; remove orphan commit metadata | AP0 | No | ◐ | follow-up PR pending |
+| AP0.1 | Split provenance internals behind the stable facade; reject URL userinfo; remove orphan commit metadata | AP0 | No | ◐ | private Forgejo PR #159 |
 | AP1 | Link exact archived session IDs automatically when repo/ref/commit evidence agrees | AP0 | Yes—private-session fixtures | ☐ | — |
 | AP2 | Read-only scheduled refresh on the primary archive host | AP0, SSH fleet collect decision | Yes—schedule/retention review | ☐ | — |
 | AP3 | Portable redacted aggregate/export, if useful | AP0 | Yes—privacy review | ☐ | — |
