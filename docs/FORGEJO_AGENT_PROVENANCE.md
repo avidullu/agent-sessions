@@ -143,19 +143,19 @@ Legend: ☐ Todo · ◐ In progress · ☑ Done · ⛔ Blocked/gated.
 | ID | Deliverable | Depends on | Gated? | Status | PR |
 | --- | --- | --- | --- | --- | --- |
 | AP0 | SQLite schema, bounded Forgejo sync, identity-policy mapping, `who`/`list`/`attest` CLI, adversarial tests | forge-service FS-114 | No | ☑ | private Forgejo PR #158 |
-| AP0.1 | Split provenance internals behind the stable facade; reject URL userinfo; remove orphan commit metadata | AP0 | No | ◐ | private Forgejo PR #159 |
+| AP0.1 | Split provenance internals behind the stable facade; reject URL userinfo; remove orphan commit metadata | AP0 | No | ☑ | private Forgejo PR #159 |
 | AP1 | Link exact archived session IDs automatically when repo/ref/commit evidence agrees | AP0 | Yes—private-session fixtures | ☐ | — |
 | AP2 | Read-only scheduled refresh on the primary archive host | AP0, SSH fleet collect decision | Yes—schedule/retention review | ☐ | — |
 | AP3 | Portable redacted aggregate/export, if useful | AP0 | Yes—privacy review | ☐ | — |
 
-AP0 shipped as one independently reviewable PR. AP0.1 is a hardening follow-up;
-AP1–AP3 must not be stacked on it before review/merge.
+AP0 and its AP0.1 hardening follow-up shipped as independently reviewable PRs.
+AP1–AP3 remain separate open rows.
 
 ## 8. Open questions
 
-No owner decision blocks AP0.1. AP1 will need a reviewed definition of what
-session evidence is sufficient for automatic linkage. AP2 must follow the
-existing primary-host scheduling decision rather than creating a second writer.
+AP1 will need a reviewed definition of what session evidence is sufficient for
+automatic linkage. AP2 must follow the existing primary-host scheduling
+decision rather than creating a second writer.
 
 ## 9. Definition of done
 
@@ -207,3 +207,6 @@ existing primary-host scheduling decision rather than creating a second writer.
   split of the 1,151-line implementation into focused storage, Forgejo sync,
   private-file, and formatting modules; it also rejects URL userinfo and
   removes commit/co-author rows left orphaned by force-push SHA churn.
+- 2026-08-09 — AP0.1 merged as PR #159 after its exact-head Linux/Windows
+  Python 3.11/3.13 matrix, aggregate CI gate, and 95.18% local coverage gate
+  passed. AP1–AP3 remain honestly open, so the project stays `IN PROGRESS`.
