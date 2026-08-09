@@ -17,6 +17,7 @@
 | [COMPOSE_STACK.md](COMPOSE_STACK.md) | What this repo owns vs external tools |
 | [AUTOMATION.md](AUTOMATION.md) | Daily export scripts |
 | [SSH_FLEET_COLLECT_PLAN.md](SSH_FLEET_COLLECT_PLAN.md) | **DRAFT** — primary-host SSH fleet collect (hourly light pull from other machines; approval-gated ship-back) |
+| [FORGEJO_AGENT_PROVENANCE.md](FORGEJO_AGENT_PROVENANCE.md) | **IN PROGRESS** — local SQLite PR/commit/review attribution, exact bot identity mapping, and evidence-backed historical agent links |
 | [LOCAL_CI.md](LOCAL_CI.md) | **Active** — `scripts/local_ci.sh`, the drift guard, and the opt-in pre-push hook (H3, #63) |
 | [ENGINEERING_BASELINE.md](ENGINEERING_BASELINE.md) | Baseline architecture |
 | [BASELINE_PLANNING.md](BASELINE_PLANNING.md) | PR-sized implementation plan |

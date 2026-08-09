@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
+import sys
 from pathlib import Path
 
 from .archive import ExportResult, discover_sources, export_sources, pdf_existing, prune_index_records
@@ -264,6 +267,99 @@ def _handle_baseline_replay_ingest(config: ArchiveConfig, args: argparse.Namespa
     )
 
 
+def _provenance_url(args: argparse.Namespace) -> str:
+    value = args.forgejo_url
+    if not isinstance(value, str) or not value:
+        raise SystemExit("provenance requires --forgejo-url or AGENT_SESSIONS_FORGEJO_URL")
+    return value.rstrip("/")
+
+
+def _handle_provenance_sync(args: argparse.Namespace) -> int:
+    from .provenance import ForgejoClient, Store, sync_repository
+
+    forgejo_url = _provenance_url(args)
+    with Store(args.database) as store:
+        if args.identity_policy is not None:
+            seeded = store.seed_identity_policy(args.identity_policy)
+            print(f"Identity policy: {seeded} coding agents indexed.")
+        client = ForgejoClient(forgejo_url, args.token_file)
+        count = sync_repository(
+            store,
+            client,
+            args.repository,
+            args.pull_numbers or (),
+            max_pulls=args.max_pulls,
+        )
+    print(f"Synced {count} pull request(s) from {args.repository}; bodies/comments stored=0.")
+    return 0
+
+
+def _handle_provenance_who(args: argparse.Namespace) -> int:
+    from .provenance import Store, format_summary
+
+    with Store(args.database) as store:
+        value = store.pull_summary(_provenance_url(args), args.repository, args.pull_number)
+    print(json.dumps(value, indent=2, sort_keys=True) if args.json else format_summary(value))
+    return 0
+
+
+def _handle_provenance_list(args: argparse.Namespace) -> int:
+    from .provenance import Store
+
+    with Store(args.database) as store:
+        values = store.list_by_agent(args.agent, args.repository)
+    if args.json:
+        print(json.dumps(values, indent=2, sort_keys=True))
+    elif not values:
+        print(f"No pull requests are attributed to {args.agent}.")
+    else:
+        for value in values:
+            print(f"{value['repository']}#{value['pull_number']} {value['title']}")
+    return 0
+
+
+def _handle_provenance_attest(args: argparse.Namespace) -> int:
+    from .provenance import Store
+
+    with Store(args.database) as store:
+        created = store.attest(
+            _provenance_url(args),
+            args.repository,
+            args.pull_number,
+            args.agent,
+            args.source,
+            args.evidence_ref,
+            args.attested_by,
+        )
+    print(f"Attestation {'created' if created else 'already present'}; observed Forgejo facts were not changed.")
+    return 0
+
+
+def _handle_provenance_add_identifier(args: argparse.Namespace) -> int:
+    from .provenance import Store
+
+    with Store(args.database) as store:
+        store.add_identifier(args.agent, args.kind, args.value, args.source)
+    print(f"Identifier registered for {args.agent}.")
+    return 0
+
+
+def _handle_provenance_agents(args: argparse.Namespace) -> int:
+    from .provenance import Store
+
+    with Store(args.database) as store:
+        values = store.agent_rows()
+    if args.json:
+        print(json.dumps(values, indent=2, sort_keys=True))
+    else:
+        for value in values:
+            identifiers = ", ".join(
+                f"{identifier['kind']}={identifier['value']}" for identifier in value["identifiers"]
+            )
+            print(f"{value['agent_id']}: {value['display_name']} ({identifiers or 'no identifiers'})")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Export local coding-agent sessions.")
     parser.add_argument("--repo-root", type=Path, default=default_repo_root(), help="Archive repository root.")
@@ -311,6 +407,88 @@ def build_parser() -> argparse.ArgumentParser:
     p_prune = sub.add_parser("prune", help="Drop index records whose archive Markdown is missing on disk.")
     p_prune.add_argument("--dry-run", action="store_true", help="Report what would be pruned without writing.")
     p_prune.set_defaults(func=_handle_prune)
+
+    p_provenance = sub.add_parser(
+        "provenance",
+        help="Sync and query local Forgejo PR/commit/review agent attribution.",
+    )
+    p_provenance.add_argument(
+        "--database",
+        type=Path,
+        default=Path(
+            os.environ.get(
+                "AGENT_SESSIONS_PROVENANCE_DB",
+                "~/.local/share/agent-sessions/forgejo-provenance.sqlite3",
+            )
+        ).expanduser(),
+        help="Local SQLite index (default: user data directory).",
+    )
+    p_provenance.add_argument(
+        "--forgejo-url",
+        default=os.environ.get("AGENT_SESSIONS_FORGEJO_URL"),
+        help="Forgejo HTTPS origin; may also use AGENT_SESSIONS_FORGEJO_URL.",
+    )
+    provenance_sub = p_provenance.add_subparsers(dest="provenance_cmd", required=True)
+
+    p_provenance_sync = provenance_sub.add_parser("sync", help="Fetch bounded PR identity metadata; no bodies.")
+    p_provenance_sync.add_argument("--token-file", type=Path, required=True)
+    p_provenance_sync.add_argument("--repo", dest="repository", required=True, help="Repository as owner/name.")
+    p_provenance_sync.add_argument(
+        "--pr",
+        dest="pull_numbers",
+        action="append",
+        type=int,
+        help="Sync one PR number; repeat as needed. Without this, sync recent PRs.",
+    )
+    p_provenance_sync.add_argument("--max-pulls", type=int, default=500)
+    p_provenance_sync.add_argument(
+        "--identity-policy",
+        type=Path,
+        help="Versioned forge-service agent identity policy used for exact actor mapping.",
+    )
+    p_provenance_sync.set_defaults(func=_handle_provenance_sync)
+
+    p_provenance_who = provenance_sub.add_parser("who", help="Explain who submitted, authored, reviewed, and merged a PR.")
+    p_provenance_who.add_argument("--repo", dest="repository", required=True)
+    p_provenance_who.add_argument("--pr", dest="pull_number", type=int, required=True)
+    p_provenance_who.add_argument("--json", action="store_true")
+    p_provenance_who.set_defaults(func=_handle_provenance_who)
+
+    p_provenance_list = provenance_sub.add_parser("list", help="List PRs attributed to one agent.")
+    p_provenance_list.add_argument("--agent", required=True)
+    p_provenance_list.add_argument("--repo", dest="repository")
+    p_provenance_list.add_argument("--json", action="store_true")
+    p_provenance_list.set_defaults(func=_handle_provenance_list)
+
+    p_provenance_attest = provenance_sub.add_parser(
+        "attest",
+        help="Append explicit owner or archived-session attribution evidence.",
+    )
+    p_provenance_attest.add_argument("--repo", dest="repository", required=True)
+    p_provenance_attest.add_argument("--pr", dest="pull_number", type=int, required=True)
+    p_provenance_attest.add_argument("--agent", required=True)
+    p_provenance_attest.add_argument(
+        "--source",
+        choices=("owner-attestation", "session-evidence"),
+        required=True,
+    )
+    p_provenance_attest.add_argument("--evidence-ref", required=True)
+    p_provenance_attest.add_argument("--attested-by", required=True)
+    p_provenance_attest.set_defaults(func=_handle_provenance_attest)
+
+    p_provenance_identifier = provenance_sub.add_parser(
+        "add-identifier",
+        help="Register a reviewed historical Forgejo login or Git email for an indexed agent.",
+    )
+    p_provenance_identifier.add_argument("--agent", required=True)
+    p_provenance_identifier.add_argument("--kind", choices=("forgejo_login", "git_email"), required=True)
+    p_provenance_identifier.add_argument("--value", required=True)
+    p_provenance_identifier.add_argument("--source", required=True)
+    p_provenance_identifier.set_defaults(func=_handle_provenance_add_identifier)
+
+    p_provenance_agents = provenance_sub.add_parser("agents", help="List indexed agents and exact identifiers.")
+    p_provenance_agents.add_argument("--json", action="store_true")
+    p_provenance_agents.set_defaults(func=_handle_provenance_agents)
 
     p_baseline = sub.add_parser("baseline", help="Work with engineering baseline candidates.")
     baseline_sub = p_baseline.add_subparsers(dest="baseline_cmd", required=True)
@@ -511,5 +689,13 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.cmd == "provenance":
+        from .provenance import ProvenanceError
+
+        try:
+            return int(args.func(args))
+        except ProvenanceError as exc:
+            print(f"agent-archive provenance: {exc}", file=sys.stderr)
+            return 2
     config = load_config(args.repo_root.resolve(), args.config)
     return int(args.func(config, args))

@@ -44,7 +44,7 @@ if ($BreakLock -and (Test-Path -LiteralPath $lockDir)) {
 try {
     New-Item -ItemType Directory -Path $lockDir -ErrorAction Stop | Out-Null
 } catch {
-    throw "local-export: lock exists at $lockDir — another export may be running. After confirming no export is active, retry with -BreakLock."
+    throw "local-export: lock exists at $lockDir -- another export may be running. After confirming no export is active, retry with -BreakLock."
 }
 Set-Content -LiteralPath (Join-Path $lockDir "token") -Value $lockToken -Encoding ascii
 @(

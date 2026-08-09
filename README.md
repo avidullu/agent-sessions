@@ -55,6 +55,22 @@ agent-archive export --all
 agent-archive status
 ```
 
+Query local source-control provenance without storing PR or session bodies:
+
+```bash
+agent-archive provenance --forgejo-url https://forge.example.test sync \
+  --token-file ~/.config/forgejo/provenance.token \
+  --identity-policy /path/to/agent-identities.v1.json \
+  --repo Example/project --pr 123
+agent-archive provenance --forgejo-url https://forge.example.test who \
+  --repo Example/project --pr 123
+```
+
+The rebuildable SQLite index distinguishes observed Forgejo actors, Git
+identity/signature evidence, unverified co-author trailers, and explicit
+owner/session attestations. See
+[Forgejo agent provenance](docs/FORGEJO_AGENT_PROVENANCE.md).
+
 See [Getting Started](docs/GETTING_STARTED.md) for full setup including the VS Code extension, PDF export, and daily automation.
 
 **Prefer to let an agent do the setup?** See [Agent-Assisted Setup](#agent-assisted-setup) — a carefully written prompt that lets Codex, Claude, Gemini, Grok, or another capable agent clone, install, discover, validate, and produce a first archive + structured setup report on a new machine.
