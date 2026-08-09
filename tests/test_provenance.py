@@ -15,11 +15,15 @@ from unittest import mock
 
 import pytest
 
+from agent_sessions.cli import main
 from agent_sessions.provenance import (
     ForgejoClient,
     ProvenanceError,
     Store,
     _harden_private_access,
+    _read_regular,
+    _RejectRedirects,
+    _require_private_access,
     format_summary,
     sync_repository,
 )
@@ -125,14 +129,17 @@ class FakeClient:
         self.commits = commits
         self.reviews = reviews or {}
         self.comments = comments or {}
+        self.maximums: list[int | None] = []
 
     def get(self, path: str) -> Any:
         number = int(path.rstrip("/").split("/")[-1])
         return self.pulls[number]
 
-    def pages(self, path: str) -> list[Any]:
+    def pages(self, path: str, *, maximum: int | None = None) -> list[Any]:
+        self.maximums.append(maximum)
         if path.endswith("pulls?state=all&sort=recentupdate"):
-            return list(self.pulls.values())
+            values = list(self.pulls.values())
+            return values[: maximum + 1] if maximum is not None else values
         parts = path.split("/")
         if parts[-1] == "commits":
             return self.commits.get(int(parts[-2]), [])
@@ -191,6 +198,44 @@ def test_store_rejects_symlink_and_unknown_schema(tmp_path: Path) -> None:
         Store(target).open()
 
 
+@pytest.mark.skipif(os.name == "nt", reason="exact POSIX creation mode is covered on Linux")
+def test_database_is_private_before_sqlite_opens_it(tmp_path: Path) -> None:
+    path = tmp_path / "private" / "index.sqlite3"
+    real_connect = sqlite3.connect
+
+    def inspected_connect(database: str | Path) -> sqlite3.Connection:
+        assert Path(database) == path
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+        return real_connect(database)
+
+    with mock.patch("agent_sessions.provenance.sqlite3.connect", side_effect=inspected_connect):
+        with Store(path):
+            pass
+
+
+@pytest.mark.skipif(os.name == "nt", reason="symlink replacement requires POSIX semantics")
+def test_database_open_fails_if_path_changes_after_descriptor_check(tmp_path: Path) -> None:
+    path = tmp_path / "private" / "index.sqlite3"
+    replacement = tmp_path / "replacement.sqlite3"
+    path.parent.mkdir()
+    path.write_bytes(b"")
+    replacement.write_bytes(b"")
+    path.chmod(0o600)
+    replacement.chmod(0o600)
+
+    def replace_database(candidate: Path, info: os.stat_result | None = None) -> None:
+        _require_private_access(candidate, info)
+        if candidate == path:
+            candidate.unlink()
+            candidate.symlink_to(replacement)
+
+    with (
+        mock.patch("agent_sessions.provenance._require_private_access", side_effect=replace_database),
+        pytest.raises(ProvenanceError, match="database changed while it was open"),
+    ):
+        Store(path).open()
+
+
 def test_identity_policy_seeds_only_coding_agents_and_rejects_duplicate_identifiers(
     store: Store, tmp_path: Path
 ) -> None:
@@ -200,6 +245,37 @@ def test_identity_policy_seeds_only_coding_agents_and_rejects_duplicate_identifi
         store.add_identifier("claude", "git_email", "codex-agent@agents.invalid", "bad")
     with pytest.raises(ProvenanceError, match="unknown agent"):
         store.add_identifier("grok", "git_email", "grok@example.test", "missing")
+
+
+def test_policy_rotation_removes_only_stale_policy_identifiers(store: Store, tmp_path: Path) -> None:
+    policy = identity_policy(tmp_path / "identity.json")
+    assert store.seed_identity_policy(policy) == 2
+    store.add_identifier("codex", "git_email", "historical@example.test", "owner-reviewed")
+    value = json.loads(policy.read_text(encoding="utf-8"))
+    codex = next(item for item in value["principals"] if item["id"] == "codex")
+    claude = next(item for item in value["principals"] if item["id"] == "claude")
+    codex["username"] = "codex-agent-v2"
+    claude["username"] = "codex-agent"
+    policy.write_text(json.dumps(value), encoding="utf-8")
+
+    assert store.seed_identity_policy(policy) == 2
+
+    identifiers = {
+        (row["kind"], row["value"])
+        for agent in store.agent_rows()
+        if agent["agent_id"] == "codex"
+        for row in agent["identifiers"]
+    }
+    assert ("forgejo_login", "codex-agent") not in identifiers
+    assert ("forgejo_login", "codex-agent-v2") in identifiers
+    assert ("git_email", "historical@example.test") in identifiers
+    claude_identifiers = {
+        (row["kind"], row["value"])
+        for agent in store.agent_rows()
+        if agent["agent_id"] == "claude"
+        for row in agent["identifiers"]
+    }
+    assert ("forgejo_login", "codex-agent") in claude_identifiers
 
 
 def test_policy_rejects_duplicate_json_keys_and_wrong_kind(store: Store, tmp_path: Path) -> None:
@@ -297,6 +373,36 @@ def test_exact_bot_actor_and_signed_identity_attribute_without_attestation(
     assert store.list_by_agent("claude") == []
 
 
+def test_human_submitted_pull_with_bot_commit_reports_partial_participation(
+    store: Store, tmp_path: Path
+) -> None:
+    seed(store, tmp_path)
+    client = FakeClient(
+        [pull(actor="avidullu", merged=False)],
+        {
+            7: [
+                commit(
+                    actor="codex-agent",
+                    name="Codex Agent",
+                    email="codex-agent@agents.invalid",
+                    signed=True,
+                )
+            ]
+        },
+    )
+    sync_repository(store, client, REPO, [7])
+
+    result = store.pull_summary(FORGE, REPO, 7)
+    assert result["attribution"] == {
+        "status": "partial",
+        "agent_ids": ["codex"],
+        "confidence": "partial-forgejo-actor",
+        "sources": ["forgejo-participant"],
+        "evidence": ["observed-pr-author:avidullu", "forgejo_login:codex-agent"],
+    }
+    assert store.list_by_agent("codex", REPO) == []
+
+
 def test_git_email_is_reported_as_unverified_when_forgejo_actor_is_human(
     store: Store, tmp_path: Path
 ) -> None:
@@ -347,7 +453,7 @@ def test_sync_is_idempotent_and_refreshes_details(store: Store, tmp_path: Path) 
 
 def test_failed_sync_is_recorded_without_partial_pull_state(store: Store) -> None:
     class BrokenClient(FakeClient):
-        def pages(self, path: str) -> list[Any]:
+        def pages(self, path: str, *, maximum: int | None = None) -> list[Any]:
             raise ProvenanceError("injected failure")
 
     client = BrokenClient([pull()], {7: [commit()]})
@@ -359,12 +465,56 @@ def test_failed_sync_is_recorded_without_partial_pull_state(store: Store) -> Non
     assert row["error"] == "injected failure"
 
 
+def test_mid_batch_failure_keeps_prior_atomic_pull_and_reports_committed_count(store: Store) -> None:
+    class SecondPullBreaks(FakeClient):
+        def pages(self, path: str, *, maximum: int | None = None) -> list[Any]:
+            if path.endswith("/pulls/8/commits"):
+                raise ProvenanceError("second pull failed")
+            return super().pages(path, maximum=maximum)
+
+    client = SecondPullBreaks(
+        [pull(7), pull(8)],
+        {7: [commit()], 8: [commit(sha="c" * 40)]},
+    )
+
+    with pytest.raises(ProvenanceError, match="second pull failed"):
+        sync_repository(store, client, REPO)
+
+    assert store.db.execute("SELECT number FROM pull_requests ORDER BY number").fetchall()[0][0] == 7
+    row = store.db.execute("SELECT status, pull_count, error FROM sync_runs").fetchone()
+    assert dict(row) == {"status": "failed", "pull_count": 1, "error": "second pull failed"}
+
+
+@pytest.mark.parametrize("field", ["pull", "review", "comment"])
+def test_boolean_api_ids_fail_closed(store: Store, field: str) -> None:
+    value = pull()
+    if field == "pull":
+        value["number"] = True
+        with pytest.raises(ProvenanceError, match="pull request number"):
+            with store.db:
+                store.upsert_pull(FORGE, REPO, value)
+        return
+
+    with store.db:
+        store.upsert_pull(FORGE, REPO, value)
+        reviews = [{"id": True, "user": {"login": "reviewer"}}] if field == "review" else []
+        comments = [{"id": True, "user": {"login": "commenter"}}] if field == "comment" else []
+        with pytest.raises(ProvenanceError, match=f"{field} id"):
+            store.replace_pull_details(FORGE, REPO, 7, [], reviews, comments)
+
+
 def test_invalid_inputs_fail_closed(store: Store, tmp_path: Path) -> None:
     seed(store, tmp_path)
     with pytest.raises(ProvenanceError, match="owner/name"):
         store.repository_id(FORGE, "not-a-repo", create=True)
     with pytest.raises(ProvenanceError, match="unique positive"):
         sync_repository(store, FakeClient([pull()], {7: []}), REPO, [7, 7])
+    with pytest.raises(ProvenanceError, match="max_pulls"):
+        sync_repository(store, FakeClient([pull()], {7: []}), REPO, max_pulls=0)
+    too_many = FakeClient([pull(7), pull(8)], {7: [], 8: []})
+    with pytest.raises(ProvenanceError, match="above --max-pulls=1"):
+        sync_repository(store, too_many, REPO, max_pulls=1)
+    assert too_many.maximums == [1]
     with pytest.raises(ProvenanceError, match="not indexed"):
         store.pull_summary(FORGE, REPO, 404)
 
@@ -383,6 +533,27 @@ def test_token_must_be_private_and_https(tmp_path: Path) -> None:
         token.chmod(0o600)
     with pytest.raises(ProvenanceError, match="HTTPS"):
         ForgejoClient("http://forge.example.test", token)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="symlink replacement requires POSIX semantics")
+def test_secret_read_fails_if_path_is_replaced_after_descriptor_open(tmp_path: Path) -> None:
+    token = tmp_path / "token"
+    replacement = tmp_path / "replacement"
+    token.write_text("original", encoding="utf-8")
+    replacement.write_text("must-not-read", encoding="utf-8")
+    token.chmod(0o600)
+    replacement.chmod(0o600)
+
+    def replace_path(path: Path, info: os.stat_result | None = None) -> None:
+        assert info is not None
+        path.unlink()
+        path.symlink_to(replacement)
+
+    with (
+        mock.patch("agent_sessions.provenance._require_private_access", side_effect=replace_path),
+        pytest.raises(ProvenanceError, match="secret file changed while it was open"),
+    ):
+        _read_regular(token, maximum=4096, secret=True)
 
 
 def test_windows_acl_probe_fails_closed_on_unexpected_principal(tmp_path: Path) -> None:
@@ -442,21 +613,49 @@ def test_forgejo_client_get_pages_and_errors(tmp_path: Path) -> None:
 
     calls = 0
 
-    def fake_urlopen(request: object, timeout: int) -> Response:
+    def fake_open(request: Any, timeout: int) -> Response:
         nonlocal calls
         assert timeout == 30
         assert "opaque" not in str(request)
+        assert "Authorization" not in request.headers
+        assert request.unredirected_hdrs["Authorization"] == "token opaque"
         calls += 1
         return Response([{"id": 1}] if calls == 1 else [])
 
-    with mock.patch("urllib.request.urlopen", side_effect=fake_urlopen):
+    with mock.patch.object(client._opener, "open", side_effect=fake_open):
         assert client.pages("/items", limit=1) == [{"id": 1}]
 
     error = urllib.error.HTTPError("url", 403, "forbidden", Message(), None)
     error.read = mock.Mock(return_value=b'{"message":"denied"}')  # type: ignore[method-assign]
-    with mock.patch("urllib.request.urlopen", side_effect=error):
+    with mock.patch.object(client._opener, "open", side_effect=error):
         with pytest.raises(ProvenanceError, match="returned 403: denied"):
             client.get("/denied")
+
+    with pytest.raises(ProvenanceError, match="redirects are forbidden"):
+        _RejectRedirects().redirect_request(None, None, 302, "Found", {}, "https://attacker.test/token")
+
+
+def test_provenance_cli_reports_expected_errors_without_traceback(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    result = main(
+        [
+            "provenance",
+            "--database",
+            str(tmp_path / "state.sqlite3"),
+            "--forgejo-url",
+            FORGE,
+            "who",
+            "--repo",
+            REPO,
+            "--pr",
+            "7",
+        ]
+    )
+    captured = capsys.readouterr()
+    assert result == 2
+    assert "repository is not indexed" in captured.err
+    assert "Traceback" not in captured.err
 
 
 def test_database_default_can_be_overridden_without_touching_repo(tmp_path: Path) -> None:

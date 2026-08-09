@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 
 from .archive import ExportResult, discover_sources, export_sources, pdf_existing, prune_index_records
@@ -689,6 +690,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.cmd == "provenance":
-        return int(args.func(args))
+        from .provenance import ProvenanceError
+
+        try:
+            return int(args.func(args))
+        except ProvenanceError as exc:
+            print(f"agent-archive provenance: {exc}", file=sys.stderr)
+            return 2
     config = load_config(args.repo_root.resolve(), args.config)
     return int(args.func(config, args))

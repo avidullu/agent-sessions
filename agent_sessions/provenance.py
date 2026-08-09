@@ -17,7 +17,7 @@ import subprocess
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -93,6 +93,21 @@ class ProvenanceError(RuntimeError):
     """A database, policy, API, or attribution invariant failed."""
 
 
+class _RejectRedirects(urllib.request.HTTPRedirectHandler):
+    """Never forward a provenance credential beyond the configured origin."""
+
+    def redirect_request(
+        self,
+        request: Any,
+        file_pointer: Any,
+        code: int,
+        message: str,
+        headers: Any,
+        new_url: str,
+    ) -> NoReturn:
+        raise ProvenanceError("Forgejo redirected a provenance request; redirects are forbidden")
+
+
 def _fail(message: str) -> NoReturn:
     raise ProvenanceError(message)
 
@@ -118,6 +133,12 @@ def _one_line(value: Any, field: str, *, maximum: int = MAX_TEXT, allow_empty: b
     return result
 
 
+def _positive_integer(value: Any, field: str) -> int:
+    if type(value) is not int or value <= 0:
+        raise ProvenanceError(f"{field} must be a positive integer")
+    return value
+
+
 def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     value: dict[str, Any] = {}
     for key, item in pairs:
@@ -138,21 +159,57 @@ def _json(raw: bytes, description: str) -> Any:
         raise ProvenanceError(f"invalid JSON in {description}: {exc}") from exc
 
 
-def _read_regular(path: Path, *, maximum: int, secret: bool = False) -> bytes:
+def _same_file(path: Path, opened: os.stat_result, description: str) -> None:
     try:
-        info = path.lstat()
+        current = path.lstat()
     except OSError as exc:
         raise ProvenanceError(f"cannot stat {path}: {exc}") from exc
-    if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
-        raise ProvenanceError(f"expected a regular non-symlink file: {path}")
-    if info.st_size > maximum:
-        raise ProvenanceError(f"file exceeds {maximum} bytes: {path}")
-    if secret:
-        _require_private_access(path, info)
+    if stat.S_ISLNK(current.st_mode) or not stat.S_ISREG(current.st_mode) or not os.path.samestat(opened, current):
+        raise ProvenanceError(f"{description} changed while it was open: {path}")
+
+
+def _read_regular(path: Path, *, maximum: int, secret: bool = False) -> bytes:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_BINARY", 0)
     try:
-        return path.read_bytes()
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise ProvenanceError(f"cannot open regular non-symlink file {path}: {exc}") from exc
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode):
+            raise ProvenanceError(f"expected a regular non-symlink file: {path}")
+        if before.st_size > maximum:
+            raise ProvenanceError(f"file exceeds {maximum} bytes: {path}")
+        _same_file(path, before, "file")
+        if secret:
+            _require_private_access(path, before)
+            _same_file(path, before, "secret file")
+        chunks: list[bytes] = []
+        remaining = maximum + 1
+        while remaining:
+            chunk = os.read(descriptor, remaining)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        raw = b"".join(chunks)
+        after = os.fstat(descriptor)
+        if len(raw) > maximum:
+            raise ProvenanceError(f"file exceeds {maximum} bytes: {path}")
+        if (
+            not os.path.samestat(before, after)
+            or before.st_size != after.st_size
+            or before.st_mtime_ns != after.st_mtime_ns
+            or len(raw) != after.st_size
+        ):
+            raise ProvenanceError(f"file changed while reading: {path}")
+        _same_file(path, after, "file")
+        return raw
     except OSError as exc:
         raise ProvenanceError(f"cannot read {path}: {exc}") from exc
+    finally:
+        os.close(descriptor)
 
 
 def _require_private_access(path: Path, info: os.stat_result | None = None) -> None:
@@ -238,32 +295,62 @@ class Store:
     def open(self) -> None:
         if self._connection is not None:
             return
-        if self.path.exists() or self.path.is_symlink():
-            info = self.path.lstat()
-            if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
-                raise ProvenanceError(f"database must be a regular non-symlink file: {self.path}")
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        parent_info = self.path.parent.lstat()
+        if stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode):
+            raise ProvenanceError(f"database parent must be a non-symlink directory: {self.path.parent}")
         if os.name == "nt":
             _harden_private_access(self.path.parent)
         else:
             self.path.parent.chmod(0o700)
         _require_private_access(self.path.parent)
-        connection = sqlite3.connect(self.path)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute("PRAGMA journal_mode = DELETE")
-        connection.execute("PRAGMA secure_delete = ON")
-        if os.name == "nt":
-            _harden_private_access(self.path)
-        else:
-            self.path.chmod(0o600)
-        _require_private_access(self.path)
-        version = int(connection.execute("PRAGMA user_version").fetchone()[0])
-        if version not in {0, SCHEMA_VERSION}:
+        flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        flags |= getattr(os, "O_BINARY", 0)
+        created = False
+        try:
+            descriptor = os.open(self.path, flags)
+        except FileNotFoundError:
+            try:
+                descriptor = os.open(self.path, flags | os.O_CREAT | os.O_EXCL, 0o600)
+                created = True
+            except OSError as exc:
+                raise ProvenanceError(f"cannot create private database {self.path}: {exc}") from exc
+        except OSError as exc:
+            raise ProvenanceError(f"database must be a regular non-symlink file: {self.path}: {exc}") from exc
+        connection: sqlite3.Connection | None = None
+        try:
+            opened = os.fstat(descriptor)
+            if not stat.S_ISREG(opened.st_mode):
+                raise ProvenanceError(f"database must be a regular non-symlink file: {self.path}")
+            _same_file(self.path, opened, "database")
+            if os.name == "nt" and created:
+                _harden_private_access(self.path)
+            _require_private_access(self.path, opened)
+            _same_file(self.path, opened, "database")
+            connection = sqlite3.connect(self.path)
+            _same_file(self.path, opened, "database")
+        except Exception:
+            if connection is not None:
+                connection.close()
+            raise
+        finally:
+            os.close(descriptor)
+        if connection is None:
+            raise ProvenanceError(f"cannot open private database: {self.path}")
+        try:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute("PRAGMA journal_mode = DELETE")
+            connection.execute("PRAGMA secure_delete = ON")
+            _require_private_access(self.path)
+            version = int(connection.execute("PRAGMA user_version").fetchone()[0])
+            if version not in {0, SCHEMA_VERSION}:
+                raise ProvenanceError(f"unsupported provenance schema version {version}")
+            if version == 0:
+                self._create_schema(connection)
+        except Exception:
             connection.close()
-            raise ProvenanceError(f"unsupported provenance schema version {version}")
-        if version == 0:
-            self._create_schema(connection)
+            raise
         self._connection = connection
 
     def close(self) -> None:
@@ -407,17 +494,42 @@ class Store:
         if not isinstance(principals, list):
             raise ProvenanceError("identity policy principals must be a list")
         policy_sha = hashlib.sha256(raw).hexdigest()
-        rows = 0
+        policy_rows: list[tuple[str, str, str, str]] = []
+        desired_identifiers: set[tuple[str, str, str]] = set()
+        identifier_owners: dict[tuple[str, str], str] = {}
+        for index, principal in enumerate(principals):
+            if not isinstance(principal, dict):
+                raise ProvenanceError(f"identity policy principal {index} is not an object")
+            agent_id = _one_line(principal.get("id"), f"principal {index} id", allow_empty=False)
+            if not AGENT_ID.fullmatch(agent_id) or principal.get("kind") != "coding-agent":
+                continue
+            display = _one_line(principal.get("display_name"), f"principal {agent_id} display_name", allow_empty=False)
+            username = _one_line(principal.get("username"), f"principal {agent_id} username", allow_empty=False)
+            email = _one_line(principal.get("email"), f"principal {agent_id} email", allow_empty=False)
+            policy_rows.append((agent_id, display, username, email))
+            for kind, value in (("forgejo_login", username), ("git_email", email)):
+                key = (kind, value.casefold())
+                existing_owner = identifier_owners.get(key)
+                if existing_owner is not None and existing_owner != agent_id:
+                    raise ProvenanceError(f"identifier {kind}:{value} belongs to multiple policy agents")
+                identifier_owners[key] = agent_id
+                desired_identifiers.add((kind, value.casefold(), agent_id))
         with self.db:
-            for index, principal in enumerate(principals):
-                if not isinstance(principal, dict):
-                    raise ProvenanceError(f"identity policy principal {index} is not an object")
-                agent_id = _one_line(principal.get("id"), f"principal {index} id", allow_empty=False)
-                if not AGENT_ID.fullmatch(agent_id) or principal.get("kind") != "coding-agent":
-                    continue
-                display = _one_line(principal.get("display_name"), f"principal {agent_id} display_name", allow_empty=False)
-                username = _one_line(principal.get("username"), f"principal {agent_id} username", allow_empty=False)
-                email = _one_line(principal.get("email"), f"principal {agent_id} email", allow_empty=False)
+            stale = self.db.execute(
+                "SELECT kind, value, agent_id FROM agent_identifiers WHERE source LIKE 'identity-policy:%'"
+            ).fetchall()
+            for identifier in stale:
+                identity = (
+                    str(identifier["kind"]),
+                    str(identifier["value"]).casefold(),
+                    str(identifier["agent_id"]),
+                )
+                if identity not in desired_identifiers:
+                    self.db.execute(
+                        "DELETE FROM agent_identifiers WHERE kind=? AND value=?",
+                        (identifier["kind"], identifier["value"]),
+                    )
+            for agent_id, display, username, email in policy_rows:
                 self.db.execute(
                     "INSERT INTO agents(agent_id, display_name, source, policy_sha256) VALUES (?, ?, ?, ?) "
                     "ON CONFLICT(agent_id) DO UPDATE SET display_name=excluded.display_name, "
@@ -436,8 +548,7 @@ class Store:
                         "ON CONFLICT(kind, value) DO UPDATE SET agent_id=excluded.agent_id, source=excluded.source",
                         (kind, value, agent_id, f"identity-policy:{policy_sha}"),
                     )
-                rows += 1
-        return rows
+        return len(policy_rows)
 
     def add_identifier(self, agent_id: str, kind: str, value: str, source: str) -> None:
         if kind not in {"forgejo_login", "git_email"}:
@@ -478,9 +589,7 @@ class Store:
 
     def upsert_pull(self, forgejo_url: str, repository: str, value: dict[str, Any]) -> int:
         repository_id = self.repository_id(forgejo_url, repository, create=True)
-        number = value.get("number")
-        if not isinstance(number, int) or number <= 0:
-            raise ProvenanceError("pull request number must be positive")
+        number = _positive_integer(value.get("number"), "pull request number")
         author = value.get("user") or {}
         merged_by = value.get("merged_by") or {}
         head = value.get("head") or {}
@@ -614,8 +723,9 @@ class Store:
     def _insert_review(self, repository_id: int, pull_number: int, item: dict[str, Any]) -> None:
         review_id = item.get("id")
         actor = item.get("user") or {}
-        if not isinstance(review_id, int) or not isinstance(actor, dict):
+        if not isinstance(actor, dict):
             raise ProvenanceError("review has malformed identity")
+        review_id = _positive_integer(review_id, "review id")
         self.db.execute(
             "INSERT INTO reviews(repository_id, pull_number, review_id, actor_login, state, submitted_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",
@@ -632,8 +742,9 @@ class Store:
     def _insert_comment(self, repository_id: int, pull_number: int, item: dict[str, Any]) -> None:
         comment_id = item.get("id")
         actor = item.get("user") or {}
-        if not isinstance(comment_id, int) or not isinstance(actor, dict):
+        if not isinstance(actor, dict):
             raise ProvenanceError("comment has malformed identity")
+        comment_id = _positive_integer(comment_id, "comment id")
         self.db.execute(
             "INSERT INTO issue_comments(repository_id, pull_number, comment_id, actor_login, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",
@@ -717,20 +828,33 @@ class Store:
             "WHERE pc.repository_id=? AND pc.pull_number=? ORDER BY pc.position",
             (repository_id, pull_number),
         ).fetchall()
-        exact_logins = [str(pull["author_login"])]
-        exact_logins.extend(str(row["forgejo_author_login"]) for row in commits)
-        exact_logins.extend(str(row["forgejo_committer_login"]) for row in commits)
-        exact_logins.extend(str(row["signer_login"]) for row in commits if row["signature_verified"])
-        exact = self._mapped("forgejo_login", exact_logins)
-        if exact:
-            agents = tuple(sorted(exact))
-            evidence = tuple(item for agent in agents for item in exact[agent])
+        pull_actor = self._mapped("forgejo_login", [str(pull["author_login"])])
+        commit_logins = [str(row["forgejo_author_login"]) for row in commits]
+        commit_logins.extend(str(row["forgejo_committer_login"]) for row in commits)
+        commit_logins.extend(str(row["signer_login"]) for row in commits if row["signature_verified"])
+        commit_actors = self._mapped("forgejo_login", commit_logins)
+        exact_agents = tuple(sorted(set(pull_actor) | set(commit_actors)))
+        if pull_actor:
+            evidence_by_agent = {
+                agent: sorted(set(pull_actor.get(agent, ())) | set(commit_actors.get(agent, ())))
+                for agent in exact_agents
+            }
+            evidence = tuple(item for agent in exact_agents for item in evidence_by_agent[agent])
             return Attribution(
-                "attributed" if len(agents) == 1 else "conflict",
-                agents,
-                "exact-forgejo-actor" if len(agents) == 1 else "conflicting",
+                "attributed" if len(exact_agents) == 1 else "conflict",
+                exact_agents,
+                "exact-forgejo-actor" if len(exact_agents) == 1 else "conflicting",
                 ("forgejo-actor",),
                 evidence,
+            )
+        if commit_actors:
+            evidence = tuple(item for agent in exact_agents for item in commit_actors[agent])
+            return Attribution(
+                "partial",
+                exact_agents,
+                "partial-forgejo-actor",
+                ("forgejo-participant",),
+                (f"observed-pr-author:{pull['author_login']}", *evidence),
             )
 
         emails = [str(row["author_email"]) for row in commits]
@@ -871,14 +995,16 @@ class ForgejoClient:
         if not token or any(character.isspace() for character in token):
             raise ProvenanceError("Forgejo token is empty or malformed")
         self._token = token
+        self._opener = urllib.request.build_opener(_RejectRedirects())
 
     def get(self, path: str) -> Any:
         request = urllib.request.Request(
             f"{self.base_url}/api/v1{path}",
-            headers={"Accept": "application/json", "Authorization": f"token {self._token}"},
+            headers={"Accept": "application/json"},
         )
+        request.add_unredirected_header("Authorization", f"token {self._token}")
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
+            with self._opener.open(request, timeout=30) as response:
                 raw = response.read(MAX_API_BYTES + 1)
         except urllib.error.HTTPError as exc:
             detail = ""
@@ -895,15 +1021,27 @@ class ForgejoClient:
             raise ProvenanceError(f"Forgejo GET {path} exceeded {MAX_API_BYTES} bytes")
         return _json(raw, f"Forgejo GET {path}")
 
-    def pages(self, path: str, *, limit: int = 50, max_pages: int = 100) -> list[Any]:
+    def pages(
+        self,
+        path: str,
+        *,
+        limit: int = 50,
+        max_pages: int = 100,
+        maximum: int | None = None,
+    ) -> list[Any]:
+        if limit < 1 or max_pages < 1 or maximum is not None and maximum < 1:
+            raise ProvenanceError("pagination limits must be positive")
         values: list[Any] = []
         separator = "&" if "?" in path else "?"
+        page_size = min(limit, maximum + 1) if maximum is not None else limit
         for page in range(1, max_pages + 1):
-            batch = self.get(f"{path}{separator}page={page}&limit={limit}")
+            batch = self.get(f"{path}{separator}page={page}&limit={page_size}")
             if not isinstance(batch, list):
                 raise ProvenanceError(f"Forgejo paginated response for {path} is not an array")
             values.extend(batch)
-            if len(batch) < limit:
+            if maximum is not None and len(values) > maximum:
+                return values[: maximum + 1]
+            if len(batch) < page_size:
                 return values
         raise ProvenanceError(f"Forgejo pagination for {path} exceeded {max_pages} pages")
 
@@ -915,7 +1053,7 @@ class ForgejoSource(Protocol):
 
     def get(self, path: str) -> Any: ...
 
-    def pages(self, path: str) -> list[Any]: ...
+    def pages(self, path: str, *, maximum: int | None = None) -> list[Any]: ...
 
 
 def _repo_path(repository: str) -> str:
@@ -933,32 +1071,38 @@ def sync_repository(
     *,
     max_pulls: int = 500,
 ) -> int:
+    _positive_integer(max_pulls, "max_pulls")
     root = _repo_path(repository)
     started = _now()
     with store.db:
         repository_id = store.repository_id(client.base_url, repository, create=True)
     count = 0
     try:
+        pulls: Iterable[Any]
         if pull_numbers:
-            if len(set(pull_numbers)) != len(pull_numbers) or any(number <= 0 for number in pull_numbers):
+            if len(set(pull_numbers)) != len(pull_numbers):
                 raise ProvenanceError("pull numbers must be unique positive integers")
-            pulls = [client.get(f"{root}/pulls/{number}") for number in pull_numbers]
+            checked_numbers = tuple(_positive_integer(number, "pull number") for number in pull_numbers)
+            pulls = (client.get(f"{root}/pulls/{number}") for number in checked_numbers)
         else:
-            pulls = client.pages(f"{root}/pulls?state=all&sort=recentupdate")
-            if len(pulls) > max_pulls:
-                raise ProvenanceError(f"repository has {len(pulls)} pulls, above --max-pulls={max_pulls}")
-        with store.db:
-            for value in pulls:
-                if not isinstance(value, dict):
-                    raise ProvenanceError("pull response contains a non-object")
+            listed_pulls = client.pages(f"{root}/pulls?state=all&sort=recentupdate", maximum=max_pulls)
+            if len(listed_pulls) > max_pulls:
+                raise ProvenanceError(f"repository has {len(listed_pulls)} pulls, above --max-pulls={max_pulls}")
+            pulls = listed_pulls
+        for value in pulls:
+            if not isinstance(value, dict):
+                raise ProvenanceError("pull response contains a non-object")
+            number = _positive_integer(value.get("number"), "pull request number")
+            commits = client.pages(f"{root}/pulls/{number}/commits")
+            reviews = client.pages(f"{root}/pulls/{number}/reviews")
+            comments = client.pages(f"{root}/issues/{number}/comments")
+            if not all(isinstance(item, dict) for item in (*commits, *reviews, *comments)):
+                raise ProvenanceError(f"pull request {number} details contain a non-object")
+            with store.db:
                 number = store.upsert_pull(client.base_url, repository, value)
-                commits = client.pages(f"{root}/pulls/{number}/commits")
-                reviews = client.pages(f"{root}/pulls/{number}/reviews")
-                comments = client.pages(f"{root}/issues/{number}/comments")
-                if not all(isinstance(item, dict) for item in (*commits, *reviews, *comments)):
-                    raise ProvenanceError(f"pull request {number} details contain a non-object")
                 store.replace_pull_details(client.base_url, repository, number, commits, reviews, comments)
-                count += 1
+            count += 1
+        with store.db:
             store.db.execute(
                 "INSERT INTO sync_runs(repository_id, started_at, completed_at, pull_count, status, error) "
                 "VALUES (?, ?, ?, ?, 'success', '')",

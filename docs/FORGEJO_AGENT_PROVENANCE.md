@@ -105,7 +105,10 @@ strongly enough to reproduce the link.
 ## 5. Attribution precedence and honesty
 
 1. Append-only owner/session evidence, if internally consistent.
-2. Exact mapped Forgejo PR/commit/signed-commit actor.
+2. Exact mapped Forgejo PR author. Mapped commit/signature actors that disagree
+   with that author are a conflict; a mapped bot commit on a human-authored PR
+   is reported only as `partial-forgejo-actor` participation, not primary
+   authorship and not included by `list --agent`.
 3. Exact mapped Git email, reported as unverified if the commit is unsigned.
 4. Co-author trailers, displayed only as unverified declared co-authors.
 5. Unknown.
@@ -118,7 +121,7 @@ unknown as primary agent until stronger evidence exists.
 
 | Risk | Control | Honest limit |
 | --- | --- | --- |
-| Owner token leaks into DB/logs | token path only; owner-only POSIX mode or Windows ACL check; no token serialization | process memory necessarily holds the token while syncing |
+| Owner token leaks into DB/logs | descriptor-based no-follow read; token path only; owner-only POSIX mode or Windows ACL check; cross-origin and same-origin redirects both fail closed; no token serialization | process memory necessarily holds the token while syncing |
 | Private text enters public repo | DB lives outside repo; `.sqlite3` and `.agent-sessions/` ignored; PII gate remains | a user can still explicitly copy local output elsewhere |
 | Forged historical attribution | no style/title inference; evidence source and attester retained | owner attestations are factual assertions, not signatures in v1 |
 | Co-author trailer treated as proof | stored separately and labelled unverified | a trailer is still useful discovery evidence |
@@ -126,6 +129,12 @@ unknown as primary agent until stronger evidence exists.
 | Corrupt/ambiguous DB | schema version, constraints, FK checks, bounded values | backup is rebuild-by-sync plus reapplying local attestations |
 | Concurrent writers | SQLite transactions; DELETE journal | v1 is a single-user local CLI, not a multi-host server |
 | Windows permission drift | native ACL hardening for the DB plus a fail-closed ACL probe for DB and token | the token installer remains responsible for creating a private token ACL |
+
+The database leaf is created atomically as owner-only before SQLite opens it,
+then checked against the still-open descriptor. Network payloads are fetched
+outside SQLite write transactions; one fully validated PR is committed at a
+time, so a later API failure preserves earlier completed PRs and reports the
+actual committed count.
 
 ## 7. Deliverables and progress tracker
 
@@ -181,3 +190,9 @@ existing primary-host scheduling decision rather than creating a second writer.
   NTFS access. AP0 now hardens the database directory/file with native ACLs and
   verifies token ACLs without mutating the token; the same path passed a live
   Surface Windows directory-and-file probe.
+- 2026-08-09 — Addressed owner review #467: redirect-safe credentials,
+  descriptor-based secret reads, private pre-SQLite database creation,
+  network-outside-lock per-PR transactions, strict JSON integer identities,
+  bounded pull pagination, policy-alias replacement, honest mixed-actor
+  attribution, and clean expected CLI failures. Removed the unrelated
+  `local-export.ps1` punctuation drive-by from AP0.
