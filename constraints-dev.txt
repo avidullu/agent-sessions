@@ -38,5 +38,5 @@ types-reportlab==4.5.1.20260712
 # Transitive pins for the same reason — coverage and pluggy affect gate output.
 coverage==7.15.2
 iniconfig==2.3.0
-packaging==26.2
+packaging==26.3
 pluggy==1.6.0
