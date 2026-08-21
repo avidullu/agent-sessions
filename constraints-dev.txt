@@ -28,7 +28,7 @@
 # Verified together on Python 3.12.3 via scripts/local_ci.sh: 643 passed, ruff
 # clean, mypy clean, coverage 96.61%.
 
-mypy==2.3.0
+mypy==2.3.1
 pytest==9.1.1
 pytest-cov==7.1.0
 reportlab==5.0.0
