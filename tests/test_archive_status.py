@@ -195,6 +195,46 @@ class TestStatusSummary:
 
         assert summary.new_files == 1
 
+
+    def test_same_size_different_tail_does_not_hash(
+        self, archive_config: ArchiveConfig, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        root = archive_config.sources[0].roots[0]
+        root.mkdir(parents=True)
+        indexed = root / "indexed.jsonl"
+        new_file = root / "new.jsonl"
+        indexed_body = '{"sessionId":"indexed","pad":"' + ("A" * 40) + '"}' + "\n"
+        new_body = '{"sessionId":"newfile","pad":"' + ("B" * 40) + '"}' + "\n"
+        assert len(indexed_body) == len(new_body)
+        indexed.write_text(indexed_body, encoding="utf-8")
+        export_sources(archive_config)
+        new_file.write_text(new_body, encoding="utf-8")
+
+        def _boom(_path: object) -> str:
+            raise AssertionError("sha256_file must not run when tails differ")
+
+        monkeypatch.setattr("agent_sessions.archive_status.sha256_file", _boom)
+        summary = status_summary(archive_config)
+
+        assert summary.new_files == 1
+
+    def test_byte_identical_pair_without_session_id_is_new(self, archive_config: ArchiveConfig) -> None:
+        root = archive_config.sources[0].roots[0]
+        first = root / "first" / "session.jsonl"
+        alias = root / "second" / "session-copy.jsonl"
+        first.parent.mkdir(parents=True)
+        alias.parent.mkdir(parents=True)
+        content = '{"messages":[]}' + "\n"
+        first.write_text(content, encoding="utf-8")
+        export_sources(archive_config)
+        alias.write_text(content, encoding="utf-8")
+
+        summary = status_summary(archive_config)
+
+        assert summary.visible_files == 2
+        assert summary.indexed_records == 1
+        assert summary.new_files == 1
+
     def test_render_status(self, archive_config: ArchiveConfig) -> None:
         write_indexes(
             archive_config,

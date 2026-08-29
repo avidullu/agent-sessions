@@ -136,7 +136,9 @@ def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> 
                     if digest_candidates:
                         source = source_by_name[key[0]]
                         extractor = get_extractor(source.kind)
-                        assert extractor is not None
+                        if extractor is None:
+                            new_files += 1
+                            continue
                         try:
                             session = extractor(path)
                         except (OSError, TypeError, ValueError):
