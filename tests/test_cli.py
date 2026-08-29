@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from agent_sessions import __version__
 from agent_sessions.archive import ExportResult
 from agent_sessions.cli import _export_summary_lines, build_parser, main
 
@@ -15,6 +16,12 @@ class TestBuildParser:
     def test_creates_parser(self) -> None:
         parser = build_parser()
         assert parser is not None
+
+    def test_version_reports_installed_package(self, capsys: pytest.CaptureFixture[str]) -> None:
+        with pytest.raises(SystemExit) as exc_info:
+            main(["--version"])
+        assert exc_info.value.code == 0
+        assert capsys.readouterr().out.endswith(f" {__version__}\n")
 
     def test_discover_subcommand(self) -> None:
         parser = build_parser()

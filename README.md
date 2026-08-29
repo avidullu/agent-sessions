@@ -45,6 +45,9 @@ Configure sources in `sources.toml` (copy from `sources.example.toml`). Platform
 # Install
 pip install agent-session-hub
 
+# Confirm which installed release you are running
+agent-archive --version
+
 # Discover sessions
 agent-archive discover --write docs/DISCOVERY.md
 
