@@ -137,7 +137,7 @@ fi
 # Use portable single-quoted absolute paths so cron does not depend on cwd.
 # Cron consumes unescaped percent signs before invoking /bin/sh, even inside
 # shell quotes, so cron_quote also protects them.
-cron_line="$minute $hour * * * $(cron_quote "$export_script") --log-dir $(cron_quote "$log_dir") --write-primary-marker$pdf_flag"
+cron_line="$minute $hour * * * AGENT_SESSIONS_ROUTINE_SCHEMA=1 $(cron_quote "$export_script") --log-dir $(cron_quote "$log_dir") --write-primary-marker$pdf_flag"
 
 {
   printf '%s\n' "$filtered"

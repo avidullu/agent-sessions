@@ -12,6 +12,7 @@ from .archive import ExportResult, discover_sources, export_sources, pdf_existin
 from .archive_status import archive_status
 from .baseline import baseline_scaffold, baseline_suggest
 from .config import ArchiveConfig, load_config
+from .routine import discover_routine, format_routine_status
 
 
 def default_repo_root() -> Path:
@@ -20,6 +21,21 @@ def default_repo_root() -> Path:
 
 def _handle_discover(config: ArchiveConfig, args: argparse.Namespace) -> int:
     return discover_sources(config, samples=args.samples, write=args.write)
+
+
+def _handle_routine_status(args: argparse.Namespace) -> int:
+    report = discover_routine(
+        args.repo_root,
+        hour=args.hour,
+        minute=args.minute,
+        log_dir=args.log_dir,
+        pdf=args.pdf,
+    )
+    if args.json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        print(format_routine_status(report))
+    return 0
 
 
 def _export_summary_lines(
@@ -47,7 +63,8 @@ def _export_summary_lines(
         if track_artifacts:
             lines.append("- Rendered Markdown/PDF artifacts are configured as Git-tracked archive outputs.")
         else:
-            lines.append("- Rendered Markdown/PDF artifacts are local-only; Git tracks only archive metadata.")
+            lines.append("- Rendered transcripts and newly generated catalog metadata are local-only by default.")
+            lines.append("- Existing tracked private catalogs remain tracked; new private catalogs require `git add -f`.")
         if write_pdfs:
             lines.append("- PDFs are written beside Markdown files when `reportlab` is available.")
         else:
@@ -404,6 +421,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_status.add_argument("--json", action="store_true", help="Write machine-readable JSON.")
     p_status.set_defaults(func=_handle_status)
 
+    p_routine = sub.add_parser("routine", help="Discover installable local-export automation.")
+    routine_sub = p_routine.add_subparsers(dest="routine_cmd", required=True)
+    p_routine_status = routine_sub.add_parser("status", help="Inspect routine install and update state.")
+    p_routine_status.add_argument("--hour", type=int, default=7, choices=range(24))
+    p_routine_status.add_argument("--minute", type=int, default=30, choices=range(60))
+    p_routine_status.add_argument("--log-dir", type=Path)
+    p_routine_status.add_argument("--pdf", action="store_true")
+    p_routine_status.add_argument("--json", action="store_true", help="Write the versioned machine contract.")
+    p_routine_status.set_defaults(func=_handle_routine_status)
+
     p_prune = sub.add_parser("prune", help="Drop index records whose archive Markdown is missing on disk.")
     p_prune.add_argument("--dry-run", action="store_true", help="Report what would be pruned without writing.")
     p_prune.set_defaults(func=_handle_prune)
@@ -689,7 +716,9 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if args.cmd == "provenance":
+    if args.cmd in {"provenance", "routine"}:
+        if args.cmd == "routine":
+            return int(args.func(args))
         from .provenance import ProvenanceError
 
         try:

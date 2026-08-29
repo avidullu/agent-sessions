@@ -121,15 +121,64 @@ esac
         return "'" + str(value).replace("'", "'\\''").replace("%", "\\%") + "'"
 
     assert cron_quote(scripts / "local-export.sh") in cron_line
+    assert "AGENT_SESSIONS_ROUTINE_SCHEMA=1" in cron_line
     assert f"--log-dir {cron_quote(log_dir)}" in cron_line
     command = cron_line.split(maxsplit=5)[5].replace("\\%", "%")
     syntax = subprocess.run(["sh", "-n", "-c", command], check=False)
     assert syntax.returncode == 0
 
 
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_public_clone_ignores_untracked_local_catalog(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    shutil.copy2(REPO_ROOT / ".gitignore", repo / ".gitignore")
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+
+    for relative in ("archive/.router-index.jsonl", "archive/index.jsonl", "archive/INDEX.md"):
+        target = repo / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("private local catalog\n", encoding="utf-8")
+        ignored = subprocess.run(
+            ["git", "-C", str(repo), "check-ignore", "-q", relative],
+            check=False,
+        )
+        assert ignored.returncode == 0, relative
+
+    subprocess.run(["git", "-C", str(repo), "add", "--", "archive/"], check=True)
+    assert subprocess.run(
+        ["git", "-C", str(repo), "diff", "--cached", "--quiet"],
+        check=False,
+    ).returncode == 0
+
+    subprocess.run(
+        ["git", "-C", str(repo), "add", "-f", "archive/index.jsonl", "archive/INDEX.md"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo), "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "private catalog"],
+        check=True,
+    )
+    for relative in ("archive/index.jsonl", "archive/INDEX.md"):
+        (repo / relative).write_text("updated private catalog\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "--", "archive/"], check=True)
+    staged = subprocess.run(
+        ["git", "-C", str(repo), "diff", "--cached", "--name-only"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    assert set(staged) == {"archive/INDEX.md", "archive/index.jsonl"}
+
+
 def test_local_export_ps1_present() -> None:
     assert (REPO_ROOT / "scripts" / "local-export.ps1").is_file()
-    assert (REPO_ROOT / "scripts" / "install-local-export-schedule.ps1").is_file()
+    installer = REPO_ROOT / "scripts" / "install-local-export-schedule.ps1"
+    assert installer.is_file()
+    text = installer.read_text(encoding="utf-8")
+    assert 'foreach ($version in @("3.13", "3.12", "3.11"))' in text
+    assert '"-Python", "`"$Python`""' in text
+    assert "Python 3.11 or newer is required" in text
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX lock behavior")

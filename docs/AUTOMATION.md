@@ -21,7 +21,8 @@ Search indexing and baseline suggestion runs stay separate from either job.
 | `archive/**/*.md`, `archive/**/*.pdf` | **Ignored** — full transcripts stay local |
 | `raw/` | **Ignored** — may contain secrets / full tool output |
 | `sources.toml` | **Ignored** — machine-specific roots |
-| `archive/index.jsonl`, `archive/INDEX.md` | **Not ignored** — portable catalog metadata |
+| `archive/.router-index.jsonl` | **Ignored** — private local VS Code feeder sidecar |
+| `archive/index.jsonl`, `archive/INDEX.md` | **Ignored when untracked** — local catalog metadata; existing tracked private catalogs remain tracked |
 | `archive/.primary-host` | **Ignored** — optional marker written by local-export |
 
 If your remotes are the public GitHub/Forgejo **product** repositories, do **not**
@@ -67,6 +68,21 @@ ownership-checked so an older process cannot delete a newer process's lock.
 
 ### Install a daily schedule
 
+Discover whether the current machine can host the routine, whether it is
+already current, and the exact install/update action without changing anything:
+
+```bash
+agent-archive --repo-root . routine status
+agent-archive --repo-root . routine status --json
+```
+
+The JSON contract is `agent-sessions.routine-discovery.v1`. It reports
+`installable`, `current`, `update_available`, `repair_required`, or
+`unsupported`, includes argument-vector actions for safe automation, and omits
+the hostname and session content. Re-running the installer is the supported
+update path; managed entries carry a routine schema so older schedules become
+visibly updateable instead of silently drifting.
+
 ```bash
 # Linux / WSL / macOS (user crontab)
 ./scripts/install-local-export-schedule.sh
@@ -79,10 +95,19 @@ ownership-checked so an older process cannot delete a newer process's lock.
 # Windows (current-user Scheduled Task)
 .\scripts\install-local-export-schedule.ps1
 .\scripts\install-local-export-schedule.ps1 -Hour 7 -Minute 30 -Pdf
+.\scripts\install-local-export-schedule.ps1 -Python "C:\Python313\python.exe"
 .\scripts\install-local-export-schedule.ps1 -Uninstall
 ```
 
-The installer wires **local-export** only. It does not push to remotes.
+The Windows installer selects Python 3.13, 3.12, or 3.11 through the Python
+launcher, then falls back to a compatible `python.exe`; an older default
+interpreter is rejected before Task Scheduler is changed. `-Python` pins an
+explicit compatible interpreter.
+
+The installer wires **local-export** only. It does not push to remotes. Generated
+catalog metadata and the Router sidecar are ignored when untracked, so a public
+product clone stays clean. An existing tracked private catalog continues to be
+tracked; deliberately publishing a new sanitized catalog requires `git add -f`.
 
 ### Single-host tips
 
@@ -97,7 +122,15 @@ The installer wires **local-export** only. It does not push to remotes.
 ## Private catalog sync (`daily-export`)
 
 Use only when the remote is a **private** archive you intend to update with
-catalog metadata.
+catalog metadata. Before the first scheduled run in a new private archive,
+bootstrap the ignored catalog explicitly:
+
+```bash
+git add -f archive/index.jsonl archive/INDEX.md
+git commit -m "archive: initialize private catalog"
+```
+
+After that, the files are tracked normally and `daily-export` can update them.
 
 The scheduled job should:
 

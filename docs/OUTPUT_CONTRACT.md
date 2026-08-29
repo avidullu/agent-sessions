@@ -24,17 +24,19 @@ The contract has two producer paths, both landing in the same `archive/`:
 
 | Producer | Writes | Indexed by |
 | --- | --- | --- |
-| `agent-sessions` (Python) | local `archive/**/*.md`/`.pdf` artifacts + tracked `archive/index.jsonl` + `archive/INDEX.md` | itself, on `export` |
+| `agent-sessions` (Python) | local `archive/**/*.md`/`.pdf` artifacts + generated `archive/index.jsonl` + `archive/INDEX.md` (ignored when untracked) | itself, on `export` |
 | Feeder tool (e.g. router) | local `archive/**/*.md` artifacts + `archive/.router-index.jsonl` sidecar | merged into `index.jsonl` on the next `export` |
 
 If a feeder's output diverges from this document, the archive silently
 fragments (duplicate files, mismatched catalog rows). The conformance tests in
 both repos exist to prevent that — see §8.
 
-By default, Git tracks archive metadata only. Rendered transcript bodies
-(`archive/**/*.md`, except `archive/INDEX.md`) and PDFs are local-only files on
-the user's machine. Set `[archive] track_artifacts = true` only for an explicit
-repo policy change that intentionally commits rendered transcript artifacts.
+By default, generated catalog metadata, rendered transcript bodies, and PDFs
+are local-only files on the user's machine. Existing tracked private catalogs
+continue to be tracked; a new private archive opts in with `git add -f
+archive/index.jsonl archive/INDEX.md`. Set `[archive] track_artifacts = true`
+only for an explicit repo policy change that intentionally commits rendered
+transcript artifacts.
 
 ## 2. Archive Markdown format
 
@@ -194,7 +196,7 @@ feeder.
 | --- | --- | --- |
 | `source` | string | source name, e.g. `copilot-vscode-windows` |
 | `kind` | string | extractor kind, e.g. `copilot_chat` |
-| `source_file` | string | native path to the source log; a feeder writes it absolute, and the hub rewrites any user home prefix to a portable `~` form (plus a username-free `source_origin`) when the record enters the tracked catalog — tracked files never carry a real home directory |
+| `source_file` | string | native path to the source log; a feeder writes it absolute, and the hub rewrites any user home prefix to a portable `~` form (plus a username-free `source_origin`) when the record enters the generated catalog — a deliberately tracked private catalog never carries a real home directory |
 | `sha256` | string | hex digest of the source file |
 | `size` | integer | source file size in bytes |
 | `mtime` | number | source mtime, float epoch seconds |

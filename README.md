@@ -53,6 +53,9 @@ agent-archive export --all
 
 # Check status
 agent-archive status
+
+# Inspect whether this machine can host the daily local-only routine
+agent-archive --repo-root . routine status
 ```
 
 Query local source-control provenance without storing PR or session bodies:
@@ -105,11 +108,16 @@ force-add it.
 - indexed records not visible from this machine, preserved from other machines;
 - source counts and inferred origin environments.
 
-`export --all` writes Markdown archive artifacts and updates the shared catalog:
+`export --all` writes Markdown archive artifacts and updates the local catalog:
 
 - `archive/**/*.md`
 - `archive/index.jsonl`
 - `archive/INDEX.md`
+
+These generated files are ignored when untracked so a public product clone does
+not accidentally publish personal metadata. An existing tracked private catalog
+continues to be tracked; bootstrap a new private catalog deliberately with
+`git add -f archive/index.jsonl archive/INDEX.md`.
 
 `export --all --pdf` also writes `archive/**/*.pdf` when `reportlab` is
 installed. The `.[dev]` install includes `reportlab`; to check a minimal
@@ -240,7 +248,8 @@ Value preview:
 - Evidence breadcrumbs:
 ```
 
-See [docs/AUTOMATION.md](docs/AUTOMATION.md) for scheduled export (local-only
+See [docs/AUTOMATION.md](docs/AUTOMATION.md) for machine-readable routine
+discovery and scheduled export (local-only
 primary host via `scripts/local-export` / `install-local-export-schedule`, or
 private catalog sync via `daily-export`) and
 [docs/MULTI_MACHINE.md](docs/MULTI_MACHINE.md) for how indexes converge across

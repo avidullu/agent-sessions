@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Machine-readable local-export routine discovery** — reports native
+  scheduler support and `installable` / `current` / `update_available` /
+  `repair_required` state through a versioned JSON contract; managed schedules
+  carry a schema marker, and Windows pins a supported Python 3.11+ interpreter.
 - **Local Forgejo agent-provenance index** — bounded metadata-only sync into a
   mode-0600 SQLite database, exact actor mapping from a versioned identity
   policy, `who`/`list` queries, and append-only owner/session attestations.
@@ -29,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   contained private staging and manual exact-approval catalog ship-back.
 
 ### Fixed
+- Untracked local catalogs cannot be staged by a default `git add -- archive/`; they stay private unless force-added.
 - Windows provenance stores now combine ACL hardening and verification in one
   PowerShell process, avoid redundant probes for newly created databases, and
   allow loaded owner machines up to 60 seconds to complete a native ACL check.
@@ -55,6 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   propagation on the other.
 
 ### Changed
+- Newly generated `archive/index.jsonl`, `archive/INDEX.md`, and Router sidecar
+  metadata are ignored when untracked, keeping public product clones private by
+  default. Existing tracked private catalogs continue to stage normally; new
+  private catalogs opt in explicitly with `git add -f`.
 - `scripts/local_ci.sh` drift guard no longer *requires* a GitHub-only job (that rule was
   mandating the false green). It now positively asserts that `ci-gate` exists, carries
   `if: ${{ always() }}`, lists every job in `needs:`, and passes every job's result to the

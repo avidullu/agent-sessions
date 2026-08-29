@@ -178,8 +178,9 @@ security follow-up: **#133**. Residual privacy prose: **#122**.
   `forge/main`. (Mirror fast-forwarded 2026-07-22 after lagging 12 commits.)
 - **Propose-only (D7) / pull model (D8)** govern all rules-project writes;
   merges require owner approval scoped to the PR or project.
-- Rendered archive Markdown/PDF transcript bodies remain local-only by
-  default; `archive/index.jsonl` and `archive/INDEX.md` are the portable
-  tracked catalog.
+- Rendered archive Markdown/PDF transcript bodies and newly generated
+  `archive/index.jsonl` / `archive/INDEX.md` remain local-only by default.
+  Existing tracked private catalogs stay tracked; a new private archive must
+  opt in with `git add -f`.
 - Hub and router catalog identity keeps distinct same-session-id records
   apart by including `sha256`; reuse checks use tail hashes.

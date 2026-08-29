@@ -13,15 +13,17 @@ tmp/
 # Use `git add -f raw/` only when you intentionally want raw backups in GitHub.
 raw/
 
-# Rendered transcript artifacts are local-only by default. Keep the catalog in
-# Git, but do not commit full Markdown/PDF transcript bodies unless an explicit
-# repo migration chooses `[archive] track_artifacts = true`.
+# Rendered transcripts and generated catalog metadata are local-only by default.
+# Existing tracked catalogs remain tracked; use `git add -f` only when a private
+# archive deliberately publishes its sanitized catalog.
 archive/**/*.md
 archive/**/*.pdf
-!archive/INDEX.md
+archive/INDEX.md
+archive/index.jsonl
 
 # Local diagnostics/state written by the VS Code feeder extension.
 archive/.router/
+archive/.router-index.jsonl
 
 # Optional primary-host marker written by scripts/local-export.sh --write-primary-marker.
 archive/.primary-host
