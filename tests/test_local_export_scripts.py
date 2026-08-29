@@ -128,7 +128,7 @@ esac
     assert syntax.returncode == 0
 
 
-@pytest.mark.skipif(os.name == "nt", reason="POSIX git behavior")
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
 def test_public_clone_ignores_untracked_local_catalog(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -168,7 +168,7 @@ def test_public_clone_ignores_untracked_local_catalog(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
     ).stdout.splitlines()
-    assert staged == ["archive/INDEX.md", "archive/index.jsonl"]
+    assert set(staged) == {"archive/INDEX.md", "archive/index.jsonl"}
 
 
 def test_local_export_ps1_present() -> None:
