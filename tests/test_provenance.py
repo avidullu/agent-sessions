@@ -41,7 +41,10 @@ def avoid_repeated_native_windows_store_acl(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Keep one real Store ACL round-trip without spawning PowerShell per test."""
-    if os.name != "nt" or request.node.name == "test_schema_is_private_versioned_and_contains_no_body_columns":
+    # Use originalname so parametrized suffixes cannot hide the real ACL test.
+    if os.name != "nt" or getattr(request.node, "originalname", request.node.name) == (
+        "test_schema_is_private_versioned_and_contains_no_body_columns"
+    ):
         return
 
     def already_private(path: Path, info: os.stat_result | None = None) -> None:
@@ -193,8 +196,11 @@ def test_schema_is_private_versioned_and_contains_no_body_columns(tmp_path: Path
         assert "signature" not in columns
         assert "payload" not in columns
     if os.name == "nt":
-        # Store.open() already ran the native ACL probe for both paths.
+        # Store.open() skipped a second probe on the newly created DB; assert
+        # the resulting ACL with Get-Acl (via the private-access helper).
         assert path.is_file()
+        _require_private_access(path)
+        _require_private_access(path.parent)
     else:
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
         assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
