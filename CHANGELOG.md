@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   contained private staging and manual exact-approval catalog ship-back.
 
 ### Fixed
+- Windows provenance stores now combine ACL hardening and verification in one
+  PowerShell process, avoid redundant probes for newly created databases, and
+  allow loaded owner machines up to 60 seconds to complete a native ACL check.
 - Local-only exports now use an atomic, ownership-checked cross-shell lock without
   time-based eviction; PowerShell propagates failed native commands; and installed
   cron commands safely quote paths containing spaces, apostrophes, or percent signs.

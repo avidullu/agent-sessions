@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, NoReturn
 
 MAX_TEXT = 1000
+WINDOWS_ACL_TIMEOUT_SECONDS = 60
 
 WINDOWS_ACL_PROBE = """
 $ErrorActionPreference = 'Stop'
@@ -194,7 +195,7 @@ def _require_private_access(path: Path, info: os.stat_result | None = None) -> N
             capture_output=True,
             text=True,
             env=environment,
-            timeout=15,
+            timeout=WINDOWS_ACL_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         raise ProvenanceError(f"cannot verify the current-user Windows ACL: {path}") from exc
@@ -203,19 +204,25 @@ def _require_private_access(path: Path, info: os.stat_result | None = None) -> N
 
 
 def _harden_private_access(path: Path) -> None:
-    """Replace inherited Windows access with current-user/system/admin rules."""
+    """Replace inherited Windows access and verify the resulting private ACL."""
     if os.name != "nt":
         return
     environment = os.environ.copy()
     environment["AGENT_SESSIONS_PRIVATE_PATH"] = str(path)
     try:
         result = subprocess.run(
-            ["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", _powershell_encoded(WINDOWS_ACL_HARDEN)],
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-EncodedCommand",
+                _powershell_encoded(WINDOWS_ACL_HARDEN + WINDOWS_ACL_PROBE),
+            ],
             check=False,
             capture_output=True,
             text=True,
             env=environment,
-            timeout=15,
+            timeout=WINDOWS_ACL_TIMEOUT_SECONDS,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         raise ProvenanceError(f"cannot harden the current-user Windows ACL: {path}") from exc

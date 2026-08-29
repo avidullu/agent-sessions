@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import sqlite3
@@ -33,6 +34,24 @@ REPO = "Example/project"
 SHA_A = "a" * 40
 SHA_B = "b" * 40
 SHA_C = "c" * 40
+
+
+@pytest.fixture(autouse=True)
+def avoid_repeated_native_windows_store_acl(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Keep one real Store ACL round-trip without spawning PowerShell per test."""
+    # Use originalname so parametrized suffixes cannot hide the real ACL test.
+    if os.name != "nt" or getattr(request.node, "originalname", request.node.name) == (
+        "test_schema_is_private_versioned_and_contains_no_body_columns"
+    ):
+        return
+
+    def already_private(path: Path, info: os.stat_result | None = None) -> None:
+        del path, info
+
+    monkeypatch.setattr("agent_sessions._provenance_store._harden_private_access", already_private)
+    monkeypatch.setattr("agent_sessions._provenance_store._require_private_access", already_private)
 
 
 def identity_policy(path: Path) -> Path:
@@ -177,8 +196,11 @@ def test_schema_is_private_versioned_and_contains_no_body_columns(tmp_path: Path
         assert "signature" not in columns
         assert "payload" not in columns
     if os.name == "nt":
-        # Store.open() already ran the native ACL probe for both paths.
+        # Store.open() skipped a second probe on the newly created DB; assert
+        # the resulting ACL with Get-Acl (via the private-access helper).
         assert path.is_file()
+        _require_private_access(path)
+        _require_private_access(path.parent)
     else:
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
         assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
@@ -614,6 +636,7 @@ def test_windows_acl_probe_fails_closed_on_unexpected_principal(tmp_path: Path) 
         _require_private_access(path)
     assert run.call_args.kwargs["env"]["AGENT_SESSIONS_PRIVATE_PATH"] == str(path)
     assert str(path) not in run.call_args.args[0]
+    assert run.call_args.kwargs["timeout"] == 60
 
 
 def test_windows_acl_hardener_fails_closed_without_path_in_argv(tmp_path: Path) -> None:
@@ -628,6 +651,11 @@ def test_windows_acl_hardener_fails_closed_without_path_in_argv(tmp_path: Path) 
         _harden_private_access(path)
     assert run.call_args.kwargs["env"]["AGENT_SESSIONS_PRIVATE_PATH"] == str(path)
     assert str(path) not in run.call_args.args[0]
+    assert run.call_args.kwargs["timeout"] == 60
+    encoded_script = run.call_args.args[0][-1]
+    script = base64.b64decode(encoded_script).decode("utf-16-le")
+    assert "icacls.exe" in script
+    assert "Get-Acl" in script
 
 
 def test_forgejo_client_get_pages_and_errors(tmp_path: Path) -> None:

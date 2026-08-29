@@ -79,7 +79,7 @@ class Store:
             _harden_private_access(self.path.parent)
         else:
             self.path.parent.chmod(0o700)
-        _require_private_access(self.path.parent)
+            _require_private_access(self.path.parent)
         flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
         flags |= getattr(os, "O_BINARY", 0)
         created = False
@@ -100,8 +100,11 @@ class Store:
                 raise ProvenanceError(f"database must be a regular non-symlink file: {self.path}")
             _same_file(self.path, opened, "database")
             if os.name == "nt" and created:
+                # Newly created Windows DBs skip a separate _require_private_access
+                # probe: combined harden+probe already ran icacls and Get-Acl.
                 _harden_private_access(self.path)
-            _require_private_access(self.path, opened)
+            else:
+                _require_private_access(self.path, opened)
             _same_file(self.path, opened, "database")
             connection = sqlite3.connect(self.path)
             _same_file(self.path, opened, "database")
@@ -118,7 +121,10 @@ class Store:
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute("PRAGMA journal_mode = DELETE")
             connection.execute("PRAGMA secure_delete = ON")
-            _require_private_access(self.path)
+            # Intentional: skip the post-open probe on a newly created Windows DB
+            # because _harden_private_access already verified the private ACL.
+            if os.name != "nt" or not created:
+                _require_private_access(self.path)
             version = int(connection.execute("PRAGMA user_version").fetchone()[0])
             if version not in {0, SCHEMA_VERSION}:
                 raise ProvenanceError(f"unsupported provenance schema version {version}")
