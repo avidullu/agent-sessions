@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .archive import (
+    index_identity_key,
     index_record_key,
     iter_source_files,
     merge_index_records,
@@ -83,6 +84,12 @@ def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> 
         indexed = merge_index_records(indexed, router_records)
 
     indexed_by_key = {index_record_key(record): record for record in indexed}
+    indexed_identity_keys = {index_identity_key(record) for record in indexed}
+    indexed_by_size: dict[int, list[dict[str, Any]]] = {}
+    for record in indexed:
+        size = record.get("size")
+        if isinstance(size, int):
+            indexed_by_size.setdefault(size, []).append(record)
     visible_by_key: dict[tuple[str, str], tuple[int, float, Path]] = {}
     skipped_sources: list[str] = []
 
@@ -92,6 +99,7 @@ def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> 
         for source in config.sources
         if not selected_names or source.name in selected_names or source.kind in selected_names
     ]
+    source_by_name = {source.name: source for source in sources}
     for source in sources:
         if get_extractor(source.kind) is None:
             skipped_sources.append(f"{source.name} ({source.kind})")
@@ -107,6 +115,41 @@ def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> 
     for key, (size, mtime, path) in visible_by_key.items():
         idx_record: dict[str, Any] | None = indexed_by_key.get(key)
         if idx_record is None:
+            # The catalog intentionally collapses byte-identical copies of the
+            # same logical session even when both local paths remain visible.
+            # Avoid reporting those secondary paths as perpetually new. The
+            # size and tail checks keep the ordinary all-new status path cheap;
+            # full hashing and extraction happen only for plausible aliases.
+            same_size = indexed_by_size.get(size, [])
+            if same_size:
+                tail_digest = tail_sha256_file(path)
+                tail_candidates = [
+                    record
+                    for record in same_size
+                    if not record.get("tail_sha256") or record.get("tail_sha256") == tail_digest
+                ]
+                if tail_candidates:
+                    digest = sha256_file(path)
+                    digest_candidates = [
+                        record for record in tail_candidates if record.get("sha256") == digest
+                    ]
+                    if digest_candidates:
+                        source = source_by_name[key[0]]
+                        extractor = get_extractor(source.kind)
+                        assert extractor is not None
+                        try:
+                            session = extractor(path)
+                        except (OSError, TypeError, ValueError):
+                            session = None
+                        if session is not None:
+                            candidate = {
+                                "source": source.name,
+                                "source_file": str(path),
+                                "sha256": digest,
+                                "metadata": session.metadata,
+                            }
+                            if index_identity_key(candidate) in indexed_identity_keys:
+                                continue
             new_files += 1
             continue
         if idx_record.get("size") == size and idx_record.get("mtime") == mtime:
