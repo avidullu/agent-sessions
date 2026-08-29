@@ -93,6 +93,15 @@ class TestBuildParser:
         assert args.source == ["codex"]
         assert args.json is True
 
+    def test_routine_status(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["routine", "status", "--hour", "6", "--minute", "15", "--json"])
+        assert args.cmd == "routine"
+        assert args.routine_cmd == "status"
+        assert args.hour == 6
+        assert args.minute == 15
+        assert args.json is True
+
     def test_provenance_sync(self) -> None:
         parser = build_parser()
         args = parser.parse_args(

@@ -53,6 +53,9 @@ agent-archive export --all
 
 # Check status
 agent-archive status
+
+# Inspect whether this machine can host the daily local-only routine
+agent-archive --repo-root . routine status
 ```
 
 Query local source-control provenance without storing PR or session bodies:
@@ -245,7 +248,8 @@ Value preview:
 - Evidence breadcrumbs:
 ```
 
-See [docs/AUTOMATION.md](docs/AUTOMATION.md) for scheduled export (local-only
+See [docs/AUTOMATION.md](docs/AUTOMATION.md) for machine-readable routine
+discovery and scheduled export (local-only
 primary host via `scripts/local-export` / `install-local-export-schedule`, or
 private catalog sync via `daily-export`) and
 [docs/MULTI_MACHINE.md](docs/MULTI_MACHINE.md) for how indexes converge across

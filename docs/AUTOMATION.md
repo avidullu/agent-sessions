@@ -68,6 +68,21 @@ ownership-checked so an older process cannot delete a newer process's lock.
 
 ### Install a daily schedule
 
+Discover whether the current machine can host the routine, whether it is
+already current, and the exact install/update action without changing anything:
+
+```bash
+agent-archive --repo-root . routine status
+agent-archive --repo-root . routine status --json
+```
+
+The JSON contract is `agent-sessions.routine-discovery.v1`. It reports
+`installable`, `current`, `update_available`, `repair_required`, or
+`unsupported`, includes argument-vector actions for safe automation, and omits
+the hostname and session content. Re-running the installer is the supported
+update path; managed entries carry a routine schema so older schedules become
+visibly updateable instead of silently drifting.
+
 ```bash
 # Linux / WSL / macOS (user crontab)
 ./scripts/install-local-export-schedule.sh

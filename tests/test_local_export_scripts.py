@@ -121,6 +121,7 @@ esac
         return "'" + str(value).replace("'", "'\\''").replace("%", "\\%") + "'"
 
     assert cron_quote(scripts / "local-export.sh") in cron_line
+    assert "AGENT_SESSIONS_ROUTINE_SCHEMA=1" in cron_line
     assert f"--log-dir {cron_quote(log_dir)}" in cron_line
     command = cron_line.split(maxsplit=5)[5].replace("\\%", "%")
     syntax = subprocess.run(["sh", "-n", "-c", command], check=False)

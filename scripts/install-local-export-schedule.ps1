@@ -59,6 +59,7 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -StartWhenAvai
 
 Register-ScheduledTask `
     -TaskName $TaskName `
+    -Description "Agent Sessions managed local-export routine schema v1" `
     -Action $action `
     -Trigger $trigger `
     -Settings $settings `
