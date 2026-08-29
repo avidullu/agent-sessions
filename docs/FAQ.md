@@ -55,7 +55,10 @@ To the `archive/` directory inside the agent-sessions repo (configurable via `so
 By default:
 
 - **Transcript bodies** (`archive/**/*.md`, optional PDFs) are **gitignored** — local only.
-- **Catalog metadata** (`archive/index.jsonl`, `archive/INDEX.md`) is **not** gitignored, so a **private** archive remote can share “what is indexed” across machines without uploading full transcripts.
+- **Catalog metadata** (`archive/index.jsonl`, `archive/INDEX.md`) is
+  **gitignored when untracked**, so a public product clone keeps personal
+  metadata local. An existing tracked private catalog remains tracked; a new
+  private archive can opt in with `git add -f`.
 
 If you cloned the **public** product repo, keep personal catalogs on disk and use
 [`scripts/local-export`](AUTOMATION.md) (no commit/push). Do not push personal

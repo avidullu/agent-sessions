@@ -145,6 +145,31 @@ def test_public_clone_ignores_untracked_local_catalog(tmp_path: Path) -> None:
         )
         assert ignored.returncode == 0, relative
 
+    subprocess.run(["git", "-C", str(repo), "add", "--", "archive/"], check=True)
+    assert subprocess.run(
+        ["git", "-C", str(repo), "diff", "--cached", "--quiet"],
+        check=False,
+    ).returncode == 0
+
+    subprocess.run(
+        ["git", "-C", str(repo), "add", "-f", "archive/index.jsonl", "archive/INDEX.md"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo), "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "private catalog"],
+        check=True,
+    )
+    for relative in ("archive/index.jsonl", "archive/INDEX.md"):
+        (repo / relative).write_text("updated private catalog\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "--", "archive/"], check=True)
+    staged = subprocess.run(
+        ["git", "-C", str(repo), "diff", "--cached", "--name-only"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    assert staged == ["archive/INDEX.md", "archive/index.jsonl"]
+
 
 def test_local_export_ps1_present() -> None:
     assert (REPO_ROOT / "scripts" / "local-export.ps1").is_file()

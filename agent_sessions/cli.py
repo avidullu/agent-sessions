@@ -63,7 +63,8 @@ def _export_summary_lines(
         if track_artifacts:
             lines.append("- Rendered Markdown/PDF artifacts are configured as Git-tracked archive outputs.")
         else:
-            lines.append("- Rendered Markdown/PDF artifacts are local-only; Git tracks only archive metadata.")
+            lines.append("- Rendered transcripts and newly generated catalog metadata are local-only by default.")
+            lines.append("- Existing tracked private catalogs remain tracked; new private catalogs require `git add -f`.")
         if write_pdfs:
             lines.append("- PDFs are written beside Markdown files when `reportlab` is available.")
         else:

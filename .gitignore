@@ -18,6 +18,7 @@ raw/
 # archive deliberately publishes its sanitized catalog.
 archive/**/*.md
 archive/**/*.pdf
+archive/INDEX.md
 archive/index.jsonl
 
 # Local diagnostics/state written by the VS Code feeder extension.
