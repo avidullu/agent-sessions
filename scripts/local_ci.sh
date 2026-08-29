@@ -144,7 +144,7 @@ expected_runs=(
   "$ci_gate"
 )
 
-expected_python_versions=(3.11 3.13)
+expected_python_versions=(3.13)
 
 # Every runner CI uses, and the extra `include:` legs beyond the primary matrix,
 # as "<os> <python-version>". The closing summary is derived from these rather

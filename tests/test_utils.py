@@ -9,6 +9,7 @@ import pytest
 
 from agent_sessions.utils import (
     archive_markdown_path,
+    canonical_agent,
     jsonl_objects,
     now_utc,
     read_jsonl_dicts,
@@ -16,6 +17,36 @@ from agent_sessions.utils import (
     slugify,
     text_from_content,
 )
+
+
+class TestCanonicalAgent:
+    def test_native_vscode_provider_distinguishes_zai(self) -> None:
+        assert (
+            canonical_agent(
+                {
+                    "kind": "copilot_chat",
+                    "source": "zai-vscode",
+                    "metadata": {"model_provider": "zai"},
+                }
+            )
+            == "zai"
+        )
+
+    def test_native_vscode_provider_defaults_to_copilot(self) -> None:
+        assert canonical_agent({"kind": "copilot_chat", "source": "copilot-vscode"}) == "copilot"
+
+    def test_native_vscode_github_providers_map_to_copilot(self) -> None:
+        for provider in ("github", "github-copilot"):
+            assert (
+                canonical_agent(
+                    {
+                        "kind": "copilot_chat",
+                        "source": "copilot-vscode",
+                        "metadata": {"model_provider": provider},
+                    }
+                )
+                == "copilot"
+            )
 
 
 class TestReadJsonlDicts:

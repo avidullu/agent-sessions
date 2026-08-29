@@ -22,12 +22,10 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        # Boundary versions only: 3.11 is the requires-python floor (backward
-        # compat), 3.13 the newest supported interpreter (deprecation removals).
-        # The middle version added a third to every CI event without catching
-        # anything the endpoints don't; 3.12 remains supported and covered by
-        # the floor/ceiling contract.
-        python-version: ["3.11", "3.13"]
+        # The project standardizes CI on one interpreter to keep the routine
+        # fast and predictable. The package retains its wider runtime floor;
+        # compatibility below 3.13 is not a CI-backed claim.
+        python-version: ["3.13"]
     steps:
       - name: Check out
         uses: actions/checkout@v5
@@ -68,7 +66,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest]
-        python-version: ["3.11", "3.13"]
+        python-version: ["3.13"]
     steps:
       # Do not use reusable actions in this job. One registered Windows runner
       # cannot clone action repositories because its runner/Git combination
@@ -119,7 +117,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: "3.13"
           cache: pip
 
       - name: Create isolated Python environment

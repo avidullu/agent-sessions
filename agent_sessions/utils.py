@@ -41,6 +41,13 @@ def canonical_agent(record: dict[str, Any]) -> str:
     'deepseek'
     """
     kind = str(record.get("kind", "")).strip().lower()
+    if kind == "copilot_chat":
+        metadata = record.get("metadata")
+        if isinstance(metadata, dict):
+            provider = str(metadata.get("model_provider", "")).strip().lower()
+            if provider:
+                return "copilot" if provider in {"github", "github-copilot"} else provider
+        return "copilot"
     if kind in _KIND_TO_CANONICAL:
         return _KIND_TO_CANONICAL[kind]
     source = str(record.get("source", "")).strip()

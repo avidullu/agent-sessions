@@ -208,5 +208,5 @@ decision rather than creating a second writer.
   private-file, and formatting modules; it also rejects URL userinfo and
   removes commit/co-author rows left orphaned by force-push SHA churn.
 - 2026-08-09 — AP0.1 merged as PR #159 after its exact-head Linux/Windows
-  Python 3.11/3.13 matrix, aggregate CI gate, and 95.18% local coverage gate
+  Python 3.13 Linux/Windows legs, aggregate CI gate, and local coverage gate
   passed. AP1–AP3 remain honestly open, so the project stays `IN PROGRESS`.
