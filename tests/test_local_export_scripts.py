@@ -148,7 +148,12 @@ def test_public_clone_ignores_untracked_local_catalog(tmp_path: Path) -> None:
 
 def test_local_export_ps1_present() -> None:
     assert (REPO_ROOT / "scripts" / "local-export.ps1").is_file()
-    assert (REPO_ROOT / "scripts" / "install-local-export-schedule.ps1").is_file()
+    installer = REPO_ROOT / "scripts" / "install-local-export-schedule.ps1"
+    assert installer.is_file()
+    text = installer.read_text(encoding="utf-8")
+    assert 'foreach ($version in @("3.13", "3.12", "3.11"))' in text
+    assert '"-Python", "`"$Python`""' in text
+    assert "Python 3.11 or newer is required" in text
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX lock behavior")

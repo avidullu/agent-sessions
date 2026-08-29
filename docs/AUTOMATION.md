@@ -95,8 +95,14 @@ visibly updateable instead of silently drifting.
 # Windows (current-user Scheduled Task)
 .\scripts\install-local-export-schedule.ps1
 .\scripts\install-local-export-schedule.ps1 -Hour 7 -Minute 30 -Pdf
+.\scripts\install-local-export-schedule.ps1 -Python "C:\Python313\python.exe"
 .\scripts\install-local-export-schedule.ps1 -Uninstall
 ```
+
+The Windows installer selects Python 3.13, 3.12, or 3.11 through the Python
+launcher, then falls back to a compatible `python.exe`; an older default
+interpreter is rejected before Task Scheduler is changed. `-Python` pins an
+explicit compatible interpreter.
 
 The installer wires **local-export** only. It does not push to remotes. Generated
 catalog metadata and the Router sidecar are ignored when untracked, so a public

@@ -9,6 +9,7 @@ param(
     [int]$Hour = 7,
     [int]$Minute = 30,
     [switch]$Pdf,
+    [string]$Python = "",
     [string]$LogDir = "",
     [string]$TaskName = "Agent Sessions Local Export",
     [switch]$Uninstall
@@ -40,10 +41,40 @@ if (-not $LogDir) {
 }
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
+if (-not $Python) {
+    $launcher = Get-Command "py.exe" -ErrorAction SilentlyContinue
+    if ($launcher) {
+        foreach ($version in @("3.13", "3.12", "3.11")) {
+            $candidate = (& $launcher.Source "-$version" -c "import sys; print(sys.executable)" 2>$null)
+            if ($LASTEXITCODE -eq 0 -and $candidate) {
+                $Python = $candidate.Trim()
+                break
+            }
+        }
+    }
+}
+if (-not $Python) {
+    $candidateCommand = Get-Command "python.exe" -ErrorAction SilentlyContinue
+    if ($candidateCommand) {
+        $candidateVersion = (& $candidateCommand.Source -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+        if ($LASTEXITCODE -eq 0 -and ([Version]$candidateVersion -ge [Version]"3.11")) {
+            $Python = $candidateCommand.Source
+        }
+    }
+}
+if (-not $Python) {
+    throw "Python 3.11 or newer is required for the scheduled local export"
+}
+$selectedVersion = (& $Python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+if ($LASTEXITCODE -ne 0 -or ([Version]$selectedVersion -lt [Version]"3.11")) {
+    throw "Python 3.11 or newer is required; selected interpreter is '$Python'"
+}
+
 $argList = @(
     "-NoProfile"
     "-ExecutionPolicy", "Bypass"
     "-File", "`"$ExportScript`""
+    "-Python", "`"$Python`""
     "-LogDir", "`"$LogDir`""
     "-WritePrimaryMarker"
 )
@@ -68,6 +99,7 @@ Register-ScheduledTask `
 Write-Host "Installed daily local-export task '$TaskName' at ${Hour}:$('{0:D2}' -f $Minute)."
 Write-Host "  script: $ExportScript"
 Write-Host "  logs:   $LogDir"
+Write-Host "  python: $Python ($selectedVersion)"
 Write-Host "  mode:   local-only (no git commit/push)"
 Write-Host ""
 Write-Host "Run once now:"
