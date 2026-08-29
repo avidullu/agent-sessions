@@ -127,6 +127,24 @@ esac
     assert syntax.returncode == 0
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX git behavior")
+def test_public_clone_ignores_untracked_local_catalog(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    shutil.copy2(REPO_ROOT / ".gitignore", repo / ".gitignore")
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+
+    for relative in ("archive/.router-index.jsonl", "archive/index.jsonl", "archive/INDEX.md"):
+        target = repo / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("private local catalog\n", encoding="utf-8")
+        ignored = subprocess.run(
+            ["git", "-C", str(repo), "check-ignore", "-q", relative],
+            check=False,
+        )
+        assert ignored.returncode == 0, relative
+
+
 def test_local_export_ps1_present() -> None:
     assert (REPO_ROOT / "scripts" / "local-export.ps1").is_file()
     assert (REPO_ROOT / "scripts" / "install-local-export-schedule.ps1").is_file()

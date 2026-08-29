@@ -21,7 +21,8 @@ Search indexing and baseline suggestion runs stay separate from either job.
 | `archive/**/*.md`, `archive/**/*.pdf` | **Ignored** — full transcripts stay local |
 | `raw/` | **Ignored** — may contain secrets / full tool output |
 | `sources.toml` | **Ignored** — machine-specific roots |
-| `archive/index.jsonl`, `archive/INDEX.md` | **Not ignored** — portable catalog metadata |
+| `archive/.router-index.jsonl` | **Ignored** — private local VS Code feeder sidecar |
+| `archive/index.jsonl`, `archive/INDEX.md` | **Ignored when untracked** — local catalog metadata; existing tracked private catalogs remain tracked |
 | `archive/.primary-host` | **Ignored** — optional marker written by local-export |
 
 If your remotes are the public GitHub/Forgejo **product** repositories, do **not**
@@ -82,7 +83,10 @@ ownership-checked so an older process cannot delete a newer process's lock.
 .\scripts\install-local-export-schedule.ps1 -Uninstall
 ```
 
-The installer wires **local-export** only. It does not push to remotes.
+The installer wires **local-export** only. It does not push to remotes. Generated
+catalog metadata and the Router sidecar are ignored when untracked, so a public
+product clone stays clean. An existing tracked private catalog continues to be
+tracked; deliberately publishing a new sanitized catalog requires `git add -f`.
 
 ### Single-host tips
 
@@ -97,7 +101,15 @@ The installer wires **local-export** only. It does not push to remotes.
 ## Private catalog sync (`daily-export`)
 
 Use only when the remote is a **private** archive you intend to update with
-catalog metadata.
+catalog metadata. Before the first scheduled run in a new private archive,
+bootstrap the ignored catalog explicitly:
+
+```bash
+git add -f archive/index.jsonl archive/INDEX.md
+git commit -m "archive: initialize private catalog"
+```
+
+After that, the files are tracked normally and `daily-export` can update them.
 
 The scheduled job should:
 

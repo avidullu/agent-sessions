@@ -105,11 +105,16 @@ force-add it.
 - indexed records not visible from this machine, preserved from other machines;
 - source counts and inferred origin environments.
 
-`export --all` writes Markdown archive artifacts and updates the shared catalog:
+`export --all` writes Markdown archive artifacts and updates the local catalog:
 
 - `archive/**/*.md`
 - `archive/index.jsonl`
 - `archive/INDEX.md`
+
+These generated files are ignored when untracked so a public product clone does
+not accidentally publish personal metadata. An existing tracked private catalog
+continues to be tracked; bootstrap a new private catalog deliberately with
+`git add -f archive/index.jsonl archive/INDEX.md`.
 
 `export --all --pdf` also writes `archive/**/*.pdf` when `reportlab` is
 installed. The `.[dev]` install includes `reportlab`; to check a minimal
