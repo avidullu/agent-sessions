@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows provenance stores now combine ACL hardening and verification in one
   PowerShell process, avoid redundant probes for newly created databases, and
   allow loaded owner machines up to 60 seconds to complete a native ACL check.
+- `agent-archive status` no longer reports secondary local paths for an already
+  deduplicated logical session as perpetually new. Alias detection uses size
+  and tail-digest prefilters before hashing, so unrelated new files retain the
+  fast status path.
 - Local-only exports now use an atomic, ownership-checked cross-shell lock without
   time-based eviction; PowerShell propagates failed native commands; and installed
   cron commands safely quote paths containing spaces, apostrophes, or percent signs.
