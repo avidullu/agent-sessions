@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Router-fed VS Code native chat records now use `metadata.model_provider` to
+  distinguish Z.AI and other language-model providers from GitHub Copilot.
 - **Machine-readable local-export routine discovery** — reports native
   scheduler support and `installable` / `current` / `update_available` /
   `repair_required` state through a versioned JSON contract; managed schedules
@@ -60,6 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   propagation on the other.
 
 ### Changed
+- CI and release automation now use Python 3.13 only on Linux and Windows.
+  The package retains its Python 3.11+ runtime floor for existing routine
+  installations, but older interpreters are no longer CI-backed.
 - Newly generated `archive/index.jsonl`, `archive/INDEX.md`, and Router sidecar
   metadata are ignored when untracked, keeping public product clones private by
   default. Existing tracked private catalogs continue to stage normally; new

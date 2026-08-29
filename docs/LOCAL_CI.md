@@ -34,7 +34,7 @@ throwaway virtualenv built from `constraints-dev.txt`. Roughly 60-90s cold
 ```bash
 ./scripts/local_ci.sh --lint-only            # ~5s after the first run
 ./scripts/local_ci.sh --venv .venv-local-ci  # reuse the environment
-PYTHON=python3.11 ./scripts/local_ci.sh      # match a specific CI leg
+PYTHON=python3.13 ./scripts/local_ci.sh      # match the CI interpreter
 ```
 
 There is no `--fast` / `--full` split: the full set costs seconds here, and a
@@ -43,10 +43,10 @@ green", which is the exact failure this script exists to prevent.
 
 ### What it does not cover
 
-**One interpreter, six legs.** CI runs Python 3.11/3.12/3.13 on Linux and the
-same three on Windows; the script prints which ones it did not prove (derived
-from the workflow matrix, not hardcoded). If the local interpreter is not one CI
-tests, it warns.
+**One local interpreter, two CI legs.** CI runs Python 3.13 on Linux and native
+Windows. The script prints when the local interpreter does not match that
+guarded workflow matrix. The package retains its Python 3.11+ runtime floor for
+existing installations, but versions below 3.13 are no longer CI-backed.
 
 **Windows now runs on both forges (supersedes H6/D7's GitHub-only decision).**
 The Windows legs are unconditional. They previously carried

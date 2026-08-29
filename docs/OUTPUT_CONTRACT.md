@@ -247,7 +247,7 @@ rows and dedup behave. Current `kind` values a feeder may emit:
 
 | `kind` | Meaning |
 | --- | --- |
-| `copilot_chat` | VS Code Copilot Chat (and LM-API forks: Z.AI, Grok, etc.) |
+| `copilot_chat` | VS Code native chat (Copilot and LM-API providers such as Z.AI); `metadata.model_provider` supplies the canonical agent when present |
 | `deepseek_request_dump` | DeepSeek V4 VS Code extension request dumps |
 
 New feeder kinds should be added here and, where the hub also has a Python
