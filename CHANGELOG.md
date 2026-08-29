@@ -64,6 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   metadata are ignored when untracked, keeping public product clones private by
   default. Existing tracked private catalogs continue to stage normally; new
   private catalogs opt in explicitly with `git add -f`.
+- The repository development version is now `0.3.0.dev0`, distinct from the
+  latest published PyPI release (`0.2.0`), and `agent-archive --version` reports
+  the installed package version.
 - `scripts/local_ci.sh` drift guard no longer *requires* a GitHub-only job (that rule was
   mandating the false green). It now positively asserts that `ci-gate` exists, carries
   `if: ${{ always() }}`, lists every job in `needs:`, and passes every job's result to the

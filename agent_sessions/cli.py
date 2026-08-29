@@ -8,6 +8,7 @@ import os
 import sys
 from pathlib import Path
 
+from . import __version__
 from .archive import ExportResult, discover_sources, export_sources, pdf_existing, prune_index_records
 from .archive_status import archive_status
 from .baseline import baseline_scaffold, baseline_suggest
@@ -379,6 +380,7 @@ def _handle_provenance_agents(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Export local coding-agent sessions.")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--repo-root", type=Path, default=default_repo_root(), help="Archive repository root.")
     parser.add_argument("--config", type=Path, help="Optional sources TOML path.")
     sub = parser.add_subparsers(dest="cmd", required=True)
