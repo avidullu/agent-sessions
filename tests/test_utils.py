@@ -35,6 +35,19 @@ class TestCanonicalAgent:
     def test_native_vscode_provider_defaults_to_copilot(self) -> None:
         assert canonical_agent({"kind": "copilot_chat", "source": "copilot-vscode"}) == "copilot"
 
+    def test_native_vscode_github_providers_map_to_copilot(self) -> None:
+        for provider in ("github", "github-copilot"):
+            assert (
+                canonical_agent(
+                    {
+                        "kind": "copilot_chat",
+                        "source": "copilot-vscode",
+                        "metadata": {"model_provider": provider},
+                    }
+                )
+                == "copilot"
+            )
+
 
 class TestReadJsonlDicts:
     def test_skips_malformed_line_with_warning(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
