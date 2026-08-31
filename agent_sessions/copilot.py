@@ -216,6 +216,18 @@ def handle(args: argparse.Namespace) -> int:
             value = compare(args.cases, args.baseline, args.candidate, args.grades)
         elif args.copilot_action == "evaluate":
             value = evaluate(args)
+        elif args.copilot_action == "golden-generate":
+            from .copilot_golden import generate
+
+            value = generate(args.output)
+        elif args.copilot_action == "golden-blind":
+            from .copilot_golden import blind_pack
+
+            value = blind_pack(args.cases, args.baseline, args.candidate, args.output, args.seed)
+        elif args.copilot_action == "golden-finalize":
+            from .copilot_golden import finalize_ratings
+
+            value = finalize_ratings(args.cases, args.baseline, args.candidate, args.key, args.ratings, args.output)
         else:
             if not args.question:
                 while True:
@@ -287,5 +299,30 @@ def add_parser(sub: Any) -> None:
     evaluation.add_argument("--sftf", default="sftf")
     evaluation.add_argument("--launch", action="store_true")
     evaluation.add_argument("--ack-data-transmission", action="store_true")
-    for action in (collect, build, chat, propose, score, evaluation):
+    golden_generate = actions.add_parser(
+        "golden-generate", help="Create controlled paired golden cases locally; no model calls."
+    )
+    golden_generate.add_argument("--output", type=Path, required=True)
+    golden_blind = actions.add_parser(
+        "golden-blind", help="Blind two complete prediction arms and create a rating template."
+    )
+    for name in ("cases", "baseline", "candidate", "output"):
+        golden_blind.add_argument("--" + name, type=Path, required=True)
+    golden_blind.add_argument("--seed", type=int, default=1729)
+    golden_finalize = actions.add_parser(
+        "golden-finalize", help="Bind completed blinded ratings back to prediction arms."
+    )
+    for name in ("cases", "baseline", "candidate", "key", "ratings", "output"):
+        golden_finalize.add_argument("--" + name, type=Path, required=True)
+    for action in (
+        collect,
+        build,
+        chat,
+        propose,
+        score,
+        evaluation,
+        golden_generate,
+        golden_blind,
+        golden_finalize,
+    ):
         action.set_defaults(func=handle)

@@ -17,10 +17,12 @@ from agent_sessions.copilot_dataset import (
     digest,
     group_records,
     private_dir,
+    read_jsonl,
     safe_episodes,
     write_jsonl,
 )
 from agent_sessions.copilot_eval import compare
+from agent_sessions.copilot_golden import blind_pack, finalize_ratings, generate, standard_cases
 from agent_sessions.copilot_records import events, read_session, scan
 
 
@@ -288,6 +290,62 @@ def test_transfer_variant_keeps_family_and_marks_limited_claim() -> None:
     assert v["variant_kind"] == "entity_rename"
 
 
+def test_golden_suite_has_paired_fact_changes_without_training_admission(tmp_path: Path) -> None:
+    cases = standard_cases()
+    assert len(cases) == 40
+    assert len({c["family_id"] for c in cases}) == 20
+    assert {c["concept"] for c in cases} == {
+        "state_reconciliation",
+        "evidence_calibration",
+        "causal_diagnosis",
+        "constraint_revision",
+        "outcome_learning",
+    }
+    for family in {c["family_id"] for c in cases}:
+        paired = [c for c in cases if c["family_id"] == family]
+        assert {c["fact_variant"] for c in paired} == {"a", "b"}
+        assert all(c["training_eligible"] is False for c in paired)
+        assert paired[0]["messages"][1] != paired[1]["messages"][1]
+    manifest = generate(tmp_path / "golden")
+    assert manifest["paid_calls"] == 0 and manifest["training_eligible"] is False
+
+
+def test_blind_rating_round_trip_binds_predictions_and_reviewer(tmp_path: Path) -> None:
+    cases = standard_cases()[:2]
+    cases_path = tmp_path / "cases.jsonl"
+    baseline_path, candidate_path = tmp_path / "baseline.jsonl", tmp_path / "candidate.jsonl"
+    write_jsonl(cases_path, cases)
+
+    def predictions(prefix: str) -> list[dict[str, Any]]:
+        return [{"id": c["id"], "answer": f"{prefix} [E1]", "input_sha256": digest(c["messages"][:-1])} for c in cases]
+
+    write_jsonl(baseline_path, predictions("base"))
+    write_jsonl(candidate_path, predictions("candidate"))
+    blind_pack(cases_path, baseline_path, candidate_path, tmp_path / "blind")
+    template = read_jsonl(tmp_path / "blind" / "ratings-template.jsonl")
+    for rating in template:
+        rating["reviewer"] = "avi"
+        for label in ("A", "B"):
+            rating[label] = {
+                "success": True,
+                "citations_correct": True,
+                "unsupported_claims": False,
+                "secret_disclosure": False,
+            }
+    ratings_path = tmp_path / "ratings.jsonl"
+    write_jsonl(ratings_path, template)
+    report = finalize_ratings(
+        cases_path,
+        baseline_path,
+        candidate_path,
+        tmp_path / "blind" / "blind-key.jsonl",
+        ratings_path,
+        tmp_path / "final",
+    )
+    assert report["grades"] == 4 and report["cases"] == 2 and report["ready_to_score"] is True
+    assert {g["arm"] for g in read_jsonl(tmp_path / "final" / "grades.jsonl")} == {"baseline", "candidate"}
+
+
 def test_eval_rejects_gold_leakage_and_stale_grades(tmp_path: Path) -> None:
     c = {
         "id": "c",
@@ -319,6 +377,40 @@ def test_eval_rejects_gold_leakage_and_stale_grades(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="gold-free"):
         compare(*paths)
+
+
+def test_eval_requires_both_counterfactuals_for_family_success(tmp_path: Path) -> None:
+    cases = standard_cases()[:2]
+    paths = [tmp_path / name for name in ("cases", "baseline", "candidate", "grades")]
+    write_jsonl(paths[0], cases)
+
+    def prediction(case: dict[str, Any], answer: str) -> dict[str, Any]:
+        return {"id": case["id"], "answer": answer, "input_sha256": digest(case["messages"][:-1])}
+
+    baseline = [prediction(cases[0], "grounded [E1]"), prediction(cases[1], "wrong but cited [E1]")]
+    candidate = [prediction(case, "grounded [E1] [E2]") for case in cases]
+    write_jsonl(paths[1], baseline)
+    write_jsonl(paths[2], candidate)
+    grades = []
+    for arm, rows in (("baseline", baseline), ("candidate", candidate)):
+        for index, (case, row) in enumerate(zip(cases, rows, strict=True)):
+            grades.append(
+                {
+                    "arm": arm,
+                    "id": case["id"],
+                    "prediction_sha256": digest(row),
+                    "case_sha256": digest(case),
+                    "reviewer": "avi",
+                    "success": arm == "candidate" or index == 0,
+                    "citations_correct": True,
+                    "unsupported_claims": False,
+                    "secret_disclosure": False,
+                }
+            )
+    write_jsonl(paths[3], grades)
+    report = compare(*paths)
+    assert report["paired_family_success"] == {"baseline": 0.0, "candidate": 1.0}
+    assert report["pilot_thresholds_met"] is False
 
 
 def test_cli_missing_evidence_never_calls_provider(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
