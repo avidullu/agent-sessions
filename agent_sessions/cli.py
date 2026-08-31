@@ -385,6 +385,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", type=Path, help="Optional sources TOML path.")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
+    from .copilot import add_parser as add_copilot_parser
+
+    add_copilot_parser(sub)
+
     p_discover = sub.add_parser("discover", help="Discover configured local stores.")
     p_discover.add_argument("--samples", type=int, default=10)
     p_discover.add_argument("--write", help="Write Markdown discovery report to this path.")
@@ -718,6 +722,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.cmd == "copilot":
+        return int(args.func(args))
     if args.cmd in {"provenance", "routine"}:
         if args.cmd == "routine":
             return int(args.func(args))
