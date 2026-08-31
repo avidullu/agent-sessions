@@ -231,6 +231,51 @@ does not authorize deployment, spending, or autonomous retraining.
 
 ## Correction and improvement loop
 
+### User-controlled self-upgrade
+
+Run chat with `--history-dir /private/interactions`. Each visible response gets an
+`interaction_id`; the private interaction file binds the sanitized question,
+admitted evidence, answer, project/family, model-config hash, checkpoint, and
+cutoff. The internal record is not printed in the bot response.
+
+The user can accept a good answer, supply a correction, or reject the turn. For
+example, place a corrected answer with valid `[E1]` citations in a text file:
+
+```
+agent-archive copilot self-upgrade-feedback \
+  --interaction /private/interactions/<interaction-id>.jsonl \
+  --verdict correct --reviewer Avi \
+  --concept evidence_calibration --grounded --aligned \
+  --correction /private/corrected-answer.txt \
+  --allow-training-use --output /private/feedback-cycle-1
+```
+
+`--allow-training-use` is separate from the verdict. Without it, the assessment
+is retained for analysis but cannot enter training. A training-permitted accepted
+or corrected answer must be safe, grounded, aligned, and cite evidence present in
+the saved interaction. Rejected, ungrounded, or misaligned answers never become
+positive targets. Feedback records are create-once and bind the exact interaction;
+resubmitting the same decision does not silently overwrite it.
+
+Compile feedback with a reviewed replay corpus so a new round does not learn only
+from recent corrections:
+
+```
+agent-archive copilot self-upgrade-compile \
+  --feedback /private/feedback-cycle-1 \
+  --base-corpus /private/round-one \
+  --base-reviews /private/round-one-reviews.jsonl \
+  --output /private/upgrade-cycle-1
+```
+
+The compiler emits compatible `candidates.jsonl` and `reviews.jsonl`, abstracts
+the saved project name, preserves conversation families, and reports concept and
+verdict counts. The resulting queue still goes through `copilot build`, exact
+token planning, held-out golden and grounded evaluation, and an explicit model
+selection. `ready_for_training` and `ready_for_promotion` remain false at compile
+time. No user click can mutate the active model, authorize provider spending, or
+promote its own answer directly.
+
 `copilot propose --corpus CORPUS --proposal PROPOSAL.json --output /private/lessons`
 appends a correction, lesson, or withdrawal. Proposals contain a concept,
 statement, creation timestamp and source evidence IDs; original logs never change.

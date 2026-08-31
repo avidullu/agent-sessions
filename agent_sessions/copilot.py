@@ -7,12 +7,14 @@ trusted as evidence: hits resolve back to the frozen, redacted local snapshot.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
 import sys
 import time
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -141,15 +143,43 @@ def answer(args: argparse.Namespace, question: str) -> dict[str, Any]:
     sources = {f"E{i + 1}": e["event_id"] for i, e in enumerate(evidence)}
     packed = [{**e, "event_id": f"E{i + 1}", "call_id": ""} for i, e in enumerate(evidence)]
     prompt = {"question": scanned.redacted_text, "as_of": args.as_of, "evidence": packed}
-    if not evidence:
-        return {
-            "answer": "I found no admitted evidence for that project and time. Select a session or refresh the local index.",
-            "sources": {},
-            "status": "insufficient_evidence",
-            "provider_called": False,
+    interaction_id = str(uuid.uuid4())
+
+    def finish(result: dict[str, Any]) -> dict[str, Any]:
+        model_hash = ""
+        if args.model_config and args.model_config.is_file():
+            model_hash = hashlib.sha256(args.model_config.read_bytes()).hexdigest()
+        observed_answer = result.pop("_observed_answer", result.get("answer", ""))
+        result["interaction_id"] = interaction_id
+        result["_interaction"] = {
+            "schema": "session-copilot-interaction.v1",
+            "id": interaction_id,
+            "created_at": datetime.now(UTC).isoformat(),
+            "question": scanned.redacted_text,
+            "project": args.project,
+            "as_of": args.as_of,
+            "session": args.session or "",
+            "family_id": digest([args.project, args.session or sorted(sources.values())])[:24],
+            "evidence": packed,
+            "answer": observed_answer,
+            "status": result.get("status", "evidence_only"),
+            "model_config_sha256": model_hash,
+            "checkpoint": args.checkpoint or "",
+            "provider_called": result.get("provider_called", False),
         }
+        return result
+
+    if not evidence:
+        return finish(
+            {
+                "answer": "I found no admitted evidence for that project and time. Select a session or refresh the local index.",
+                "sources": {},
+                "status": "insufficient_evidence",
+                "provider_called": False,
+            }
+        )
     if args.evidence_only:
-        return {"evidence": packed, "sources": sources, "provider_called": False}
+        return finish({"evidence": packed, "sources": sources, "provider_called": False})
     if not args.launch or not args.ack_data_transmission or not args.model_config or not args.budget_ledger:
         raise ValueError("inference needs --model-config, --budget-ledger, --launch and --ack-data-transmission")
     command = [
@@ -181,23 +211,35 @@ def answer(args: argparse.Namespace, question: str) -> dict[str, Any]:
     value = json.loads(result.stdout)
     output = redact_text(value["answer"])
     if output.blocked:
-        raise ValueError("model response blocked by secret scanner")
+        return finish(
+            {
+                "answer": "[RESPONSE BLOCKED: suspected secret]",
+                "sources": sources,
+                "status": "response_blocked",
+                "provider_called": True,
+            }
+        )
     citations = re.findall(r"\[(E\d+)\]", output.redacted_text)
     if not citations or any(c not in sources for c in citations):
-        return {
-            "answer": "The response did not provide valid evidence references; no grounded answer is available.",
+        return finish(
+            {
+                "answer": "The response did not provide valid evidence references; no grounded answer is available.",
+                "_observed_answer": output.redacted_text,
+                "sources": sources,
+                "status": "invalid_citations",
+                "provider_called": True,
+            }
+        )
+    return finish(
+        {
+            **value,
+            "answer": output.redacted_text,
             "sources": sources,
-            "status": "invalid_citations",
+            "status": "answered",
             "provider_called": True,
+            "elapsed_s": round(time.monotonic() - started, 3),
         }
-    return {
-        **value,
-        "answer": output.redacted_text,
-        "sources": sources,
-        "status": "answered",
-        "provider_called": True,
-        "elapsed_s": round(time.monotonic() - started, 3),
-    }
+    )
 
 
 def handle(args: argparse.Namespace) -> int:
@@ -228,6 +270,24 @@ def handle(args: argparse.Namespace) -> int:
             from .copilot_golden import finalize_ratings
 
             value = finalize_ratings(args.cases, args.baseline, args.candidate, args.key, args.ratings, args.output)
+        elif args.copilot_action == "self-upgrade-feedback":
+            from .copilot_upgrade import record_feedback
+
+            value = record_feedback(
+                args.interaction,
+                verdict=args.verdict,
+                reviewer=args.reviewer,
+                concept=args.concept,
+                grounded=args.grounded,
+                aligned=args.aligned,
+                correction=args.correction.read_text(encoding="utf-8") if args.correction else None,
+                allow_training_use=args.allow_training_use,
+                output=args.output,
+            )
+        elif args.copilot_action == "self-upgrade-compile":
+            from .copilot_upgrade import compile_cycle
+
+            value = compile_cycle(args.feedback, args.output, args.base_corpus, args.base_reviews)
         else:
             if not args.question:
                 while True:
@@ -238,11 +298,24 @@ def handle(args: argparse.Namespace) -> int:
                     if question in ("/quit", "/exit"):
                         return 0
                     if question:
-                        print(json.dumps(answer(args, question), ensure_ascii=False, indent=2))
+                        turn = answer(args, question)
+                        interaction = turn.pop("_interaction", None)
+                        if args.history_dir:
+                            if interaction is None:
+                                raise ValueError("chat interaction record unavailable")
+                            write_jsonl(
+                                private_dir(args.history_dir) / f"{turn['interaction_id']}.jsonl", [interaction]
+                            )
+                        print(json.dumps(turn, ensure_ascii=False, indent=2))
                 # Each turn retrieves fresh evidence; no silent permanent memory writes.
             value = answer(args, args.question)
+            interaction = value.pop("_interaction", None)
             if args.history_dir:
-                write_jsonl(private_dir(args.history_dir) / f"{uuid.uuid4()}.jsonl", [value])
+                if interaction is None:
+                    raise ValueError("chat interaction record unavailable")
+                write_jsonl(private_dir(args.history_dir) / f"{value['interaction_id']}.jsonl", [interaction])
+        if isinstance(value, dict):
+            value.pop("_interaction", None)
         print(json.dumps(value, ensure_ascii=False, indent=2))
         return 0
     except (ValueError, OSError, subprocess.SubprocessError, KeyError) as exc:
@@ -314,6 +387,35 @@ def add_parser(sub: Any) -> None:
     )
     for name in ("cases", "baseline", "candidate", "key", "ratings", "output"):
         golden_finalize.add_argument("--" + name, type=Path, required=True)
+    feedback = actions.add_parser(
+        "self-upgrade-feedback", help="Record a user's source-bound assessment of one saved bot turn."
+    )
+    feedback.add_argument("--interaction", type=Path, required=True)
+    feedback.add_argument("--verdict", choices=("accept", "correct", "reject"), required=True)
+    feedback.add_argument("--reviewer", required=True)
+    feedback.add_argument(
+        "--concept",
+        choices=(
+            "state_reconciliation",
+            "evidence_calibration",
+            "causal_diagnosis",
+            "constraint_revision",
+            "outcome_learning",
+        ),
+        required=True,
+    )
+    feedback.add_argument("--grounded", action=argparse.BooleanOptionalAction, required=True)
+    feedback.add_argument("--aligned", action=argparse.BooleanOptionalAction, required=True)
+    feedback.add_argument("--correction", type=Path)
+    feedback.add_argument("--allow-training-use", action="store_true")
+    feedback.add_argument("--output", type=Path, required=True)
+    compile_upgrade = actions.add_parser(
+        "self-upgrade-compile", help="Compile user-reviewed turns into a private next-round dataset queue."
+    )
+    compile_upgrade.add_argument("--feedback", type=Path, required=True)
+    compile_upgrade.add_argument("--output", type=Path, required=True)
+    compile_upgrade.add_argument("--base-corpus", type=Path)
+    compile_upgrade.add_argument("--base-reviews", type=Path)
     for action in (
         collect,
         build,
@@ -324,5 +426,7 @@ def add_parser(sub: Any) -> None:
         golden_generate,
         golden_blind,
         golden_finalize,
+        feedback,
+        compile_upgrade,
     ):
         action.set_defaults(func=handle)

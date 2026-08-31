@@ -24,6 +24,7 @@ from agent_sessions.copilot_dataset import (
 from agent_sessions.copilot_eval import compare
 from agent_sessions.copilot_golden import blind_pack, finalize_ratings, generate, standard_cases
 from agent_sessions.copilot_records import events, read_session, scan
+from agent_sessions.copilot_upgrade import compile_cycle, record_feedback
 
 
 def event(role: str, text: str, number: int = 1) -> dict[str, str]:
@@ -432,6 +433,119 @@ def test_cli_missing_evidence_never_calls_provider(tmp_path: Path, capsys: pytes
     )
     assert code == 0
     assert json.loads(capsys.readouterr().out)["provider_called"] is False
+
+
+def test_chat_history_is_feedback_ready_but_not_exposed_in_response(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    write_jsonl(tmp_path / "sessions.jsonl", [record()])
+    history = tmp_path / "history"
+    code = main(
+        [
+            "copilot",
+            "chat",
+            "What remains?",
+            "--corpus",
+            str(tmp_path),
+            "--project",
+            "project-a",
+            "--session",
+            "one",
+            "--as-of",
+            "2026-08-02T00:00:00Z",
+            "--evidence-only",
+            "--history-dir",
+            str(history),
+        ]
+    )
+    response = json.loads(capsys.readouterr().out)
+    saved = read_jsonl(next(history.glob("*.jsonl")))[0]
+    assert code == 0 and "_interaction" not in response
+    assert saved["schema"] == "session-copilot-interaction.v1"
+    assert saved["id"] == response["interaction_id"] and len(saved["evidence"]) == 2
+
+
+def test_user_feedback_compiles_correction_without_self_promoting(tmp_path: Path) -> None:
+    interaction = {
+        "schema": "session-copilot-interaction.v1",
+        "id": "turn-one",
+        "created_at": "2026-08-01T00:00:03+00:00",
+        "question": "Did project-a deploy?",
+        "project": "project-a",
+        "as_of": "2026-08-01T00:00:03+00:00",
+        "session": "one",
+        "family_id": "family-one",
+        "evidence": [event("tool_result", "No deployment receipt exists.")],
+        "answer": "It deployed.",
+        "status": "answered",
+        "model_config_sha256": "",
+        "checkpoint": "",
+        "provider_called": False,
+    }
+    interaction["evidence"][0]["event_id"] = "E1"
+    interaction_path = tmp_path / "interaction.jsonl"
+    write_jsonl(interaction_path, [interaction])
+    feedback_dir = tmp_path / "feedback"
+    result = record_feedback(
+        interaction_path,
+        verdict="correct",
+        reviewer="avi",
+        concept="evidence_calibration",
+        grounded=True,
+        aligned=True,
+        correction="Deployment is not verified because no receipt is present. [E1]",
+        allow_training_use=True,
+        output=feedback_dir,
+    )
+    assert result["training_permitted"] is True and result["model_training_authorized"] is False
+    cycle = compile_cycle(feedback_dir, tmp_path / "cycle")
+    assert cycle["new_training_permitted_examples"] == 1
+    assert cycle["ready_for_training"] is False and cycle["ready_for_promotion"] is False
+    reviews = read_jsonl(tmp_path / "cycle" / "reviews.jsonl")
+    assert reviews[0]["entities"] == {"project-a": "ENTITY_PROJECT_1"}
+    dataset = build_dataset(tmp_path / "cycle", tmp_path / "cycle" / "reviews.jsonl", tmp_path / "upgrade-dataset")
+    assert sum(dataset["counts"].values()) == 1 and dataset["training_ready"] is False
+
+
+def test_feedback_cannot_train_without_citations_and_explicit_source_use(tmp_path: Path) -> None:
+    interaction = {
+        "schema": "session-copilot-interaction.v1",
+        "id": "x",
+        "question": "q",
+        "project": "project-a",
+        "as_of": "2026-08-01T00:00:03+00:00",
+        "family_id": "f",
+        "evidence": [event("tool_result", "observed")],
+        "answer": "unsupported",
+        "status": "answered",
+    }
+    interaction["evidence"][0]["event_id"] = "E1"
+    path = tmp_path / "interaction.jsonl"
+    write_jsonl(path, [interaction])
+    with pytest.raises(ValueError, match="citations"):
+        record_feedback(
+            path,
+            verdict="accept",
+            reviewer="avi",
+            concept="evidence_calibration",
+            grounded=True,
+            aligned=True,
+            correction=None,
+            allow_training_use=True,
+            output=tmp_path / "feedback-a",
+        )
+    result = record_feedback(
+        path,
+        verdict="accept",
+        reviewer="avi",
+        concept="evidence_calibration",
+        grounded=True,
+        aligned=True,
+        correction=None,
+        allow_training_use=False,
+        output=tmp_path / "feedback-b",
+    )
+    assert result["training_permitted"] is False
 
 
 @pytest.mark.skipif(os.name != "posix", reason="native WSL pilot")
