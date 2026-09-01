@@ -268,7 +268,13 @@ def handle(args: argparse.Namespace) -> int:
         if args.copilot_action == "prepare":
             value = prepare(args.output, args.source, args.ssh_host, args.ssh_source)
         elif args.copilot_action == "build":
-            value = build_dataset(args.corpus, args.reviews, args.output, tuple(args.holdout_project))
+            value = build_dataset(
+                args.corpus,
+                args.reviews,
+                args.output,
+                tuple(args.holdout_project),
+                args.profile,
+            )
         elif args.copilot_action == "propose":
             from .copilot_concepts import propose_lesson
 
@@ -361,6 +367,12 @@ def add_parser(sub: Any) -> None:
     build.add_argument("--corpus", required=True, type=Path)
     build.add_argument("--reviews", required=True, type=Path)
     build.add_argument("--output", required=True, type=Path)
+    build.add_argument(
+        "--profile",
+        choices=("full", "prototype"),
+        default="full",
+        help="Admission and family-split thresholds; full remains the production default.",
+    )
     build.add_argument(
         "--holdout-project", action="append", default=[], help="Entire project held out for concept transfer."
     )

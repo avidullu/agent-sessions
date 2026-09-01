@@ -294,8 +294,36 @@ def prepare(
     return report
 
 
+ADMISSION_PROFILES = {
+    "full": {
+        "train_fraction": 0.7,
+        "development_fraction": 0.1,
+        "minimum_train": 500,
+        "minimum_train_families": 50,
+        "minimum_development": 100,
+        "minimum_test": 200,
+        "minimum_test_families": 20,
+        "minimum_transfer_cases": 20,
+    },
+    "prototype": {
+        "train_fraction": 0.6,
+        "development_fraction": 0.15,
+        "minimum_train": 96,
+        "minimum_train_families": 15,
+        "minimum_development": 20,
+        "minimum_test": 40,
+        "minimum_test_families": 8,
+        "minimum_transfer_cases": 0,
+    },
+}
+
+
 def build_dataset(
-    corpus: Path, reviews_path: Path, output: Path, holdout_projects: tuple[str, ...] = ()
+    corpus: Path,
+    reviews_path: Path,
+    output: Path,
+    holdout_projects: tuple[str, ...] = (),
+    admission_profile: str = "full",
 ) -> dict[str, Any]:
     """Reviews bind exact candidates, corrected answers, evidence, and permitted use.
 
@@ -304,6 +332,9 @@ def build_dataset(
     """
     from .copilot_concepts import abstract_case
 
+    if admission_profile not in ADMISSION_PROFILES:
+        raise ValueError("unknown dataset admission profile")
+    profile = ADMISSION_PROFILES[admission_profile]
     all_candidates = read_jsonl(corpus / "candidates.jsonl")
     by_id = {c["id"]: c for c in all_candidates}
     reviewed: list[dict[str, Any]] = []
@@ -351,8 +382,18 @@ def build_dataset(
     for c in all_candidates:
         latest[c["family_id"]] = max(latest.get(c["family_id"], ""), c["as_of"])
     families = sorted(latest, key=lambda f: (latest[f], f))
+    train_boundary = int(len(families) * profile["train_fraction"])
+    development_boundary = train_boundary + int(
+        len(families) * profile["development_fraction"]
+    )
     roles = {
-        family: ("train" if i < int(len(families) * 0.7) else "development" if i < int(len(families) * 0.8) else "test")
+        family: (
+            "train"
+            if i < train_boundary
+            else "development"
+            if i < development_boundary
+            else "test"
+        )
         for i, family in enumerate(families)
     }
     project_families = {c["family_id"] for c in all_candidates if c["project"] in holdout_projects}
@@ -389,8 +430,10 @@ def build_dataset(
     for category, fraction in MIX.items():
         train.extend([r for r in partitions["train"] if r["category"] == category][: int(2000 * fraction)])
     partitions["train"] = sorted(train, key=lambda r: r["id"])
-    partitions["development"] = partitions["development"][:100]
-    partitions["test"] = partitions["test"][:200]
+    partitions["development"] = partitions["development"][
+        : int(profile["minimum_development"])
+    ]
+    partitions["test"] = partitions["test"][: int(profile["minimum_test"])]
     output = private_dir(output)
     for role, rows in partitions.items():
         write_jsonl(output / f"{role}.jsonl", rows)
@@ -398,15 +441,16 @@ def build_dataset(
     group_counts = {role: len({r["family_id"] for r in rows}) for role, rows in partitions.items()}
     transfer_count = sum(r["project"] in holdout_projects for r in partitions["test"])
     ready = (
-        counts["train"] >= 500
-        and group_counts["train"] >= 50
-        and counts["development"] == 100
-        and counts["test"] == 200
-        and group_counts["test"] >= 20
-        and transfer_count >= 20
+        counts["train"] >= profile["minimum_train"]
+        and group_counts["train"] >= profile["minimum_train_families"]
+        and counts["development"] >= profile["minimum_development"]
+        and counts["test"] >= profile["minimum_test"]
+        and group_counts["test"] >= profile["minimum_test_families"]
+        and transfer_count >= profile["minimum_transfer_cases"]
     )
     manifest = {
         "schema": "session-copilot-dataset.v1",
+        "admission_profile": admission_profile,
         "counts": counts,
         "family_counts": group_counts,
         "training_ready": ready,

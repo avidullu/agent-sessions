@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+from datetime import UTC, datetime, timedelta
 from io import StringIO
 from pathlib import Path
 from typing import Any
@@ -355,6 +356,35 @@ def test_whole_project_holdout_and_case_local_citations(tmp_path: Path) -> None:
     assert report["counts"] == {"train": 0, "development": 0, "test": 10}
     assert "[E1]" in (output / "test.jsonl").read_text()
     assert not report["training_ready"]
+
+
+def test_prototype_profile_admits_small_family_disjoint_dataset(tmp_path: Path) -> None:
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    start = datetime(2026, 8, 2, tzinfo=UTC)
+    cs = []
+    for i in range(160):
+        value = candidate()
+        value.update(
+            id=f"prototype-{i:03d}",
+            family_id=f"family-{i:03d}",
+            as_of=(start + timedelta(hours=i)).isoformat(),
+        )
+        cs.append(value)
+    write_jsonl(corpus / "candidates.jsonl", cs)
+    reviews = tmp_path / "reviews.jsonl"
+    write_jsonl(reviews, [review(c) for c in cs])
+
+    prototype = build_dataset(
+        corpus, reviews, tmp_path / "prototype", admission_profile="prototype"
+    )
+    assert prototype["admission_profile"] == "prototype"
+    assert prototype["counts"] == {"train": 96, "development": 20, "test": 40}
+    assert prototype["training_ready"] is True
+
+    full = build_dataset(corpus, reviews, tmp_path / "full")
+    assert full["admission_profile"] == "full"
+    assert full["training_ready"] is False
 
 
 def test_retrieval_enforces_project_cutoff_and_snapshot(tmp_path: Path) -> None:

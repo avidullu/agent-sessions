@@ -1,4 +1,4 @@
-# Session-concept Tinker prototype — proposed $40 envelope
+# Session-concept Tinker prototype — authorized $40 envelope
 
 ## Purpose
 
@@ -8,9 +8,10 @@ grounding/alignment signal and whether the agent-sessions → sft-factory →
 ons-lab → code-doot boundaries work end to end. It does not select a production
 model or consume the separately planned larger-experiment budget.
 
-No paid operation is authorized by this proposal. Launch requires the exact
-dataset, token plan, current price snapshot, work orders, and one explicit owner
-approval for this prototype's `$40` maximum.
+On 2026-09-01 Avi authorized use of his logs and Tinker balance for this
+prototype's `$40` maximum. Launch still requires the exact reviewed dataset,
+token plan, current price snapshot, and work orders. A diagnosed retry remains a
+separate decision and the cumulative hard stop remains `$40`.
 
 ## Pre-registered arms
 
@@ -97,13 +98,13 @@ SFT, and code-doot can adopt their durable ledger contracts independently later.
 
 | Stage | Status | Estimate | Actual | Request/evidence | Decision |
 | --- | --- | ---: | ---: | --- | --- |
-| Data and token-plan freeze | Not started | $0 | $0 | — | Await reviewed dataset |
-| Raw-base training | Not started | — | — | — | No launch approval yet |
-| Chat-model training | Not started | — | — | — | No launch approval yet |
-| Four-arm smoke | Not started | — | — | — | No launch approval yet |
-| Full evaluation | Not started | — | — | — | No launch approval yet |
+| Data and token-plan freeze | In progress | $0 | $0 | Owner authorization 2026-09-01; prototype-profile follow-up | Await reviewed dataset and exact token plan |
+| Raw-base training | Not started | — | — | Owner authorized within cumulative cap | Admission gates not yet complete |
+| Chat-model training | Not started | — | — | Owner authorized within cumulative cap | Admission gates not yet complete |
+| Four-arm smoke | Not started | — | — | Owner authorized within cumulative cap | Runs after both trained arms |
+| Full evaluation | Not started | — | — | Owner authorized within cumulative cap | Runs only after valid smoke |
 | Recovery | Not authorized | $8 reserved | $0 | — | Requires explicit diagnosis and approval |
-| **Cumulative paid use** | **Not started** | **$0** | **$0** | — | **Hard stop at $40** |
+| **Cumulative paid use** | **Authorized, no submissions yet** | **$0** | **$0** | — | **Hard stop at $40** |
 
 ## Integration stress path
 
