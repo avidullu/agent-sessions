@@ -261,7 +261,8 @@ def test_abstraction_changes_entities_and_ids_consistently() -> None:
 
 
 def test_stale_review_and_unreviewed_candidates_never_train(tmp_path: Path) -> None:
-    corpus = private_dir(tmp_path / "corpus")
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
     c = candidate()
     write_jsonl(corpus / "candidates.jsonl", [c])
     reviews = tmp_path / "reviews.jsonl"
@@ -276,7 +277,8 @@ def test_stale_review_and_unreviewed_candidates_never_train(tmp_path: Path) -> N
 
 
 def test_whole_project_holdout_and_case_local_citations(tmp_path: Path) -> None:
-    corpus = private_dir(tmp_path / "corpus")
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
     cs = [
         {**candidate(), "id": f"c-{i}", "family_id": f"f-{i}", "as_of": f"2026-08-{i + 1:02d}T00:00:02+00:00"}
         for i in range(10)
