@@ -28,6 +28,22 @@ adaptation, the Dronacharya v2.1 learning-rate reference, and a maximum of
 chat-ready models have different native conversation surfaces; config validation
 binds the mapping. No sports adapter initializes either arm.
 
+## Dharti model reuse
+
+The 2026-09-01 `storagectl` DHARTI catalog check found a complete local
+`Qwen/Qwen3.5-9B` snapshot at revision
+`c202236235762e1c871ad0ccb60c8ee5ba337b9a` in the prior Tinker bootstrap
+cache. Its index resolves four shards totaling 19,306,216,416 bytes and a
+12,807,982-byte tokenizer. This is the same assistant-model revision pinned by
+sft-factory's owned Qwen3.5 contract and prior Dronacharya replay.
+
+Reuse that snapshot for offline tokenizer/render checks and post-export adapter
+compatibility so the assistant model is not downloaded again. It cannot replace
+either matched Tinker arm: Tinker selects provider-managed weights by model ID,
+DHARTI has no `Qwen/Qwen3.5-9B-Base` snapshot, and Toofan's 8 GiB RTX 2070 would
+need quantization or CPU offload for this 19.3 GB model. Such an inference path
+would be an extra diagnostic with different numerics, not a scored baseline.
+
 ## Small data target
 
 Target 160 independently reviewed examples before splitting:
