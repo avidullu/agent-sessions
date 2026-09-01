@@ -125,6 +125,13 @@ cases, 200 test cases from >=20 families, and >=20 held-out-project test cases.
 Up to 2,000 training examples are selected by category quota. The trainer applies
 a separate exact 4M-token cap per model and never truncates a target.
 
+For the bounded first-candidate experiment, pass `--profile prototype`. It uses
+a 60/15/25 whole-family split and requires >=96 train examples from >=15
+families, >=20 development examples, and >=40 test examples from >=8 families.
+It does not require a project holdout; add one when the reviewed corpus can still
+meet every threshold. The selected profile is written into the dataset manifest
+and must match the trainer config. The default remains the full profile above.
+
 ## Read-only bot interface
 
 ```
