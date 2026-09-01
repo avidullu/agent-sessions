@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from io import StringIO
 from pathlib import Path
 from typing import Any
 
@@ -172,6 +173,68 @@ def test_grok_reads_history_not_transport_multiples(tmp_path: Path) -> None:
     assert list(scan(tmp_path, "grok", settled_seconds=0, max_file_bytes=1))[0]["skip_reason"] == "oversized_source"
 
 
+def test_prepare_cli_builds_a_review_queue_without_authorizing_training(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source_record = record()
+    source_record["messages"][1]["text"] = (
+        "The retained evidence shows that deployment is still unverified, so inspect the current receipt before retrying."
+    )
+    monkeypatch.setattr(dataset_module, "scan", lambda root, kind: iter([source_record]))
+    output = tmp_path / "prepared"
+    code = main(
+        [
+            "copilot",
+            "prepare",
+            "--source",
+            "codex=/unused-test-source",
+            "--output",
+            str(output),
+        ]
+    )
+    report = json.loads(capsys.readouterr().out)
+    assert code == 0 and report["candidate_examples"] == 1
+    assert report["training_ready"] is False
+    assert len(read_jsonl(output / "sessions.jsonl")) == 1
+
+
+def test_remote_reader_streams_records_and_rejects_failed_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Process:
+        def __init__(self, status: int) -> None:
+            self.stdout = StringIO(json.dumps(record()) + "\n")
+            self.status = status
+
+        def __enter__(self) -> Process:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def wait(self) -> int:
+            return self.status
+
+    monkeypatch.setattr(dataset_module.subprocess, "Popen", lambda *args, **kwargs: Process(0))
+    assert len(list(dataset_module.remote_records("test-host", [("codex", "/logs")]))) == 1
+    monkeypatch.setattr(dataset_module.subprocess, "Popen", lambda *args, **kwargs: Process(1))
+    with pytest.raises(ValueError, match="discard incomplete snapshot"):
+        list(dataset_module.remote_records("test-host", [("codex", "/logs")]))
+
+
+def test_search_retrieval_resolves_hits_back_to_frozen_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_jsonl(tmp_path / "sessions.jsonl", [record()])
+
+    class Result:
+        stdout = json.dumps({"hits": [{"source_path": "/private/source.jsonl"}]})
+
+    monkeypatch.setattr(copilot_module.subprocess, "run", lambda *args, **kwargs: Result())
+    evidence = retrieve(tmp_path, "deployment", project="project-a", as_of="2026-08-02T00:00:00Z")
+    assert [item["event_id"] for item in evidence] == ["source-1", "source-2"]
+
+
 def test_malformed_source_is_not_silently_admitted(tmp_path: Path) -> None:
     path = tmp_path / "bad.jsonl"
     path.write_text('{"type":"response_item"}\ntruncated{\n')
@@ -300,6 +363,13 @@ def test_retrieval_enforces_project_cutoff_and_snapshot(tmp_path: Path) -> None:
     evidence = retrieve(tmp_path, "anything", project="project-a", as_of="2026-08-01T00:00:01Z", session="one")
     assert len(evidence) == 1 and evidence[0]["role"] == "user"
     assert retrieve(tmp_path, "anything", project="project-b", as_of="2026-08-01T00:00:01Z", session="one") == []
+    with pytest.raises(ValueError, match="timezone"):
+        retrieve(tmp_path, "anything", project="project-a", as_of="not-a-time", session="one")
+
+
+def test_source_argument_rejects_unsupported_or_missing_roots() -> None:
+    with pytest.raises(copilot_module.argparse.ArgumentTypeError, match="expected codex=PATH"):
+        copilot_module.source("gemini=/logs")
 
 
 def test_proposal_preserves_source_and_never_self_authorizes(tmp_path: Path) -> None:
@@ -472,6 +542,73 @@ def test_cli_missing_evidence_never_calls_provider(tmp_path: Path, capsys: pytes
     assert json.loads(capsys.readouterr().out)["provider_called"] is False
 
 
+def test_interactive_chat_refreshes_evidence_and_saves_feedback_record(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_jsonl(tmp_path / "sessions.jsonl", [record()])
+    questions = iter(["What remains?", "/quit"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(questions))
+    history = tmp_path / "history"
+    code = main(
+        [
+            "copilot",
+            "chat",
+            "--corpus",
+            str(tmp_path),
+            "--project",
+            "project-a",
+            "--session",
+            "one",
+            "--as-of",
+            "2026-08-02T00:00:00Z",
+            "--evidence-only",
+            "--history-dir",
+            str(history),
+        ]
+    )
+    response = json.loads(capsys.readouterr().out)
+    saved = read_jsonl(next(history.glob("*.jsonl")))[0]
+    assert code == 0 and response["provider_called"] is False
+    assert saved["id"] == response["interaction_id"]
+
+
+@pytest.mark.parametrize("failure", ["authorization", "duplicate", "reference", "unsafe"])
+def test_evaluation_rejects_invalid_or_unsafe_batches_before_sampling(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    failure: str,
+) -> None:
+    case = standard_cases()[0]
+    cases = [case]
+    args = [
+        "copilot",
+        "evaluate",
+        "--cases",
+        str(tmp_path / "cases.jsonl"),
+        "--model-config",
+        str(tmp_path / "model.json"),
+        "--budget-ledger",
+        str(tmp_path / "budget.jsonl"),
+        "--output",
+        str(tmp_path / "output"),
+        "--evaluation-id",
+        "rejection-test",
+    ]
+    if failure == "duplicate":
+        cases.append(case)
+    elif failure == "reference":
+        case["messages"][-1]["role"] = "user"
+    elif failure == "unsafe":
+        case["messages"][1]["content"] = "API_KEY=supersecretvalue"
+    write_jsonl(tmp_path / "cases.jsonl", cases)
+    if failure != "authorization":
+        args.extend(["--launch", "--ack-data-transmission"])
+    assert main(args) == 2
+    assert "copilot:" in capsys.readouterr().err
+
+
 @pytest.mark.parametrize(
     ("sampled_answer", "status"),
     [
@@ -538,6 +675,8 @@ def test_evaluate_withholds_reference_and_writes_bound_prediction(
             str(output),
             "--evaluation-id",
             "local-boundary-test",
+            "--checkpoint",
+            "tinker://test-checkpoint",
             "--sftf",
             str(fake_sftf(tmp_path / "sftf", "The state is supported. [E1]")),
             "--launch",
@@ -550,6 +689,41 @@ def test_evaluate_withholds_reference_and_writes_bound_prediction(
     assert prediction["id"] == case["id"]
     assert prediction["input_sha256"] == digest(case["messages"][:-1])
     assert case["messages"][-1]["content"] not in prediction["answer"]
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ("unknown", "duplicate or unknown"),
+        ("missing-reviewer", "requires reviewer"),
+        ("uncited", "cite only supplied evidence"),
+        ("empty-question", "unsafe or empty"),
+        ("category", "unknown training category"),
+        ("future", "future evidence"),
+    ],
+)
+def test_dataset_admission_rejects_unbound_or_unsafe_reviews(tmp_path: Path, change: str, message: str) -> None:
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    item = candidate()
+    if change == "future":
+        item["evidence"][0]["timestamp"] = "2026-09-01T00:00:00+00:00"
+    submitted = review(item)
+    if change == "unknown":
+        submitted["candidate_id"] = "missing"
+    elif change == "missing-reviewer":
+        submitted["reviewer"] = ""
+    elif change == "uncited":
+        submitted["answer"] = "No evidence reference."
+    elif change == "empty-question":
+        submitted["question"] = ""
+    elif change == "category":
+        submitted["category"] = "memorize-user"
+    write_jsonl(corpus / "candidates.jsonl", [item])
+    reviews = tmp_path / "reviews.jsonl"
+    write_jsonl(reviews, [submitted])
+    with pytest.raises(ValueError, match=message):
+        build_dataset(corpus, reviews, tmp_path / "output")
 
 
 def test_chat_history_is_feedback_ready_but_not_exposed_in_response(
