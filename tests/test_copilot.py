@@ -7,6 +7,10 @@ from typing import Any
 
 import pytest
 
+import agent_sessions.copilot as copilot_module
+import agent_sessions.copilot_dataset as dataset_module
+import agent_sessions.copilot_golden as golden_module
+import agent_sessions.copilot_upgrade as upgrade_module
 from agent_sessions.cli import main
 from agent_sessions.copilot import retrieve
 from agent_sessions.copilot_concepts import abstract_case, propose_lesson, transfer_case
@@ -82,12 +86,30 @@ def review(c: dict[str, Any]) -> dict[str, Any]:
 
 
 def fake_sftf(path: Path, answer: str) -> Path:
-    path.write_text(
-        "#!/bin/sh\nprintf '%s\\n' " + json.dumps(json.dumps({"answer": answer})) + "\n",
-        encoding="utf-8",
-    )
+    payload = json.dumps({"answer": answer})
+    if os.name == "nt":
+        path = path.with_suffix(".cmd")
+        path.write_text(f"@echo off\r\n@echo {payload}\r\n", encoding="utf-8")
+    else:
+        path.write_text("#!/bin/sh\nprintf '%s\\n' " + json.dumps(payload) + "\n", encoding="utf-8")
     path.chmod(0o700)
     return path
+
+
+@pytest.fixture(autouse=True)
+def exercise_portable_logic_behind_private_storage_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Windows rejects pilot storage, while the logic above that boundary stays portable."""
+    if os.name == "posix":
+        return
+
+    def test_private_dir(path: Path) -> Path:
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    for module in (copilot_module, dataset_module, golden_module, upgrade_module):
+        monkeypatch.setattr(module, "private_dir", test_private_dir)
 
 
 def test_codex_preserves_calls_without_reasoning_or_duplicate_transport() -> None:
@@ -216,6 +238,10 @@ def test_forks_and_cross_machine_duplicates_share_partition_family() -> None:
 
 
 def test_private_output_refuses_git_and_symlink(tmp_path: Path) -> None:
+    if os.name != "posix":
+        with pytest.raises(ValueError, match="Windows ACL support is not yet qualified"):
+            private_dir(tmp_path / "dataset")
+        return
     (tmp_path / ".git").mkdir()
     with pytest.raises(ValueError, match="Git"):
         private_dir(tmp_path / "dataset")

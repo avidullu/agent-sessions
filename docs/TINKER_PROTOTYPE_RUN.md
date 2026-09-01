@@ -86,21 +86,33 @@ and `$0.10/GB-month` checkpoint storage.
 | Unallocated contingency | $8 | never consumed automatically |
 | **Total** | **$40** | expected materially below cap |
 
-Use a new prototype-only budget ledger. It must enforce a `$40` aggregate across
-all buckets rather than inheriting the larger experiment's `$40/$40/$20` bucket
-limits. Reservations are not refunded automatically after ambiguous provider
-outcomes. A failed or timed-out request stops the run for reconciliation; the
-recovery reserve is not retry permission.
+Do not build a prototype-specific or cross-repository ledger for this run. Track
+the estimate, actual charge, request identifier, and outcome in the Markdown run
+record below. Before each paid stage, compare the recorded cumulative spend plus
+the next estimate with the `$40` cap. A failed or timed-out request stops the run
+for manual reconciliation; the recovery reserve is not retry permission. ONS,
+SFT, and code-doot can adopt their durable ledger contracts independently later.
+
+### Prototype run record
+
+| Stage | Status | Estimate | Actual | Request/evidence | Decision |
+| --- | --- | ---: | ---: | --- | --- |
+| Data and token-plan freeze | Not started | $0 | $0 | — | Await reviewed dataset |
+| Raw-base training | Not started | — | — | — | No launch approval yet |
+| Chat-model training | Not started | — | — | — | No launch approval yet |
+| Four-arm smoke | Not started | — | — | — | No launch approval yet |
+| Full evaluation | Not started | — | — | — | No launch approval yet |
+| Recovery | Not authorized | $8 reserved | $0 | — | Requires explicit diagnosis and approval |
+| **Cumulative paid use** | **Not started** | **$0** | **$0** | — | **Hard stop at $40** |
 
 ## Integration stress path
 
 1. **agent-sessions:** freeze reviewed data, whole-family splits, golden cases,
    blind packs, human grades, and score report.
 2. **sft-factory:** render exact tokens, enforce arm-specific renderer and
-   prototype admission, reserve the shared budget, train, sample, and export
-   short-lived checkpoints.
-3. **ons-lab:** validate two matched managed work orders and the separate `$40`
-   prototype envelope without reading prompts or executing the provider.
+   prototype admission, train, sample, and export short-lived checkpoints.
+3. **ons-lab:** validate two matched managed work orders without reading prompts
+   or executing the provider.
 4. **code-doot:** consume a locator-free model-result candidate in inspection
    mode and record `deployment_candidate=false`. A small follow-up PR may add
    this generic inspection contract; the prototype does not create an endpoint,
@@ -109,8 +121,8 @@ recovery reserve is not retry permission.
 ## Stop conditions
 
 Stop before paid submission if renderer/tokenization, family isolation, source
-use, aggregate budget, observer health, or exact work-order identity is not
-green. Stop after the smoke if response parsing or citations are invalid. Stop
+use, the Markdown spend record, observer health, or exact work-order identity is
+not current and green. Stop after the smoke if response parsing or citations are invalid. Stop
 after training if either run is ambiguous until provider state is reconciled.
 Regardless of scores, retain `promotion_authorized=false` and
 `deployment_candidate=false` for this prototype.
