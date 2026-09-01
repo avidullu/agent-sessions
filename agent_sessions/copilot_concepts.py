@@ -19,6 +19,21 @@ CONCEPTS = {
 }
 
 
+def validate_entity_mapping(value: Any) -> dict[str, str]:
+    """Validate the reviewer-owned substitutions used by every dataset path."""
+    if not isinstance(value, dict) or any(
+        not isinstance(k, str)
+        or len(k) < 3
+        or not isinstance(v, str)
+        or not re.fullmatch(r"ENTITY_[A-Z]+_[0-9]+", v)
+        for k, v in value.items()
+    ):
+        raise ValueError("entity mapping requires source strings and ENTITY_TYPE_N placeholders")
+    if len(set(value.values())) != len(value):
+        raise ValueError("distinct source entities must keep distinct placeholders")
+    return value
+
+
 def abstract_case(candidate: dict[str, Any], review: dict[str, Any]) -> dict[str, Any]:
     """Apply reviewer-specified, consistent entity substitutions to the whole case.
 
@@ -30,14 +45,7 @@ def abstract_case(candidate: dict[str, Any], review: dict[str, Any]) -> dict[str
         raise ValueError("review must identify a supported transferable concept")
     if review.get("concept_reviewed") is not True:
         raise ValueError("review must check that the lesson is evidence-backed, not a personal preference")
-    substitutions = review.get("entities", {})
-    if not isinstance(substitutions, dict) or any(
-        not isinstance(k, str) or len(k) < 3 or not isinstance(v, str) or not re.fullmatch(r"ENTITY_[A-Z]+_[0-9]+", v)
-        for k, v in substitutions.items()
-    ):
-        raise ValueError("entity mapping requires source strings and ENTITY_TYPE_N placeholders")
-    if len(set(substitutions.values())) != len(substitutions):
-        raise ValueError("distinct source entities must keep distinct placeholders")
+    substitutions = validate_entity_mapping(review.get("entities", {}))
 
     def replace(text: str) -> str:
         for old in sorted(substitutions, key=len, reverse=True):

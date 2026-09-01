@@ -16,6 +16,7 @@
 | [PROJECT_DOC_TEMPLATE.md](PROJECT_DOC_TEMPLATE.md) | Tracked project doc skeleton (from `badminton-highlight-indexer`) |
 | [COMPOSE_STACK.md](COMPOSE_STACK.md) | What this repo owns vs external tools |
 | [TINKER_PROTOTYPE_RUN.md](TINKER_PROTOTYPE_RUN.md) | **PROPOSED** — $40 four-arm Tinker prototype, manual labeling, grounded evaluation, and integration stress test |
+| [SESSION_COPILOT.md](SESSION_COPILOT.md) | Private, evidence-grounded session copilot and reviewer-controlled self-upgrade workflow |
 | [AUTOMATION.md](AUTOMATION.md) | Daily export scripts |
 | [SSH_FLEET_COLLECT_PLAN.md](SSH_FLEET_COLLECT_PLAN.md) | **DRAFT** — primary-host SSH fleet collect (hourly light pull from other machines; approval-gated ship-back) |
 | [FORGEJO_AGENT_PROVENANCE.md](FORGEJO_AGENT_PROVENANCE.md) | **IN PROGRESS** — local SQLite PR/commit/review attribution, exact bot identity mapping, and evidence-backed historical agent links |

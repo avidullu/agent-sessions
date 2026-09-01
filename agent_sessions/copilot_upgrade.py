@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .baseline_redaction import redact_text
-from .copilot_concepts import CONCEPTS
+from .copilot_concepts import CONCEPTS, validate_entity_mapping
 from .copilot_dataset import private_dir, read_jsonl, write_jsonl
 from .copilot_records import digest
 
@@ -32,6 +32,7 @@ def record_feedback(
     aligned: bool,
     correction: str | None,
     allow_training_use: bool,
+    entities: dict[str, str] | None,
     output: Path,
 ) -> dict[str, Any]:
     interaction = _one(interaction_path)
@@ -52,6 +53,12 @@ def record_feedback(
     trainable = verdict in {"accept", "correct"} and grounded and aligned and allow_training_use
     if trainable and (scanned.blocked or not citations or any(c not in evidence_ids for c in citations)):
         raise ValueError("training-permitted feedback requires a safe answer with valid evidence citations")
+    entity_mapping = validate_entity_mapping(entities or {})
+    project = interaction.get("project")
+    if trainable and (not entity_mapping or (isinstance(project, str) and project not in entity_mapping)):
+        raise ValueError(
+            "training-permitted feedback requires a reviewer-supplied entity mapping including project"
+        )
     result = {
         "schema": "session-copilot-user-feedback.v1",
         "interaction_id": interaction["id"],
@@ -64,6 +71,7 @@ def record_feedback(
         "target_answer": scanned.redacted_text if not scanned.blocked else "",
         "training_permitted": trainable,
         "source_use_authorized": allow_training_use,
+        "entities": entity_mapping,
         "model_training_authorized": False,
         "interaction": interaction,
     }
@@ -131,11 +139,7 @@ def compile_cycle(
             "category": candidate["category"],
             "question": candidate["question"],
             "answer": item["target_answer"],
-            "entities": (
-                {interaction["project"]: "ENTITY_PROJECT_1"}
-                if isinstance(interaction.get("project"), str) and len(interaction["project"]) >= 3
-                else {}
-            ),
+            "entities": item.get("entities", {}),
             "feedback_id": item["id"],
         }
         candidates.append(candidate)

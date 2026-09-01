@@ -282,6 +282,7 @@ def handle(args: argparse.Namespace) -> int:
                 aligned=args.aligned,
                 correction=args.correction.read_text(encoding="utf-8") if args.correction else None,
                 allow_training_use=args.allow_training_use,
+                entities=json.loads(args.entities.read_text(encoding="utf-8")) if args.entities else None,
                 output=args.output,
             )
         elif args.copilot_action == "self-upgrade-compile":
@@ -408,6 +409,11 @@ def add_parser(sub: Any) -> None:
     feedback.add_argument("--aligned", action=argparse.BooleanOptionalAction, required=True)
     feedback.add_argument("--correction", type=Path)
     feedback.add_argument("--allow-training-use", action="store_true")
+    feedback.add_argument(
+        "--entities",
+        type=Path,
+        help="Private JSON object mapping reviewed source names to ENTITY_TYPE_N placeholders.",
+    )
     feedback.add_argument("--output", type=Path, required=True)
     compile_upgrade = actions.add_parser(
         "self-upgrade-compile", help="Compile user-reviewed turns into a private next-round dataset queue."

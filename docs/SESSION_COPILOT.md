@@ -247,7 +247,8 @@ agent-archive copilot self-upgrade-feedback \
   --verdict correct --reviewer Avi \
   --concept evidence_calibration --grounded --aligned \
   --correction /private/corrected-answer.txt \
-  --allow-training-use --output /private/feedback-cycle-1
+  --allow-training-use --entities /private/reviewed-entities.json \
+  --output /private/feedback-cycle-1
 ```
 
 `--allow-training-use` is separate from the verdict. Without it, the assessment
@@ -256,6 +257,11 @@ or corrected answer must be safe, grounded, aligned, and cite evidence present i
 the saved interaction. Rejected, ungrounded, or misaligned answers never become
 positive targets. Feedback records are create-once and bind the exact interaction;
 resubmitting the same decision does not silently overwrite it.
+
+Training-permitted feedback also requires a private reviewer-authored entity map,
+using the same `ENTITY_TYPE_N` placeholders as initial dataset review. The compiler
+never guesses which names are user-specific. A missing map, or one that omits the
+interaction project, refuses training use for that feedback.
 
 Compile feedback with a reviewed replay corpus so a new round does not learn only
 from recent corrections:

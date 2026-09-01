@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from io import StringIO
 from pathlib import Path
 from typing import Any
@@ -86,15 +87,15 @@ def review(c: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def fake_sftf(path: Path, answer: str) -> Path:
-    payload = json.dumps({"answer": answer})
-    if os.name == "nt":
-        path = path.with_suffix(".cmd")
-        path.write_text(f"@echo off\r\n@echo {payload}\r\n", encoding="utf-8")
-    else:
-        path.write_text("#!/bin/sh\nprintf '%s\\n' " + json.dumps(payload) + "\n", encoding="utf-8")
-    path.chmod(0o700)
-    return path
+def fake_sampler(monkeypatch: pytest.MonkeyPatch, answer: str) -> Path:
+    executable = Path("sftf-test-double")
+
+    def run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        assert command[0] == str(executable)
+        return subprocess.CompletedProcess(command, 0, json.dumps({"answer": answer}), "")
+
+    monkeypatch.setattr(copilot_module.subprocess, "run", run)
+    return executable
 
 
 @pytest.fixture(autouse=True)
@@ -619,6 +620,7 @@ def test_evaluation_rejects_invalid_or_unsafe_batches_before_sampling(
 )
 def test_chat_sampler_boundary_validates_and_redacts_output(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     sampled_answer: str,
     status: str,
@@ -640,7 +642,7 @@ def test_chat_sampler_boundary_validates_and_redacts_output(
             "--as-of",
             "2026-08-02T00:00:00Z",
             "--sftf",
-            str(fake_sftf(tmp_path / "sftf", sampled_answer)),
+            str(fake_sampler(monkeypatch, sampled_answer)),
             "--model-config",
             str(model_config),
             "--budget-ledger",
@@ -655,7 +657,7 @@ def test_chat_sampler_boundary_validates_and_redacts_output(
 
 
 def test_evaluate_withholds_reference_and_writes_bound_prediction(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     case = standard_cases()[0]
     cases = tmp_path / "cases.jsonl"
@@ -678,7 +680,7 @@ def test_evaluate_withholds_reference_and_writes_bound_prediction(
             "--checkpoint",
             "tinker://test-checkpoint",
             "--sftf",
-            str(fake_sftf(tmp_path / "sftf", "The state is supported. [E1]")),
+            str(fake_sampler(monkeypatch, "The state is supported. [E1]")),
             "--launch",
             "--ack-data-transmission",
         ]
@@ -786,6 +788,7 @@ def test_user_feedback_compiles_correction_without_self_promoting(tmp_path: Path
         aligned=True,
         correction="Deployment is not verified because no receipt is present. [E1]",
         allow_training_use=True,
+        entities={"project-a": "ENTITY_PROJECT_1"},
         output=feedback_dir,
     )
     assert result["training_permitted"] is True and result["model_training_authorized"] is False
@@ -813,6 +816,25 @@ def test_feedback_cannot_train_without_citations_and_explicit_source_use(tmp_pat
     interaction["evidence"][0]["event_id"] = "E1"
     path = tmp_path / "interaction.jsonl"
     write_jsonl(path, [interaction])
+    interaction["answer"] = "Observed. [E1]"
+    path.unlink()
+    write_jsonl(path, [interaction])
+    with pytest.raises(ValueError, match="entity mapping"):
+        record_feedback(
+            path,
+            verdict="accept",
+            reviewer="avi",
+            concept="evidence_calibration",
+            grounded=True,
+            aligned=True,
+            correction=None,
+            allow_training_use=True,
+            entities=None,
+            output=tmp_path / "feedback-no-entities",
+        )
+    interaction["answer"] = "unsupported"
+    path.unlink()
+    write_jsonl(path, [interaction])
     with pytest.raises(ValueError, match="citations"):
         record_feedback(
             path,
@@ -823,6 +845,7 @@ def test_feedback_cannot_train_without_citations_and_explicit_source_use(tmp_pat
             aligned=True,
             correction=None,
             allow_training_use=True,
+            entities={"project-a": "ENTITY_PROJECT_1"},
             output=tmp_path / "feedback-a",
         )
     result = record_feedback(
@@ -834,6 +857,7 @@ def test_feedback_cannot_train_without_citations_and_explicit_source_use(tmp_pat
         aligned=True,
         correction=None,
         allow_training_use=False,
+        entities=None,
         output=tmp_path / "feedback-b",
     )
     assert result["training_permitted"] is False
