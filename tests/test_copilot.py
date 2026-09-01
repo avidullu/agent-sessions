@@ -81,6 +81,15 @@ def review(c: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def fake_sftf(path: Path, answer: str) -> Path:
+    path.write_text(
+        "#!/bin/sh\nprintf '%s\\n' " + json.dumps(json.dumps({"answer": answer})) + "\n",
+        encoding="utf-8",
+    )
+    path.chmod(0o700)
+    return path
+
+
 def test_codex_preserves_calls_without_reasoning_or_duplicate_transport() -> None:
     hidden = {
         "type": "response_item",
@@ -435,6 +444,86 @@ def test_cli_missing_evidence_never_calls_provider(tmp_path: Path, capsys: pytes
     assert json.loads(capsys.readouterr().out)["provider_called"] is False
 
 
+@pytest.mark.parametrize(
+    ("sampled_answer", "status"),
+    [
+        ("The deployment remains unverified. [E1]", "answered"),
+        ("The deployment remains unverified.", "invalid_citations"),
+        ("API_KEY=supersecretvalue [E1]", "response_blocked"),
+    ],
+)
+def test_chat_sampler_boundary_validates_and_redacts_output(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    sampled_answer: str,
+    status: str,
+) -> None:
+    write_jsonl(tmp_path / "sessions.jsonl", [record()])
+    model_config = tmp_path / "model.json"
+    model_config.write_text("{}", encoding="utf-8")
+    code = main(
+        [
+            "copilot",
+            "chat",
+            "What remains?",
+            "--corpus",
+            str(tmp_path),
+            "--project",
+            "project-a",
+            "--session",
+            "one",
+            "--as-of",
+            "2026-08-02T00:00:00Z",
+            "--sftf",
+            str(fake_sftf(tmp_path / "sftf", sampled_answer)),
+            "--model-config",
+            str(model_config),
+            "--budget-ledger",
+            str(tmp_path / "budget.jsonl"),
+            "--launch",
+            "--ack-data-transmission",
+        ]
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert code == 0 and result["status"] == status and result["provider_called"] is True
+    assert "supersecretvalue" not in json.dumps(result)
+
+
+def test_evaluate_withholds_reference_and_writes_bound_prediction(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    case = standard_cases()[0]
+    cases = tmp_path / "cases.jsonl"
+    write_jsonl(cases, [case])
+    output = tmp_path / "predictions"
+    code = main(
+        [
+            "copilot",
+            "evaluate",
+            "--cases",
+            str(cases),
+            "--model-config",
+            str(tmp_path / "model.json"),
+            "--budget-ledger",
+            str(tmp_path / "budget.jsonl"),
+            "--output",
+            str(output),
+            "--evaluation-id",
+            "local-boundary-test",
+            "--sftf",
+            str(fake_sftf(tmp_path / "sftf", "The state is supported. [E1]")),
+            "--launch",
+            "--ack-data-transmission",
+        ]
+    )
+    result = json.loads(capsys.readouterr().out)
+    prediction = read_jsonl(output / "predictions.jsonl")[0]
+    assert code == 0 and result["status"] == "predictions_complete_grading_pending"
+    assert prediction["id"] == case["id"]
+    assert prediction["input_sha256"] == digest(case["messages"][:-1])
+    assert case["messages"][-1]["content"] not in prediction["answer"]
+
+
 def test_chat_history_is_feedback_ready_but_not_exposed_in_response(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -466,7 +555,7 @@ def test_chat_history_is_feedback_ready_but_not_exposed_in_response(
 
 
 def test_user_feedback_compiles_correction_without_self_promoting(tmp_path: Path) -> None:
-    interaction = {
+    interaction: dict[str, Any] = {
         "schema": "session-copilot-interaction.v1",
         "id": "turn-one",
         "created_at": "2026-08-01T00:00:03+00:00",
@@ -508,7 +597,7 @@ def test_user_feedback_compiles_correction_without_self_promoting(tmp_path: Path
 
 
 def test_feedback_cannot_train_without_citations_and_explicit_source_use(tmp_path: Path) -> None:
-    interaction = {
+    interaction: dict[str, Any] = {
         "schema": "session-copilot-interaction.v1",
         "id": "x",
         "question": "q",
