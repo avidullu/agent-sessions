@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Session copilot commands** — prepare evidence-bound examples, build reviewed
+  concept datasets, chat through the SFT Factory boundary, run golden evaluations,
+  and compile reviewer-controlled self-upgrade cycles without automatic promotion.
 - Router-fed VS Code native chat records now use `metadata.model_provider` to
   distinguish Z.AI and other language-model providers from GitHub Copilot.
 - **Machine-readable local-export routine discovery** — reports native
