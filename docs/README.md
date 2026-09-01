@@ -15,6 +15,7 @@
 | [archives/TECH_DEBT_PLAN.md](archives/TECH_DEBT_PLAN.md) | **DONE (archived)** — tech-debt remediation plan, TD1–TD15 all landed (#28, #31, #33, #35, #37, #38, #40) |
 | [PROJECT_DOC_TEMPLATE.md](PROJECT_DOC_TEMPLATE.md) | Tracked project doc skeleton (from `badminton-highlight-indexer`) |
 | [COMPOSE_STACK.md](COMPOSE_STACK.md) | What this repo owns vs external tools |
+| [TINKER_PROTOTYPE_RUN.md](TINKER_PROTOTYPE_RUN.md) | **PROPOSED** — $40 four-arm Tinker prototype, manual labeling, grounded evaluation, and integration stress test |
 | [AUTOMATION.md](AUTOMATION.md) | Daily export scripts |
 | [SSH_FLEET_COLLECT_PLAN.md](SSH_FLEET_COLLECT_PLAN.md) | **DRAFT** — primary-host SSH fleet collect (hourly light pull from other machines; approval-gated ship-back) |
 | [FORGEJO_AGENT_PROVENANCE.md](FORGEJO_AGENT_PROVENANCE.md) | **IN PROGRESS** — local SQLite PR/commit/review attribution, exact bot identity mapping, and evidence-backed historical agent links |
