@@ -800,6 +800,37 @@ def test_user_feedback_compiles_correction_without_self_promoting(tmp_path: Path
     dataset = build_dataset(tmp_path / "cycle", tmp_path / "cycle" / "reviews.jsonl", tmp_path / "upgrade-dataset")
     assert sum(dataset["counts"].values()) == 1 and dataset["training_ready"] is False
 
+    bad_feedback = read_jsonl(next(feedback_dir.glob("*.jsonl")))[0]
+    bad_feedback["entities"] = {}
+    bad_dir = tmp_path / "bad-feedback"
+    bad_dir.mkdir()
+    write_jsonl(bad_dir / "feedback.jsonl", [bad_feedback])
+    with pytest.raises(ValueError, match="entity mapping"):
+        compile_cycle(bad_dir, tmp_path / "bad-cycle")
+
+    bad_review = {**reviews[0], "entities": {}}
+    write_jsonl(tmp_path / "bad-review.jsonl", [bad_review])
+    with pytest.raises(ValueError, match="nonempty reviewer entity mapping"):
+        build_dataset(tmp_path / "cycle", tmp_path / "bad-review.jsonl", tmp_path / "bad-dataset")
+
+    base = tmp_path / "base"
+    base.mkdir()
+    replay = {**candidate(), "id": "replay", "family_id": "prepared-family"}
+    write_jsonl(base / "candidates.jsonl", [replay])
+    write_jsonl(
+        base / "sessions.jsonl",
+        [{**record("one"), "family_id": "prepared-family"}],
+    )
+    write_jsonl(tmp_path / "base-reviews.jsonl", [])
+    compile_cycle(
+        feedback_dir,
+        tmp_path / "joined-cycle",
+        base_corpus=base,
+        base_reviews=tmp_path / "base-reviews.jsonl",
+    )
+    joined = read_jsonl(tmp_path / "joined-cycle" / "candidates.jsonl")
+    assert joined[-1]["family_id"] == "prepared-family"
+
 
 def test_feedback_cannot_train_without_citations_and_explicit_source_use(tmp_path: Path) -> None:
     interaction: dict[str, Any] = {

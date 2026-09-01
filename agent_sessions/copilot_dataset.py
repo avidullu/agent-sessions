@@ -320,6 +320,9 @@ def build_dataset(
             raise ValueError("review is stale: candidate content changed")
         if not review.get("reviewer") or review.get("training_permitted") is not True:
             raise ValueError("accepted example requires reviewer and explicit source-use approval")
+        entities = review.get("entities")
+        if not isinstance(entities, dict) or not entities:
+            raise ValueError("accepted example requires a nonempty reviewer entity mapping")
         answer = review.get("answer", "")
         evidence_ids = {e["event_id"] for e in candidate["evidence"]}
         cited = re.findall(r"\[([^\[\]]+)\]", answer)

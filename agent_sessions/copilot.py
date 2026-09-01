@@ -144,6 +144,27 @@ def answer(args: argparse.Namespace, question: str) -> dict[str, Any]:
     packed = [{**e, "event_id": f"E{i + 1}", "call_id": ""} for i, e in enumerate(evidence)]
     prompt = {"question": scanned.redacted_text, "as_of": args.as_of, "evidence": packed}
     interaction_id = str(uuid.uuid4())
+    family_id = ""
+    session_records = read_jsonl(args.corpus / "sessions.jsonl")
+    if args.session:
+        families = {
+            record.get("family_id", digest(record["session_id"])[:24])
+            for record in session_records
+            if record.get("session_id") == args.session or record.get("parent_id") == args.session
+        }
+        if len(families) > 1:
+            raise ValueError("selected session maps to multiple prepared families")
+        family_id = next(iter(families), "")
+    if not family_id:
+        evidence_ids = set(sources.values())
+        families = {
+            record.get("family_id", digest(record["session_id"])[:24])
+            for record in session_records
+            if evidence_ids & {event["event_id"] for event in record.get("messages", [])}
+        }
+        if len(families) > 1:
+            raise ValueError("selected evidence maps to multiple prepared families")
+        family_id = next(iter(families), digest(args.session or sorted(evidence_ids))[:24])
 
     def finish(result: dict[str, Any]) -> dict[str, Any]:
         model_hash = ""
@@ -159,7 +180,7 @@ def answer(args: argparse.Namespace, question: str) -> dict[str, Any]:
             "project": args.project,
             "as_of": args.as_of,
             "session": args.session or "",
-            "family_id": digest([args.project, args.session or sorted(sources.values())])[:24],
+            "family_id": family_id,
             "evidence": packed,
             "answer": observed_answer,
             "status": result.get("status", "evidence_only"),

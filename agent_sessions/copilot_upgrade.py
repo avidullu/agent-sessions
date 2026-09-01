@@ -95,6 +95,7 @@ def compile_cycle(
     seen: set[str] = set()
     candidates = read_jsonl(base_corpus / "candidates.jsonl") if base_corpus else []
     reviews = read_jsonl(base_reviews) if base_reviews else []
+    base_sessions = read_jsonl(base_corpus / "sessions.jsonl") if base_corpus else []
     replay_examples = len(candidates)
     existing_ids = {candidate["id"] for candidate in candidates}
     counts: Counter[str] = Counter()
@@ -111,10 +112,28 @@ def compile_cycle(
         counts[item["verdict"]] += 1
         if not item.get("training_permitted"):
             continue
+        entities = validate_entity_mapping(item.get("entities", {}))
+        project = interaction.get("project")
+        if not entities or (isinstance(project, str) and project not in entities):
+            raise ValueError(
+                "training-permitted feedback requires a reviewed entity mapping including project"
+            )
+        family_id = interaction.get("family_id")
+        if base_corpus:
+            session = interaction.get("session")
+            matched_families = {
+                record["family_id"]
+                for record in base_sessions
+                if session
+                and (record.get("session_id") == session or record.get("parent_id") == session)
+            }
+            if len(matched_families) != 1:
+                raise ValueError("feedback session cannot be joined to exactly one replay family")
+            family_id = next(iter(matched_families))
         candidate = {
             "schema": "session-copilot-candidate.v1",
             "id": digest(["user-feedback-candidate-v1", item["id"]]),
-            "family_id": interaction["family_id"],
+            "family_id": family_id,
             "project": interaction["project"],
             "category": "correction" if item["verdict"] == "correct" else "continuation",
             "as_of": interaction["as_of"],
@@ -139,7 +158,7 @@ def compile_cycle(
             "category": candidate["category"],
             "question": candidate["question"],
             "answer": item["target_answer"],
-            "entities": item.get("entities", {}),
+            "entities": entities,
             "feedback_id": item["id"],
         }
         candidates.append(candidate)
