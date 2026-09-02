@@ -71,6 +71,16 @@ tool-cache interpreter and exposes the venv's interpreter explicitly as
 `CI_PYTHON`. The install and test commands invoke that exact executable rather
 than trusting ambient PATH state.
 
+**Linux `setup-python` on a read-only hosted toolcache.** Self-hosted Forgejo
+`ci-heavy` / `ci-light` runners sometimes remount `/opt/hostedtoolcache`
+read-only. `actions/setup-python@v6` then fails with `mkdir: cannot create
+directory ‘/opt/hostedtoolcache/Python’: Read-only file system` before any repo
+gate runs (measured 2026-09-03 on #169). Every Linux job that still uses
+`setup-python` first runs `scripts/ci-writable-python-toolcache.sh`, which
+points `AGENT_TOOLSDIRECTORY` and `RUNNER_TOOL_CACHE` at `$RUNNER_TEMP`. That
+step is CI-only; `local_ci.sh` mirrors the `run:` line for drift detection and
+does not execute it.
+
 ### The `ci-gate` job — read this one, not the individual checks
 
 **Forgejo reports a SKIPPED job as `success` in the commit-status API.** A job

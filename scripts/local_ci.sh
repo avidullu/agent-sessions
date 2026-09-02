@@ -120,6 +120,11 @@ ci_windows_setup='./scripts/ci-python-venv.ps1 -PythonVersion "${{ matrix.python
 ci_windows_install='& $env:CI_PYTHON -m pip install -e ".[dev]" -c constraints-dev.txt'
 ci_windows_pytest='& $env:CI_PYTHON -m pytest --cov=agent_sessions --cov-report=term-missing --cov-fail-under=92'
 
+# Linux setup-python must not write into a read-only /opt/hostedtoolcache on
+# self-hosted Forgejo runners. This step is CI-only (needs RUNNER_TEMP and
+# GITHUB_ENV); it is mirrored for drift detection and not executed here.
+ci_linux_toolcache='bash scripts/ci-writable-python-toolcache.sh'
+
 # The ci-gate assertion. Held as one string, not an array, because it carries
 # literal Actions `${{ }}` expressions that bash must not expand. This gate has
 # no local equivalent — `needs.<job>.result` only exists inside CI — so it is
@@ -130,7 +135,9 @@ ci_gate='bash scripts/ci-gate.sh "test=${{ needs.test.result }}" "test-windows=$
 # Windows uses the explicit interpreter selected by ci-python-venv.ps1. Link
 # and PII checks need only the standard library.
 expected_runs=(
+  "$ci_linux_toolcache"
   "${ci_install[*]}"
+  "$ci_linux_toolcache"
   "${ci_install[*]}"
   "${ci_ruff[*]}"
   "${ci_mypy[*]}"
@@ -139,7 +146,9 @@ expected_runs=(
   "$ci_windows_setup"
   "$ci_windows_install"
   "$ci_windows_pytest"
+  "$ci_linux_toolcache"
   "${ci_linkcheck[*]}"
+  "$ci_linux_toolcache"
   "${ci_pii[*]}"
   "$ci_gate"
 )

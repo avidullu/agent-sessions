@@ -192,3 +192,49 @@ def test_windows_job_bootstraps_without_reusable_actions() -> None:
     assert "fetch --no-tags --depth=1 origin $env:GITHUB_SHA" in windows
     assert 'ci-python-venv.ps1 -PythonVersion "${{ matrix.python-version }}"' in windows
     assert windows.count("$env:CI_PYTHON -m") == 2
+
+
+def test_linux_setup_python_jobs_redirect_a_writable_toolcache() -> None:
+    """setup-python must not mkdir into a read-only /opt/hostedtoolcache.
+
+    Measured 2026-09-03 on ci-heavy/ci-light for PR #169: the action failed
+    with a read-only remount before any repo gate ran. Every Linux job that
+    still uses setup-python has to redirect the cache first.
+    """
+    body = WORKFLOW.read_text(encoding="utf-8")
+    linux_jobs = ("test", "lint", "link-check", "pii-check")
+    script = "bash scripts/ci-writable-python-toolcache.sh"
+    for job in linux_jobs:
+        block = workflow_job_block(body, job)
+        assert script in block, f"{job} is missing the writable toolcache redirect"
+        setup_at = block.index("uses: actions/setup-python@v6")
+        redirect_at = block.index(script)
+        assert redirect_at < setup_at, f"{job} runs setup-python before the toolcache redirect"
+    assert body.count(script) == len(linux_jobs)
+    assert "uses: actions/setup-python@v6" not in workflow_job_block(body, "test-windows")
+    assert "uses: actions/setup-python@v6" not in workflow_job_block(body, "ci-gate")
+
+
+@requires_bash
+def test_writable_python_toolcache_script_exports_job_private_cache(tmp_path: Path) -> None:
+    assert BASH is not None
+    env_file = tmp_path / "github.env"
+    runner_temp = tmp_path / "runner-temp"
+    runner_temp.mkdir()
+    script = REPO_ROOT / "scripts" / "ci-writable-python-toolcache.sh"
+    result = subprocess.run(
+        [BASH, str(script)],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={
+            "RUNNER_TEMP": str(runner_temp),
+            "GITHUB_ENV": str(env_file),
+        },
+    )
+    assert result.returncode == 0
+    cache = runner_temp / "hostedtoolcache"
+    assert cache.is_dir()
+    exported = env_file.read_text(encoding="utf-8")
+    assert f"AGENT_TOOLSDIRECTORY={cache}" in exported
+    assert f"RUNNER_TOOL_CACHE={cache}" in exported
