@@ -15,6 +15,7 @@
 | [archives/TECH_DEBT_PLAN.md](archives/TECH_DEBT_PLAN.md) | **DONE (archived)** — tech-debt remediation plan, TD1–TD15 all landed (#28, #31, #33, #35, #37, #38, #40) |
 | [PROJECT_DOC_TEMPLATE.md](PROJECT_DOC_TEMPLATE.md) | Tracked project doc skeleton (from `badminton-highlight-indexer`) |
 | [COMPOSE_STACK.md](COMPOSE_STACK.md) | What this repo owns vs external tools |
+| [XDSYNC_BOUNDARY.md](XDSYNC_BOUNDARY.md) | **Accepted** — session archive vs curated instruction/memory control plane; closed-loop diagram (#148 / #157 / #153) |
 | [TINKER_PROTOTYPE_RUN.md](TINKER_PROTOTYPE_RUN.md) | **PROPOSED** — $40 four-arm Tinker prototype, manual labeling, grounded evaluation, and integration stress test |
 | [SESSION_COPILOT.md](SESSION_COPILOT.md) | Private, evidence-grounded session copilot and reviewer-controlled self-upgrade workflow |
 | [AUTOMATION.md](AUTOMATION.md) | Daily export scripts |

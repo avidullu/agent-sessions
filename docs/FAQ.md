@@ -125,6 +125,14 @@ The hub applies **redaction-v1** to all exported text:
 
 Redaction is best-effort — always review exported transcripts before sharing. See [ENGINEERING_BASELINE.md](ENGINEERING_BASELINE.md) for details.
 
+## Is this a replacement for CLAUDE.md, AGENTS.md, or agent memory products?
+
+No. This hub archives what happened in sessions. Curated instructions and
+project memory belong in an owner-chosen control plane (for example
+`avis-agents-xdsync`). This repo must not silently rewrite those files.
+Optional products such as Mem0 or agentmemory remain retrieval layers, not
+the attested promote destination. See [XDSYNC_BOUNDARY.md](XDSYNC_BOUNDARY.md).
+
 ## There are a few different names — which is which?
 
 The project spans a couple of registries, so it wears a few names:
