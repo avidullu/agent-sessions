@@ -1,13 +1,15 @@
 # Roadmap
 
-> **Status:** `Active (reference)` · **Owner:** `avidullu` · **Last updated:** `2026-08-01`
+> **Status:** `Active (reference)` · **Owner:** `avidullu` · **Last updated:** `2026-09-03`
 > Future importers and features; intentionally local-first.
 
 This archive is local-first: importers should prefer session data stored on
 owned CPU/RAM and local disks, including Windows and WSL paths.
 
 Search and live-memory features are intentionally delegated to the compose stack
-instead of rebuilt here; see [COMPOSE_STACK.md](COMPOSE_STACK.md).
+instead of rebuilt here; see [COMPOSE_STACK.md](COMPOSE_STACK.md). Curated
+instruction/project-memory continuity is a sibling control plane, not a roadmap
+item for this archive; see [XDSYNC_BOUNDARY.md](XDSYNC_BOUNDARY.md).
 
 ## Active design: collector + non-code + session-intel
 

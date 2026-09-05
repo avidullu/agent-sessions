@@ -14,6 +14,7 @@ script's behaviour and the workflow wiring that makes it meaningful.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -192,3 +193,82 @@ def test_windows_job_bootstraps_without_reusable_actions() -> None:
     assert "fetch --no-tags --depth=1 origin $env:GITHUB_SHA" in windows
     assert 'ci-python-venv.ps1 -PythonVersion "${{ matrix.python-version }}"' in windows
     assert windows.count("$env:CI_PYTHON -m") == 2
+
+
+def test_linux_setup_python_jobs_redirect_a_writable_toolcache() -> None:
+    """setup-python must not mkdir into a read-only /opt/hostedtoolcache.
+
+    Measured 2026-09-03 on ci-heavy/ci-light for PR #169: the action failed
+    with a read-only remount before any repo gate ran. Every Linux job that
+    still uses setup-python has to redirect the cache first.
+    """
+    body = WORKFLOW.read_text(encoding="utf-8")
+    linux_jobs = ("test", "lint", "link-check", "pii-check")
+    script = "bash scripts/ci-writable-python-toolcache.sh"
+    for job in linux_jobs:
+        block = workflow_job_block(body, job)
+        assert script in block, f"{job} is missing the writable toolcache redirect"
+        setup_at = block.index("uses: actions/setup-python@v6")
+        redirect_at = block.index(script)
+        assert redirect_at < setup_at, f"{job} runs setup-python before the toolcache redirect"
+    assert body.count(script) == len(linux_jobs)
+    assert "uses: actions/setup-python@v6" not in workflow_job_block(body, "test-windows")
+    assert "uses: actions/setup-python@v6" not in workflow_job_block(body, "ci-gate")
+
+
+def _toolcache_script_env(tmp_path: Path, *, runner_temp: Path | None) -> tuple[Path, dict[str, str]]:
+    env_file = tmp_path / "github.env"
+    env = os.environ.copy()
+    if runner_temp is None:
+        env.pop("RUNNER_TEMP", None)
+    else:
+        env["RUNNER_TEMP"] = str(runner_temp)
+    env["GITHUB_ENV"] = str(env_file)
+    return env_file, env
+
+
+def _exported_env(env_file: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        key, _, value = line.partition("=")
+        values[key] = value
+    return values
+
+
+@requires_bash
+def test_writable_python_toolcache_script_exports_job_private_cache(tmp_path: Path) -> None:
+    assert BASH is not None
+    runner_temp = tmp_path / "runner-temp"
+    runner_temp.mkdir()
+    script = REPO_ROOT / "scripts" / "ci-writable-python-toolcache.sh"
+    env_file, env = _toolcache_script_env(tmp_path, runner_temp=runner_temp)
+    result = subprocess.run(
+        [BASH, str(script)],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert result.returncode == 0
+    cache = runner_temp / "hostedtoolcache"
+    assert cache.is_dir()
+    exported = _exported_env(env_file)
+    # bash joins with `/` even when RUNNER_TEMP uses Windows separators
+    assert Path(exported["AGENT_TOOLSDIRECTORY"]) == cache
+    assert Path(exported["RUNNER_TOOL_CACHE"]) == cache
+    assert exported["PIP_REQUIRE_VIRTUALENV"] == "0"
+
+
+@requires_bash
+def test_writable_python_toolcache_script_requires_runner_temp(tmp_path: Path) -> None:
+    assert BASH is not None
+    script = REPO_ROOT / "scripts" / "ci-writable-python-toolcache.sh"
+    _env_file, env = _toolcache_script_env(tmp_path, runner_temp=None)
+    result = subprocess.run(
+        [BASH, str(script)],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert result.returncode != 0
+    assert "RUNNER_TEMP is required" in result.stderr

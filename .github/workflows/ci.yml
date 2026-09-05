@@ -30,6 +30,9 @@ jobs:
       - name: Check out
         uses: actions/checkout@v5
 
+      - name: Use a writable Python tool cache
+        run: bash scripts/ci-writable-python-toolcache.sh
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -114,6 +117,9 @@ jobs:
       - name: Check out
         uses: actions/checkout@v5
 
+      - name: Use a writable Python tool cache
+        run: bash scripts/ci-writable-python-toolcache.sh
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -144,6 +150,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
+      - name: Use a writable Python tool cache
+        run: bash scripts/ci-writable-python-toolcache.sh
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
@@ -160,6 +168,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
+      - name: Use a writable Python tool cache
+        run: bash scripts/ci-writable-python-toolcache.sh
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"

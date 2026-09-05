@@ -325,8 +325,12 @@ python .\tools\agent_archive.py baseline bundle --focus badminton-highlight-inde
 ## Compose Stack
 
 This repo owns durable export and baseline generation. Search, Claude-specific
-browsing, live capture, and runtime memory are delegated to external tools where
-they are already stronger. See [docs/COMPOSE_STACK.md](docs/COMPOSE_STACK.md).
+browsing, live capture, and optional vendor runtime memory are delegated to
+external tools where they are already stronger. Curated instructions and
+project memory belong in an owner-chosen control plane, not in this archive;
+the only write from sessions into that plane is an owner-attested promote.
+See [docs/COMPOSE_STACK.md](docs/COMPOSE_STACK.md) and
+[docs/XDSYNC_BOUNDARY.md](docs/XDSYNC_BOUNDARY.md).
 
 Daily export automation (local-only schedule or private catalog push) is
 documented in [docs/AUTOMATION.md](docs/AUTOMATION.md). Multi-machine indexing is
