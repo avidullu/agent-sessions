@@ -77,9 +77,10 @@ read-only. `actions/setup-python@v6` then fails with `mkdir: cannot create
 directory ‘/opt/hostedtoolcache/Python’: Read-only file system` before any repo
 gate runs (measured 2026-09-03 on #169). Every Linux job that still uses
 `setup-python` first runs `scripts/ci-writable-python-toolcache.sh`, which
-points `AGENT_TOOLSDIRECTORY` and `RUNNER_TOOL_CACHE` at `$RUNNER_TEMP`. That
-step is CI-only; `local_ci.sh` mirrors the `run:` line for drift detection and
-does not execute it.
+points `AGENT_TOOLSDIRECTORY` and `RUNNER_TOOL_CACHE` at `$RUNNER_TEMP` and
+clears `PIP_REQUIRE_VIRTUALENV` so the action's post-download pip upgrade can
+run outside a venv. That step is CI-only; `local_ci.sh` mirrors the `run:`
+line for drift detection and does not execute it.
 
 ### The `ci-gate` job — read this one, not the individual checks
 

@@ -14,6 +14,7 @@ script's behaviour and the workflow wiring that makes it meaningful.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -215,26 +216,59 @@ def test_linux_setup_python_jobs_redirect_a_writable_toolcache() -> None:
     assert "uses: actions/setup-python@v6" not in workflow_job_block(body, "ci-gate")
 
 
+def _toolcache_script_env(tmp_path: Path, *, runner_temp: Path | None) -> tuple[Path, dict[str, str]]:
+    env_file = tmp_path / "github.env"
+    env = os.environ.copy()
+    if runner_temp is None:
+        env.pop("RUNNER_TEMP", None)
+    else:
+        env["RUNNER_TEMP"] = str(runner_temp)
+    env["GITHUB_ENV"] = str(env_file)
+    return env_file, env
+
+
+def _exported_env(env_file: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        key, _, value = line.partition("=")
+        values[key] = value
+    return values
+
+
 @requires_bash
 def test_writable_python_toolcache_script_exports_job_private_cache(tmp_path: Path) -> None:
     assert BASH is not None
-    env_file = tmp_path / "github.env"
     runner_temp = tmp_path / "runner-temp"
     runner_temp.mkdir()
     script = REPO_ROOT / "scripts" / "ci-writable-python-toolcache.sh"
+    env_file, env = _toolcache_script_env(tmp_path, runner_temp=runner_temp)
     result = subprocess.run(
         [BASH, str(script)],
         check=True,
         capture_output=True,
         text=True,
-        env={
-            "RUNNER_TEMP": str(runner_temp),
-            "GITHUB_ENV": str(env_file),
-        },
+        env=env,
     )
     assert result.returncode == 0
     cache = runner_temp / "hostedtoolcache"
     assert cache.is_dir()
-    exported = env_file.read_text(encoding="utf-8")
-    assert f"AGENT_TOOLSDIRECTORY={cache}" in exported
-    assert f"RUNNER_TOOL_CACHE={cache}" in exported
+    exported = _exported_env(env_file)
+    # bash joins with `/` even when RUNNER_TEMP uses Windows separators
+    assert Path(exported["AGENT_TOOLSDIRECTORY"]) == cache
+    assert Path(exported["RUNNER_TOOL_CACHE"]) == cache
+    assert exported["PIP_REQUIRE_VIRTUALENV"] == "0"
+
+
+@requires_bash
+def test_writable_python_toolcache_script_requires_runner_temp(tmp_path: Path) -> None:
+    assert BASH is not None
+    script = REPO_ROOT / "scripts" / "ci-writable-python-toolcache.sh"
+    _env_file, env = _toolcache_script_env(tmp_path, runner_temp=None)
+    result = subprocess.run(
+        [BASH, str(script)],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert result.returncode != 0
+    assert "RUNNER_TEMP is required" in result.stderr
