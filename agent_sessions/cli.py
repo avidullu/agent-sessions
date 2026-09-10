@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import sys
+import zlib
 from pathlib import Path
 
 from . import __version__
@@ -85,6 +86,12 @@ def _handle_export(config: ArchiveConfig, args: argparse.Namespace) -> int:
     if not args.all and not args.source:
         raise SystemExit("export requires --all or at least one --source")
     write_pdfs = config.write_pdfs if args.pdf is None else args.pdf
+    from .backup import backup, destination, require_backup
+
+    backup_root = None
+    if config.backup_on_export and not args.dry_run:
+        backup_root = destination(config)
+        require_backup(backup_root)
     result = export_sources(
         config,
         selected=args.source,
@@ -104,6 +111,43 @@ def _handle_export(config: ArchiveConfig, args: argparse.Namespace) -> int:
             )
         )
     )
+    if backup_root is not None:
+        print("Independent backup: " + json.dumps(backup(config, backup_root), sort_keys=True))
+    return 0
+
+
+def _handle_backup(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .backup import backup, destination, initialize, restore, verify
+
+    value = args.destination or config.backup_dir
+    if value is None:
+        raise ValueError("Set [backup].directory or --destination.")
+    root = (value.expanduser().resolve() if args.backup_cmd in {"verify", "restore"}
+            else destination(config, value))
+    if args.backup_cmd == "init":
+        initialize(root, args.compression)
+        print(f"Initialized independent backup: {root}")
+    elif args.backup_cmd == "run":
+        print(json.dumps(backup(config, root, args.machine), indent=2))
+    elif args.backup_cmd == "verify":
+        report = verify(root)
+        print(json.dumps(report, indent=2))
+        return 0 if report["ok"] else 1
+    else:
+        print(f"Restored {restore(root, args.snapshot, args.output)} files; see restore-map.json.")
+    return 0
+
+
+def _handle_stats(config: ArchiveConfig, args: argparse.Namespace) -> int:
+    from .archive_stats import archive_statistics, render_statistics
+
+    value = args.destination or config.backup_dir
+    root = value.expanduser().resolve() if value else None
+    report = archive_statistics(config, root)
+    rendered = json.dumps(report, indent=2, sort_keys=True) + "\n" if args.json else render_statistics(report)
+    if args.output:
+        args.output.write_text(rendered, encoding="utf-8")
+    print(rendered, end="")
     return 0
 
 
@@ -427,6 +471,26 @@ def build_parser() -> argparse.ArgumentParser:
     p_status.add_argument("--json", action="store_true", help="Write machine-readable JSON.")
     p_status.set_defaults(func=_handle_status)
 
+    p_backup = sub.add_parser("backup", help="Preserve logs on independent storage, with retained versions.")
+    backup_sub = p_backup.add_subparsers(dest="backup_cmd", required=True)
+    for operation in ("init", "run", "verify", "restore"):
+        child = backup_sub.add_parser(operation)
+        child.add_argument("--destination", type=Path, help="Override [backup].directory.")
+        child.set_defaults(func=_handle_backup)
+        if operation == "init":
+            child.add_argument("--compression", choices=("gzip", "none"), default="gzip")
+        elif operation == "run":
+            child.add_argument("--machine", help="Machine label recorded in the private snapshot.")
+        elif operation == "restore":
+            child.add_argument("--snapshot", required=True, help="Filename from backup snapshots/.")
+            child.add_argument("--output", required=True, type=Path, help="New restore directory.")
+
+    p_stats = sub.add_parser("stats", help="Session, byte, distribution, and durable-backup metrics.")
+    p_stats.add_argument("--destination", type=Path, help="Include metrics for this independent backup.")
+    p_stats.add_argument("--json", action="store_true")
+    p_stats.add_argument("--output", type=Path, help="Write a local report; never uploads it.")
+    p_stats.set_defaults(func=_handle_stats)
+
     p_routine = sub.add_parser("routine", help="Discover installable local-export automation.")
     routine_sub = p_routine.add_subparsers(dest="routine_cmd", required=True)
     p_routine_status = routine_sub.add_parser("status", help="Inspect routine install and update state.")
@@ -734,5 +798,18 @@ def main(argv: list[str] | None = None) -> int:
         except ProvenanceError as exc:
             print(f"agent-archive provenance: {exc}", file=sys.stderr)
             return 2
-    config = load_config(args.repo_root.resolve(), args.config)
+    repo_root = args.repo_root.resolve()
+    standalone = args.cmd == "stats" or (args.cmd == "backup" and args.backup_cmd in {"init", "verify", "restore"})
+    if standalone and args.destination and not (
+        args.config or (repo_root / "sources.toml").exists() or (repo_root / "config/default_sources.toml").exists()
+    ):
+        config = ArchiveConfig(repo_root, repo_root / "archive", repo_root / "raw", ())
+    else:
+        config = load_config(repo_root, args.config)
+    if args.cmd in {"backup", "stats"} or (args.cmd == "export" and config.backup_on_export):
+        try:
+            return int(args.func(config, args))
+        except (OSError, ValueError, EOFError, zlib.error) as exc:
+            print(f"agent-archive {args.cmd}: {exc}", file=sys.stderr)
+            return 2
     return int(args.func(config, args))
