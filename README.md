@@ -42,6 +42,24 @@ DeepSeek, Grok, and VS Code agents (via the companion
 Run `agent-archive init` in your private workspace to create `sources.toml` from packaged defaults.
 Review the source paths before exporting; a source checkout is not required.
 
+## Independent backups and archive statistics
+
+Preserve session logs on a user-selected external directory, even after source
+cleanup or agent uninstall. Backups retain versions, deduplicate identical
+content, and use gzip compression by default (`--compression none` is also
+available). `backup verify` checks integrity; `backup restore` recovers into a
+new directory. Enable `[backup] on_export = true` to back up after exports.
+
+```sh
+agent-archive backup init --destination /mnt/backup-disk/session-archive
+agent-archive backup run --destination /mnt/backup-disk/session-archive
+agent-archive stats --destination /mnt/backup-disk/session-archive
+```
+
+See [durable backups and statistics](docs/DURABLE_BACKUPS.md) for configuration,
+SSH collection, recovery, compression options, metric definitions, and limits.
+Reports can be written as local Markdown or JSON; nothing is uploaded.
+
 ## Quick Start
 
 ```bash

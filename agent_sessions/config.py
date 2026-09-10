@@ -22,6 +22,9 @@ class ArchiveConfig:
     write_pdfs: bool = False
     track_artifacts: bool = False
     disabled_sources: tuple[Source, ...] = ()
+    backup_dir: Path | None = None
+    backup_machine: str | None = None
+    backup_on_export: bool = False
 
 
 def load_config(repo_root: Path, config_path: Path | None = None) -> ArchiveConfig:
@@ -41,11 +44,16 @@ def load_config(repo_root: Path, config_path: Path | None = None) -> ArchiveConf
     write_pdfs = bool(archive_settings.get("write_pdfs", False))
     track_artifacts = bool(archive_settings.get("track_artifacts", False))
     sources = tuple(load_source(item, templates) for item in data.get("sources", []) if item.get("enabled", True))
+    backup_settings = data.get("backup", {})
+    backup_directory = backup_settings.get("directory")
     return ArchiveConfig(
         repo_root=repo_root,
         archive_dir=archive_dir,
         raw_dir=raw_dir,
         sources=sources,
+        backup_dir=repo_path(repo_root, str(Path(backup_directory).expanduser())) if backup_directory else None,
+        backup_machine=backup_settings.get("machine"),
+        backup_on_export=bool(backup_settings.get("on_export", False)),
         write_pdfs=write_pdfs,
         track_artifacts=track_artifacts,
         disabled_sources=tuple(load_source(item, templates) for item in data.get("sources", [])
