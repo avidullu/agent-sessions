@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import gzip
+import hashlib
 import json
 import math
+import zlib
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
@@ -59,6 +62,9 @@ def backup_metrics(root: Path) -> dict[str, Any]:
     content_sizes: dict[str, int] = {}
     count = 0
     parsed_catalogs: set[str] = set()
+    parsed_raw: set[str] = set()
+    decoded_originals: set[str] = set()
+    unreadable_raw_gzip: set[str] = set()
     for _, snapshot in snapshots(root):
         count += 1
         for entry in snapshot["files"]:
@@ -72,6 +78,13 @@ def backup_metrics(root: Path) -> dict[str, Any]:
                 missing.add(key)
                 continue
             objects[key] = obj.stat().st_size
+            if entry["category"] == "raw" and entry["path"].endswith(".gz") and key not in parsed_raw:
+                parsed_raw.add(key)
+                try:
+                    with open_object(obj) as stored, gzip.GzipFile(fileobj=stored, mode="rb") as original:
+                        decoded_originals.add(hashlib.file_digest(original, "sha256").hexdigest())
+                except (OSError, EOFError, zlib.error):
+                    unreadable_raw_gzip.add(key)
             if (entry["category"] == "archive" and Path(entry["path"].replace("\\", "/")).name == "index.jsonl"
                     and key not in parsed_catalogs):
                 parsed_catalogs.add(key)
@@ -90,7 +103,8 @@ def backup_metrics(root: Path) -> dict[str, Any]:
     for row in rows:
         raw = str(row.get("raw") or "").replace("\\", "/").lstrip("/")
         markdown = str(row.get("markdown") or "").replace("\\", "/").lstrip("/")
-        has_raw = row.get("sha256") in objects or bool(raw and any(p.endswith("/" + raw) for p in paths))
+        has_raw = (row.get("sha256") in objects or row.get("sha256") in decoded_originals
+                   or bool(raw and any(p.endswith("/" + raw) for p in paths)))
         raw_covered += has_raw
         transcript_covered += has_raw or bool(markdown and any(p.endswith("/" + markdown) for p in paths))
     logical = sum(versions.values())
@@ -111,7 +125,9 @@ def backup_metrics(root: Path) -> dict[str, Any]:
         "catalog_records_with_raw_or_original": raw_covered,
         "catalog_records_with_raw_or_rendered_transcript": transcript_covered,
         "catalog_records_without_preserved_transcript": len(rows) - transcript_covered,
-        "integrity": "Existence/size inventory only; run backup verify for full SHA-256 verification.",
+        "decoded_raw_gzip_originals": len(decoded_originals),
+        "unreadable_raw_gzip_objects": len(unreadable_raw_gzip),
+        "integrity": "Inventory plus decoded raw-gzip hashes for coverage; run backup verify for full integrity.",
     }
 
 
@@ -183,5 +199,6 @@ def render_statistics(report: dict[str, Any]) -> str:
                       f"- Records with raw/original: {b['catalog_records_with_raw_or_original']:,}",
                       f"- Records with raw or rendered transcript: {b['catalog_records_with_raw_or_rendered_transcript']:,}",
                       f"- Records without preserved transcript: {b['catalog_records_without_preserved_transcript']:,}",
+                      f"- Raw gzip objects that could not be decoded: {b['unreadable_raw_gzip_objects']:,}",
                       "", b["integrity"]])
     return "\n".join(lines) + "\n"
