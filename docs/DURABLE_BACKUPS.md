@@ -150,6 +150,10 @@ Reports are local; no metrics or transcripts are uploaded. Output includes:
   and content digest (falling back to source/path/digest), and raw/rendered
   recovery coverage. All retained catalog versions contribute to this history.
 
-Statistics are an inventory, not a full integrity check; run `backup verify` for
+For legacy raw gzip copies, reports hash the decoded original bytes to match
+catalog entries even when their raw-file links are absent. This can require
+reading/decompressing old backups. Undecodable raw gzip files are counted.
+
+Statistics are not a full integrity check; run `backup verify` for
 that. A report can include private source labels and dates: review it before
 sharing publicly. The checked-in documentation and tests use synthetic data.

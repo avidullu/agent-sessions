@@ -121,3 +121,29 @@ def test_windows_catalog_in_portable_backup(tmp_path: Path) -> None:
     snapshot['files'][0]['path'] = 'E:\\example\\archive\\index.jsonl'
     path.write_text(json.dumps(snapshot))
     assert backup_metrics(root)['catalog_history']['catalog_records'] == 1
+
+
+@pytest.mark.parametrize('compression', ['gzip', 'none'])
+def test_legacy_raw_backup_coverage_uses_decoded_hash(tmp_path: Path, compression: str) -> None:
+    import gzip
+    import hashlib
+
+    repo = tmp_path / 'repo'
+    archive = repo / 'archive'
+    raw = repo / 'raw'
+    archive.mkdir(parents=True)
+    raw.mkdir()
+    original = b'legacy source log\n' * 100
+    (raw / 'old-copy.jsonl.gz').write_bytes(gzip.compress(original))
+    row = {'kind': 'codex', 'metadata': {'session_id': 'legacy'},
+           'sha256': hashlib.sha256(original).hexdigest(), 'raw': None, 'markdown': 'archive/missing.md'}
+    (archive / 'index.jsonl').write_text(json.dumps(row) + '\n')
+    config = ArchiveConfig(repo, archive, raw, ())
+    root = tmp_path / 'vault'
+    initialize(root, compression)
+    backup(config, root)
+    stats = backup_metrics(root)
+    assert stats['catalog_records_with_raw_or_original'] == 1
+    assert stats['catalog_records_without_preserved_transcript'] == 0
+    assert stats['decoded_raw_gzip_originals'] == 1
+    assert stats['unreadable_raw_gzip_objects'] == 0
