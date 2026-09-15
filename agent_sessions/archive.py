@@ -205,6 +205,7 @@ def export_sources(
                     "size": size,
                     "mtime": mtime,
                     "messages": len(session.messages),
+                    "exported_at": now_utc(),
                     "markdown": as_repo_relative(config, md_path),
                     "pdf": as_repo_relative(config, pdf_path) if pdf_path else None,
                     "raw": as_repo_relative(config, raw_path) if raw_path else None,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +19,7 @@ from .archive import (
     sha256_file,
     tail_sha256_file,
 )
+from .collection_health import collection_health
 from .config import ArchiveConfig
 from .portable_paths import portable_path
 from .sources.registry import get_extractor
@@ -45,6 +46,7 @@ class StatusSummary:
     source_counts: Counter[str]
     agent_counts: Counter[str]
     origin_counts: Counter[str]
+    collection: dict[str, Any] = field(default_factory=dict)
 
 
 def classify_source_origin(path: str) -> SourceOrigin:
@@ -75,7 +77,11 @@ def classify_source_origin(path: str) -> SourceOrigin:
 
 
 def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> StatusSummary:
-    indexed = read_existing_index_records(config)
+    try:
+        indexed = read_existing_index_records(config)
+    except OSError:
+        # Collection health reports this as unreadable, not an empty healthy archive.
+        indexed = []
     router_records = read_router_index_records(config)
     if router_records:
         # Merge router-produced records into the indexed view so status reflects
@@ -184,6 +190,7 @@ def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> 
         source_counts=source_counts,
         agent_counts=agent_counts,
         origin_counts=origin_counts,
+        collection=collection_health(config, indexed),
     )
 
 
@@ -198,6 +205,7 @@ def status_to_dict(summary: StatusSummary) -> dict[str, Any]:
         "source_counts": dict(summary.source_counts),
         "agent_counts": dict(summary.agent_counts),
         "origin_counts": dict(summary.origin_counts),
+        "collection": summary.collection,
     }
 
 
@@ -240,6 +248,23 @@ def render_status(summary: StatusSummary) -> str:
         lines.extend(["", "## Skipped Sources", ""])
         for source in summary.skipped_sources:
             lines.append(f"- `{source}`")
+
+    if summary.collection:
+        health = summary.collection
+        lines.extend([
+            "", "## Collection Health", "",
+            f"- Archive directory: `{health['archive_dir']}`",
+            f"- State: `{health['state']}`",
+            f"- Sessions / known messages: `{health['sessions']}` / `{health['messages']}`",
+            f"- Catalog counts complete: `{health['counts_complete']}` (false means partial or unavailable)",
+            f"- Sessions with unknown message count: `{health['sessions_with_unknown_message_count']}`",
+            f"- Local Markdown bytes: `{health['local_markdown_bytes']}`",
+            f"- Last successful export: `{health['last_successful_export'] or 'unknown (legacy or no exports)'}`",
+            "- Router watcher state: check VS Code's Collection Status (not observable by this CLI).",
+        ])
+        lines.extend(f"- Source `{name}`: `{state}`" for name, state in health["sources"].items())
+        lines.extend(f"- Attention: {problem}" for problem in health["problems"])
+        lines.append(f"- {health['hint']}")
 
     lines.append("")
     return "\n".join(lines)

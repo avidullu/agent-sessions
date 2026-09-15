@@ -21,6 +21,7 @@ class ArchiveConfig:
     sources: tuple[Source, ...]
     write_pdfs: bool = False
     track_artifacts: bool = False
+    disabled_sources: tuple[Source, ...] = ()
 
 
 def load_config(repo_root: Path, config_path: Path | None = None) -> ArchiveConfig:
@@ -42,6 +43,8 @@ def load_config(repo_root: Path, config_path: Path | None = None) -> ArchiveConf
         sources=sources,
         write_pdfs=write_pdfs,
         track_artifacts=track_artifacts,
+        disabled_sources=tuple(load_source(item, templates) for item in data.get("sources", [])
+                               if not item.get("enabled", True)),
     )
 
 
