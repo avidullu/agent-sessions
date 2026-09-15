@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.0] — Release candidate (not yet published)
+## [0.3.0] — 2026-09-15
 
 ### First-run setup
 - `agent-archive init` creates local configuration from a packaged template, prints

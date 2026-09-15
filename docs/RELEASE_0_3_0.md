@@ -1,6 +1,8 @@
 # 0.3.0 release readiness
 
-This PR prepares the package; it does not publish or authorize a release.
+Release preparation is separate from publication. The owner requested release
+on 2026-09-15; the final release-preparation PR still requires merge before
+tagging. A dated changelog is not proof that PyPI publication succeeded.
 
 Before the owner chooses to release:
 
@@ -15,6 +17,17 @@ Before the owner chooses to release:
 - Only after explicit owner release approval, tag the approved commit `v0.3.0` using
   the existing release workflow. Website and Marketplace publication are separate
   owner-approved actions, not consequences of opening these PRs.
+
+The tag-triggered build and PyPI publication run on GitHub only: the publisher
+uses GitHub OIDC, not a Forgejo job identity. Install all build tooling inside
+the private venv. Sync the exact reviewed main commit to GitHub before tagging;
+do not push unreviewed work or private archives. Confirm the tag does not already
+exist and require its commit to match the validated release head.
+
+After the release workflow succeeds, verify the `agent-session-hub` 0.3.0 PyPI
+metadata and install its wheel in a fresh private workspace. Exercise `--version`,
+`init`, and the synthetic router journey. Create GitHub release notes from that
+same tag only; distinguish GitHub source publication from PyPI availability.
 
 Validation failure or a fresh-install/router handoff regression blocks publication.
 If found after publication, keep local archives intact and ship a reviewed patch;

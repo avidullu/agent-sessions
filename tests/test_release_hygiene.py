@@ -37,6 +37,22 @@ def test_release_workflow_names_distribution_and_checks_tag() -> None:
     assert "parsed.is_devrelease or parsed.is_prerelease" in workflow
 
 
+def test_release_installs_only_after_private_venv() -> None:
+    workflow = (REPO_ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    assert workflow.index("uses: ./.github/actions/ci-python-venv") < workflow.index("python -m pip install")
+    assert workflow.count("uses: ./.github/actions/ci-python-venv") == 1
+
+
+def test_trusted_publication_runs_only_on_github() -> None:
+    workflow = (REPO_ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    build = workflow.split("  build:\n", 1)[1].split("  publish:\n", 1)[0]
+    publish = workflow.split("  publish:\n", 1)[1]
+    for job in (build, publish):
+        assert "    if: github.server_url == 'https://github.com'" in job
+    assert "environment: pypi" in publish
+    assert "id-token: write" in publish
+
+
 def test_dev_tag_is_rejected_even_when_it_matches_pyproject(tmp_path: Path) -> None:
     (tmp_path / "pyproject.toml").write_text('[project]\nversion = "0.3.0.dev0"\n', encoding="utf-8")
     completed = subprocess.run(
