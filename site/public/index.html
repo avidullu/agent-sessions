@@ -286,6 +286,12 @@ introducing a second index. Sketching the ownership rules first…</code></pre>
     <pre><code># Install the hub
 pip install agent-session-hub
 
+# Initialize a private workspace (hub 0.3.0+)
+mkdir my-agent-archive
+cd my-agent-archive
+agent-archive init
+# Set the router output directory to the path printed above.
+
 # See what's on this machine
 agent-archive discover --write docs/DISCOVERY.md
 
@@ -295,7 +301,9 @@ agent-archive export --all
 # Freshness and convergence signals
 agent-archive status</code></pre>
     <p>
-      Full setup — including the VS Code extension, PDF export, and daily
+      Initialization does not export or upload anything. Router auto-export is
+      opt-in. If using the older 0.2.0 package, follow the source-install option
+      until 0.3.0 is published. Full setup — including the VS Code extension, PDF export, and daily
       automation — is in
       <a href="https://github.com/avidullu/agent-sessions/blob/main/docs/GETTING_STARTED.md">GETTING_STARTED.md</a>.
     </p>

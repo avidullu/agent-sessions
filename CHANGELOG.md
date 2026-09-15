@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — Release candidate (not yet published)
+
+### First-run setup
+- `agent-archive init` creates local configuration from a packaged template, prints
+  the router output directory, and preserves existing configuration. No source clone,
+  export, or upload is required. Missing configuration now gives an actionable error.
+- Linux and Windows CI exercise an installed wheel from a fresh directory, including
+  router catalog ingestion and a synthetic user/assistant transcript.
+- README, website, and setup guide distinguish pip commands from source-only scripts.
+
 ### Added
 - **Session copilot commands** — prepare evidence-bound examples, build reviewed
   concept datasets, chat through the SFT Factory boundary, run golden evaluations,

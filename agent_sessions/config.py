@@ -25,8 +25,13 @@ class ArchiveConfig:
 
 def load_config(repo_root: Path, config_path: Path | None = None) -> ArchiveConfig:
     path = repo_path(repo_root, str(config_path)) if config_path is not None else repo_root / "sources.toml"
-    if not path.exists():
+    if config_path is None and not path.exists():
         path = repo_root / DEFAULT_CONFIG
+    if not path.exists():
+        raise SystemExit(
+            f"Configuration not found: {path}. Run agent-archive --repo-root \"{repo_root}\" init "
+            "or pass --config with an existing sources TOML file."
+        )
     data = read_toml(path)
     templates = PathTemplateContext.from_environment(repo_root)
     archive_settings = data.get("archive", {})

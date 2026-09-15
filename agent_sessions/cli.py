@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import sys
+import tomllib
 from pathlib import Path
 
 from . import __version__
@@ -389,6 +390,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     add_copilot_parser(sub)
 
+    p_init = sub.add_parser("init", help="Create local configuration and a private archive; no export or upload.")
+    p_init.add_argument("--archive-dir", type=Path, help="Router output directory (default: <repo-root>/archive).")
+
     p_discover = sub.add_parser("discover", help="Discover configured local stores.")
     p_discover.add_argument("--samples", type=int, default=10)
     p_discover.add_argument("--write", help="Write Markdown discovery report to this path.")
@@ -722,6 +726,23 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.cmd == "init":
+        from .onboarding import initialize_archive
+
+        if args.config:
+            parser.error("init creates sources.toml; do not pass --config")
+        try:
+            archive = initialize_archive(args.repo_root, args.archive_dir)
+        except OSError as exc:
+            print(f"Setup failed ({type(exc).__name__}). Check directory permissions; existing files are preserved.",
+                  file=sys.stderr)
+            return 2
+        print(f"Created configuration: {args.repo_root.expanduser().resolve() / 'sources.toml'}")
+        print(f"Set VS Code agentSessionRouter.outputDir to: {archive}")
+        print("Auto-export remains opt-in. Enable it in the router, or use Export All Sessions.")
+        print("Next: review sources.toml, then run agent-archive discover and agent-archive status from this workspace.")
+        print("No sessions exported or uploaded. Local files are ignored by Git; existing tracked files stay tracked.")
+        return 0
     if args.cmd == "copilot":
         return int(args.func(args))
     if args.cmd in {"provenance", "routine"}:
@@ -734,5 +755,10 @@ def main(argv: list[str] | None = None) -> int:
         except ProvenanceError as exc:
             print(f"agent-archive provenance: {exc}", file=sys.stderr)
             return 2
-    config = load_config(args.repo_root.resolve(), args.config)
+    try:
+        config = load_config(args.repo_root.expanduser().resolve(), args.config)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        print(f"Cannot read sources configuration ({type(exc).__name__}). Check --repo-root, --config and TOML syntax.",
+              file=sys.stderr)
+        return 2
     return int(args.func(config, args))

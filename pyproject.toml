@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-session-hub"
-version = "0.3.0.dev0"
+version = "0.3.0"
 description = "Local-first multi-agent coding session archive tooling — discover, export, and baseline your AI coding sessions"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -35,6 +35,9 @@ agent-archive = "agent_sessions.cli:main"
 
 [tool.setuptools]
 packages = ["agent_sessions", "agent_sessions.sources"]
+
+[tool.setuptools.package-data]
+agent_sessions = ["default_sources.toml"]
 
 [project.optional-dependencies]
 # Upper bounds are deliberate. These are gate tools, not libraries: a new major

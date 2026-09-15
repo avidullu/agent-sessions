@@ -5,7 +5,7 @@ A 5-minute guide to archiving your AI coding sessions.
 ## Prerequisites
 
 - **Python 3.11+** — check with `python3 --version`
-- **Git** — for cloning and versioning your archive
+- **Git** — optional, only for source installation or explicitly chosen private sync
 - One or more AI coding agents (Claude Code, Codex CLI, Gemini CLI, Grok, DeepSeek, or VS Code Copilot Chat via the router extension)
 
 > **Platform note:** This tool has been manually tested on **Windows, WSL, and Ubuntu**.
@@ -42,13 +42,34 @@ The extension auto-discovers VS Code agent sessions and exports them as Markdown
 
 ## 3. Configure sources
 
-Copy the example config and edit it for your machine:
+Create a private workspace, then initialize it (hub **0.3.0+**):
 
 ```bash
-cp sources.example.toml sources.toml
+mkdir my-agent-archive
+cd my-agent-archive
+agent-archive init
 ```
 
-Edit `sources.toml` to point at your agent session directories. See `sources.example.toml` for platform-specific examples (Windows, macOS, Linux, WSL).
+This uses a template shipped inside the package, preserves existing configuration,
+and does not collect or upload anything. Review `sources.toml` before exporting.
+The default CLI sources are Codex, Claude Code, and Grok; additional sources can be
+configured using the [source examples](../sources.example.toml).
+
+For the VS Code router, run **Agent Session Router: Set Output Directory** and
+select the exact archive directory printed by `init`. Then either explicitly
+enable **Auto-Export — Monitor for New Sessions** or run **Export All Sessions**.
+Auto-export is off by default. `agent-archive status` reads routed sessions
+directly from `.router-index.jsonl`; it does not need another export first.
+
+Already have router output? Use `agent-archive --repo-root /absolute/path/to init --archive-dir output`
+(quote paths containing spaces). The output folder must be a direct child of the
+workspace: router catalog paths are relative to that parent. Run subsequent hub commands from this workspace,
+or use `agent-archive --repo-root /path/to/workspace status` from anywhere.
+An existing source checkout can keep its configuration; `init` is not a migration.
+
+If `init` is unrecognized, check `agent-archive --version` and upgrade after 0.3.0
+is published. Version 0.2.0 requires the source-checkout setup, including copying
+`sources.example.toml`; it does not support this repo-free initialization.
 
 ## 4. Discover sessions
 
@@ -83,7 +104,11 @@ Shows archive freshness, new/changed files, and cross-machine convergence.
 
 ## 7. (Optional) Set up daily automation
 
-On one primary machine, install a **local-only** daily export (no git push):
+The scheduler installers below are **source-checkout tools**, not commands included
+by pip. Pip users can schedule `agent-archive --repo-root /path/to/workspace export --all`
+using their OS scheduler. Keep the workspace private; no automatic Git push is needed.
+
+From a source checkout on one primary machine, install a **local-only** daily export (no git push):
 
 ```bash
 # Linux / WSL / macOS
