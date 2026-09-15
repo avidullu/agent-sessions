@@ -18,6 +18,9 @@ permissions:
 
 jobs:
   build:
+    # PyPI trusts GitHub OIDC. Forgejo remains the review/CI source of truth;
+    # mirrored tags must not start a second publication attempt there.
+    if: github.server_url == 'https://github.com'
     runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'ci-heavy' }}
     steps:
       - uses: actions/checkout@v5
@@ -25,6 +28,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
+
+      - name: Create isolated Python environment
+        uses: ./.github/actions/ci-python-venv
 
       - name: Verify tag matches package version
         run: |
@@ -49,9 +55,6 @@ jobs:
               raise SystemExit(f"release tag {tag!r} does not match package version {version!r}; expected {expected!r}")
           PY
 
-      - name: Create isolated Python environment
-        uses: ./.github/actions/ci-python-venv
-
       - name: Build sdist and wheel
         run: |
           python -m pip install build twine
@@ -66,6 +69,7 @@ jobs:
           path: dist/
 
   publish:
+    if: github.server_url == 'https://github.com'
     needs: build
     runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'ci-light' }}
     environment: pypi
