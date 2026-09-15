@@ -120,10 +120,9 @@ ci_windows_setup='./scripts/ci-python-venv.ps1 -PythonVersion "${{ matrix.python
 ci_windows_install='& $env:CI_PYTHON -m pip install -e ".[dev]" -c constraints-dev.txt'
 ci_windows_pytest='& $env:CI_PYTHON -m pytest --cov=agent_sessions --cov-report=term-missing --cov-fail-under=92'
 
-# Linux setup-python must not write into a read-only /opt/hostedtoolcache on
-# self-hosted Forgejo runners. This step is CI-only (needs RUNNER_TEMP and
-# GITHUB_ENV); it is mirrored for drift detection and not executed here.
-ci_linux_toolcache='bash scripts/ci-writable-python-toolcache.sh'
+# Forgejo consumes the admitted runtime without network access. This CI-only
+# step is mirrored for drift detection; local gates use the supplied Python.
+ci_linux_toolcache='bash scripts/ci-admitted-python.sh'
 
 # The ci-gate assertion. Held as one string, not an array, because it carries
 # literal Actions `${{ }}` expressions that bash must not expand. This gate has
@@ -292,16 +291,33 @@ if [[ "$checkout_env_count" != "1" ]] ||
    ! grep -qE '^          CI_REPOSITORY_TOKEN:[[:space:]]*\$\{\{[[:space:]]*github\.token[[:space:]]*\}\}[[:space:]]*$' <<<"$windows_job_block"; then
   drift_fail "$workflow must contain exactly one step env block: the test-windows checkout's read-only repository token."
 fi
+# Exactly two complementary selector steps per Linux job are permitted. Assert
+# their adjacency and global count before filtering them from the gate guard;
+# the same condition on a test/install step or an entire job is still refused.
+printf -v forgejo_selector '%s\n' '      - name: Select admitted Python (Forgejo)' \
+  "        if: github.server_url != 'https://github.com'" '        run: bash scripts/ci-admitted-python.sh'
+printf -v github_selector '%s\n' 'uses: actions/setup-python@v6' \
+  "        if: github.server_url == 'https://github.com'" '        with:'
+for linux_job in test lint link-check pii-check; do
+  linux_block="$(job_block "$linux_job")"
+  [[ "$linux_block" == *"$forgejo_selector"* ]] ||
+    drift_fail "$linux_job lacks its exact Forgejo runtime selector."
+  [[ "$linux_block" == *"$github_selector"* ]] ||
+    drift_fail "$linux_job lacks its exact GitHub runtime selector."
+done
+selector_count="$(grep -cE '^        if: github.server_url (!=|==) '\''https://github.com'\''$' "$workflow" || true)"
+[[ "$selector_count" == 8 ]] || drift_fail "expected exactly eight runtime-selector conditions."
 neutering="$(
   grep -nE '^[[:space:]]*(-[[:space:]]*)?(if|continue-on-error|env):' "$workflow" |
     grep -vE 'if:[[:space:]]*\$\{\{[[:space:]]*always\(\)[[:space:]]*\}\}$' |
+    grep -vE '^[0-9]+:        if: github.server_url (!=|==) '\''https://github.com'\''$' |
     grep -vE '^[0-9]+:        env:[[:space:]]*$' || true
 )"
 if [[ -n "$neutering" ]]; then
   drift_fail "$workflow now uses if:/continue-on-error:/env:, which can disable or alter a gate without changing its 'run:' line." \
     "$(printf '%s' "$neutering" | sed 's/^/  /')" \
     "This guard compares run: lines; it cannot see a gate that CI no longer enforces." \
-    "Only 'if: \${{ always() }}' on ci-gate is permitted."
+    "Only ci-gate always() and the exact complementary runtime selectors are permitted."
 fi
 
 # The honest-gate invariant, asserted positively.

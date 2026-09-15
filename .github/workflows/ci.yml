@@ -30,11 +30,13 @@ jobs:
       - name: Check out
         uses: actions/checkout@v5
 
-      - name: Use a writable Python tool cache
-        run: bash scripts/ci-writable-python-toolcache.sh
+      - name: Select admitted Python (Forgejo)
+        if: github.server_url != 'https://github.com'
+        run: bash scripts/ci-admitted-python.sh
 
       - name: Set up Python
         uses: actions/setup-python@v6
+        if: github.server_url == 'https://github.com'
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -117,11 +119,13 @@ jobs:
       - name: Check out
         uses: actions/checkout@v5
 
-      - name: Use a writable Python tool cache
-        run: bash scripts/ci-writable-python-toolcache.sh
+      - name: Select admitted Python (Forgejo)
+        if: github.server_url != 'https://github.com'
+        run: bash scripts/ci-admitted-python.sh
 
       - name: Set up Python
         uses: actions/setup-python@v6
+        if: github.server_url == 'https://github.com'
         with:
           python-version: "3.13"
           cache: pip
@@ -150,9 +154,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
-      - name: Use a writable Python tool cache
-        run: bash scripts/ci-writable-python-toolcache.sh
+      - name: Select admitted Python (Forgejo)
+        if: github.server_url != 'https://github.com'
+        run: bash scripts/ci-admitted-python.sh
       - uses: actions/setup-python@v6
+        if: github.server_url == 'https://github.com'
         with:
           python-version: "3.13"
       - name: Check internal markdown links
@@ -168,9 +174,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
-      - name: Use a writable Python tool cache
-        run: bash scripts/ci-writable-python-toolcache.sh
+      - name: Select admitted Python (Forgejo)
+        if: github.server_url != 'https://github.com'
+        run: bash scripts/ci-admitted-python.sh
       - uses: actions/setup-python@v6
+        if: github.server_url == 'https://github.com'
         with:
           python-version: "3.13"
       - name: Scan tracked files for private paths and identifiers

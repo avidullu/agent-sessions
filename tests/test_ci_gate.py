@@ -165,7 +165,7 @@ def test_no_job_is_silently_forge_conditional() -> None:
     offenders = [
         line.strip()
         for line in body.splitlines()
-        if re.match(r"^\s*if:", line) and not re.search(r"\$\{\{\s*always\(\)\s*\}\}", line)
+        if re.match(r"^    if:", line) and not re.search(r"\$\{\{\s*always\(\)\s*\}\}", line)
     ]
     assert not offenders, f"unexpected job-level if: in ci.yml: {offenders}"
 
@@ -195,80 +195,48 @@ def test_windows_job_bootstraps_without_reusable_actions() -> None:
     assert windows.count("$env:CI_PYTHON -m") == 2
 
 
-def test_linux_setup_python_jobs_redirect_a_writable_toolcache() -> None:
-    """setup-python must not mkdir into a read-only /opt/hostedtoolcache.
-
-    Measured 2026-09-03 on ci-heavy/ci-light for PR #169: the action failed
-    with a read-only remount before any repo gate ran. Every Linux job that
-    still uses setup-python has to redirect the cache first.
-    """
+def test_linux_jobs_use_admitted_runtime_only_on_forgejo() -> None:
     body = WORKFLOW.read_text(encoding="utf-8")
-    linux_jobs = ("test", "lint", "link-check", "pii-check")
-    script = "bash scripts/ci-writable-python-toolcache.sh"
-    for job in linux_jobs:
+    for job in ("test", "lint", "link-check", "pii-check"):
         block = workflow_job_block(body, job)
-        assert script in block, f"{job} is missing the writable toolcache redirect"
-        setup_at = block.index("uses: actions/setup-python@v6")
-        redirect_at = block.index(script)
-        assert redirect_at < setup_at, f"{job} runs setup-python before the toolcache redirect"
-    assert body.count(script) == len(linux_jobs)
-    assert "uses: actions/setup-python@v6" not in workflow_job_block(body, "test-windows")
-    assert "uses: actions/setup-python@v6" not in workflow_job_block(body, "ci-gate")
+        assert "if: github.server_url != 'https://github.com'\n        run: bash scripts/ci-admitted-python.sh" in block
+        assert "uses: actions/setup-python@v6\n        if: github.server_url == 'https://github.com'" in block
+    assert "ci-writable-python-toolcache" not in body
+    assert "ci-admitted-python" not in workflow_job_block(body, "test-windows")
+    assert "ci-admitted-python" not in workflow_job_block(body, "ci-gate")
 
 
-def _toolcache_script_env(tmp_path: Path, *, runner_temp: Path | None) -> tuple[Path, dict[str, str]]:
-    env_file = tmp_path / "github.env"
+def test_admitted_bootstrap_has_no_download_or_policy_bypass() -> None:
+    script = (REPO_ROOT / "scripts/ci-admitted-python.sh").read_text()
+    assert "sha256sum -c SHA256SUMS" in script
+    assert "--root /opt/bheemci-deps/python-runtime-v1" in script
+    assert '--into "$RUNNER_TEMP/agent-hub-python"' in script
+    assert "PIP_REQUIRE_VIRTUALENV=true" in script
+    for forbidden in ("curl ", "wget ", "pip install", "RUNNER_TOOL_CACHE=", "PIP_REQUIRE_VIRTUALENV=0"):
+        assert forbidden not in script
+
+
+@requires_bash
+def test_admitted_python_requires_runner_temp(tmp_path: Path) -> None:
+    assert BASH is not None
     env = os.environ.copy()
-    if runner_temp is None:
-        env.pop("RUNNER_TEMP", None)
-    else:
-        env["RUNNER_TEMP"] = str(runner_temp)
-    env["GITHUB_ENV"] = str(env_file)
-    return env_file, env
-
-
-def _exported_env(env_file: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    for line in env_file.read_text(encoding="utf-8").splitlines():
-        key, _, value = line.partition("=")
-        values[key] = value
-    return values
-
-
-@requires_bash
-def test_writable_python_toolcache_script_exports_job_private_cache(tmp_path: Path) -> None:
-    assert BASH is not None
-    runner_temp = tmp_path / "runner-temp"
-    runner_temp.mkdir()
-    script = REPO_ROOT / "scripts" / "ci-writable-python-toolcache.sh"
-    env_file, env = _toolcache_script_env(tmp_path, runner_temp=runner_temp)
-    result = subprocess.run(
-        [BASH, str(script)],
-        check=True,
-        capture_output=True,
-        text=True,
-        env=env,
-    )
-    assert result.returncode == 0
-    cache = runner_temp / "hostedtoolcache"
-    assert cache.is_dir()
-    exported = _exported_env(env_file)
-    # bash joins with `/` even when RUNNER_TEMP uses Windows separators
-    assert Path(exported["AGENT_TOOLSDIRECTORY"]) == cache
-    assert Path(exported["RUNNER_TOOL_CACHE"]) == cache
-    assert exported["PIP_REQUIRE_VIRTUALENV"] == "0"
-
-
-@requires_bash
-def test_writable_python_toolcache_script_requires_runner_temp(tmp_path: Path) -> None:
-    assert BASH is not None
-    script = REPO_ROOT / "scripts" / "ci-writable-python-toolcache.sh"
-    _env_file, env = _toolcache_script_env(tmp_path, runner_temp=None)
-    result = subprocess.run(
-        [BASH, str(script)],
-        capture_output=True,
-        text=True,
-        env=env,
-    )
+    env.pop("RUNNER_TEMP", None)
+    env["GITHUB_ENV"] = str(tmp_path / "github.env")
+    env["GITHUB_PATH"] = str(tmp_path / "github.path")
+    result = subprocess.run([BASH, str(REPO_ROOT / "scripts/ci-admitted-python.sh")],
+                            capture_output=True, text=True, env=env)
     assert result.returncode != 0
     assert "RUNNER_TEMP is required" in result.stderr
+    assert not (tmp_path / "github.env").exists()
+    assert not (tmp_path / "github.path").exists()
+
+
+def test_vendored_python_consumer_checksums() -> None:
+    import hashlib
+
+    root = REPO_ROOT / "ci/python-runtime"
+    lines = (root / "SHA256SUMS").read_text().splitlines()
+    assert len(lines) == 3
+    for line in lines:
+        digest, name = line.split()
+        assert hashlib.sha256((root / name).read_bytes()).hexdigest() == digest
