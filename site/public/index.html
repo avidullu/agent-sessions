@@ -51,6 +51,9 @@
   .brand span { color: var(--accent); }
   nav.top a { margin-left: 20px; color: var(--muted); font-size: 15px; }
   nav.top a:hover { color: var(--accent); }
+  header.site > .wrap { width: 100%; gap: 12px; flex-wrap: wrap; }
+  nav.top { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+  nav.top a { margin-left: 0; }
   .hero { padding: 72px 0 48px; }
   .hero h1 {
     font-size: clamp(34px, 6vw, 52px);
@@ -147,6 +150,10 @@
       <a class="btn primary" href="https://github.com/avidullu/agent-sessions#quick-start">Get started</a>
       <a class="btn ghost" href="https://marketplace.visualstudio.com/items?itemName=avidullu.agent-session-router">VS Code extension</a>
     </div>
+    <p class="trust">
+      <a href="https://pypi.org/project/agent-session-hub/0.3.0/">Hub 0.3.0 is available on PyPI</a>
+      · <a href="https://github.com/avidullu/agent-sessions/releases/tag/v0.3.0">Release notes</a>
+    </p>
     <p class="agents">
       Works with Claude Code · Codex CLI · Gemini · Grok · DeepSeek ·
       GitHub Copilot Chat · Continue · Cline · Cody · Aider · Tabby
@@ -193,13 +200,13 @@
       <div class="card">
         <h3>Plain artifacts</h3>
         <p>Markdown transcripts plus a JSONL catalog. Everything is greppable,
-        diffable, and versionable — no database, no proprietary viewer.</p>
+        diffable, and versionable — no proprietary archive database or viewer.</p>
       </div>
       <div class="card">
         <h3>Deterministic extraction</h3>
         <p>Each agent gets a purpose-built extractor held to a frozen output
-        contract, so two machines produce byte-identical renders of the same
-        session.</p>
+        contract, with shared fixtures checking message content and portable
+        output across implementations.</p>
       </div>
       <div class="card">
         <h3>Privacy by design</h3>
@@ -227,7 +234,7 @@
   extracts messages                            extracts messages
   renders Markdown (contract v1)               renders Markdown + PDF (contract v1)
   writes .router-index.jsonl sidecar  ───────▶ merges sidecar → archive/index.jsonl
-  auto-watches for new sessions                baseline: suggest → promote → publish
+  optionally watches for new sessions          baseline: suggest → review → promote
 </pre></div>
     <p>
       The router covers agents that live inside VS Code storage; the hub covers
@@ -283,13 +290,15 @@ introducing a second index. Sketching the ownership rules first…</code></pre>
   <div class="wrap">
     <p class="kicker">Quick start</p>
     <h2>Five minutes to your first archive</h2>
-    <pre><code># Install the hub
-pip install agent-session-hub
+    <pre><code># Install or upgrade inside your Python environment
+python -m pip install --upgrade agent-session-hub
+agent-archive --version
 
 # Initialize a private workspace (hub 0.3.0+)
 mkdir my-agent-archive
 cd my-agent-archive
 agent-archive init
+# Review sources.toml before reading personal session stores.
 # Set the router output directory to the path printed above.
 
 # See what's on this machine
@@ -302,10 +311,17 @@ agent-archive export --all
 agent-archive status</code></pre>
     <p>
       Initialization does not export or upload anything. Router auto-export is
-      opt-in. If using the older 0.2.0 package, follow the source-install option
-      until 0.3.0 is published. Full setup — including the VS Code extension, PDF export, and daily
+      opt-in. Hub 0.3.0 supports this workflow without cloning the product repo.
+      Keep transcripts and catalogs in your private workspace, not the public
+      source repository. Full setup — including the VS Code extension, PDF export, and daily
       automation — is in
       <a href="https://github.com/avidullu/agent-sessions/blob/main/docs/GETTING_STARTED.md">GETTING_STARTED.md</a>.
+    </p>
+    <p>
+      <code>agent-archive status --json</code> reports archive location, session and
+      message counts, missing artifacts, source availability, and recorded export
+      times. Unknown times stay unknown. For actual VS Code watcher state, use
+      the router's Output panel; the hub cannot infer whether VS Code is watching.
     </p>
   </div>
 </section>
@@ -313,27 +329,28 @@ agent-archive status</code></pre>
 <section>
   <div class="wrap">
     <p class="kicker">Beyond archiving</p>
-    <h2>From transcripts to institutional memory</h2>
+    <h2>Carry useful lessons into your next session</h2>
     <p>
-      Once sessions are catalogued, the <strong>baseline pipeline</strong> mines
-      them. It proposes handoff summaries and guardrails from what actually
-      happened (<em>suggest</em>), lets you curate what deserves to persist
-      (<em>promote</em>), and publishes the result as tracked, reviewable
-      Markdown (<em>publish</em>).
+      Our north star is to help a developer carry useful, verifiable lessons
+      between coding sessions and agents, without losing ownership of their
+      history or instructions. Dependable capture comes first; a useful,
+      reviewed lesson comes next.
     </p>
     <p>
-      An experimental rules-extraction track goes further: it distills recurring
-      corrections and preferences into candidate standing rules for your agents.
-      An efficacy harness measures recall against real sessions, and
-      echo-contamination controls prevent agents from laundering their own
-      boilerplate into “your preferences.”
+      The <strong>baseline pipeline</strong> proposes candidates with evidence,
+      lets you record feedback, and promotes accepted guardrails into local
+      baseline files. Publishing a generated agent view is a local write—not
+      an upload, installed hook, or rewrite of your project's instructions.
     </p>
     <p>
-      Example of a promoted preference that survived the loop:
+      The owner-attested bridge into an external instruction or project-memory
+      store is <strong>not shipped</strong>. Neither archive volume nor a generated
+      suggestion proves that an agent learned something useful.
     </p>
-    <pre><code># Prefer linear invalidation paths in concurrent caches.
-# Reject secondary indexes unless the ownership model is proven first.
-# (Extracted from 3 sessions, calibrated 2026-07)</code></pre>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/avidullu/agent-sessions/blob/main/docs/BASELINE_USER_GUIDE.md">Review your first lesson</a>
+      <a class="btn ghost" href="https://github.com/avidullu/agent-sessions/blob/main/docs/PRODUCT_DIRECTION.md">Product direction &amp; code map</a>
+    </div>
   </div>
 </section>
 
