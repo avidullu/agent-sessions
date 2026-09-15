@@ -81,6 +81,23 @@ agent-archive status
 
 Shows archive freshness, new/changed files, and cross-machine convergence.
 
+The **Collection Health** section also reports the exact archive directory,
+session and known-message counts, local Markdown bytes, source states, missing
+local artifacts, and catalog problems. `agent-archive status --json` includes the
+same information under `collection` (schema version 1).
+
+Match the displayed directory to VS Code's `agentSessionRouter.outputDir`.
+`no_sessions` means no catalog records were found here, not proof that no source
+conversations exist. A missing router index can mean a different output directory
+or that no router export has run yet. Sources can be `disabled`, `roots_missing`,
+`available`, `inventory_only`, or `router_managed` (fed by the router sidecar).
+
+Last successful export is recorded only by versions that write `exported_at`;
+legacy records show **unknown**, never a guess from the source file's age. Missing
+local artifacts may belong to another machine; this is not automatically data loss.
+The CLI cannot observe a running VS Code watcher: use the router's **Collection
+Status** command for live watcher state and export errors. Router auto-export is opt-in.
+
 ## 7. (Optional) Set up daily automation
 
 On one primary machine, install a **local-only** daily export (no git push):

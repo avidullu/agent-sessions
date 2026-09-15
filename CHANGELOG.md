@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   contained private staging and manual exact-approval catalog ship-back.
 
 ### Fixed
+- **Collection health visibility** — `status` and `status --json` report the resolved
+  archive directory, sessions, known messages, local Markdown bytes, missing
+  artifacts, source enablement/root availability, and catalog read problems.
+  New exports record `exported_at`; unchanged exports retain their prior time.
+  Legacy times remain unknown. The CLI does not infer VS Code watcher state.
 - Untracked local catalogs cannot be staged by a default `git add -- archive/`; they stay private unless force-added.
 - Windows provenance stores now combine ACL hardening and verification in one
   PowerShell process, avoid redundant probes for newly created databases, and
