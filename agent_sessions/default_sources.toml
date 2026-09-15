@@ -1,0 +1,25 @@
+# Portable first-run defaults. Router records are read from archive_dir/.router-index.jsonl
+# automatically; no raw VS Code source paths are required here.
+[archive]
+archive_dir = "archive"
+raw_dir = "raw"
+write_pdfs = false
+track_artifacts = false
+
+[[sources]]
+name = "codex-local"
+kind = "codex"
+roots = ["{home}/.codex/sessions", "{home}/.codex/archived_sessions"]
+glob = "**/*.jsonl"
+
+[[sources]]
+name = "claude-local"
+kind = "claude"
+roots = ["{home}/.claude/projects"]
+glob = "**/*.jsonl"
+
+[[sources]]
+name = "grok-local"
+kind = "grok"
+roots = ["{home}/.grok/sessions"]
+glob = "**/chat_history.jsonl"

@@ -37,7 +37,8 @@ DeepSeek, Grok, and VS Code agents (via the companion
 | GitHub Copilot Chat | VS Code (all platforms) | [Router extension](https://marketplace.visualstudio.com/items?itemName=avidullu.agent-session-router) |
 | Continue, Cline, Cody, Aider, Tabby | VS Code (all platforms) | [Router extension](https://marketplace.visualstudio.com/items?itemName=avidullu.agent-session-router) |
 
-Configure sources in `sources.toml` (copy from `sources.example.toml`). Platform-specific examples included for Windows, macOS, Linux, and WSL.
+Run `agent-archive init` in your private workspace to create `sources.toml` from packaged defaults.
+Review the source paths before exporting; a source checkout is not required.
 
 ## Quick Start
 
@@ -47,6 +48,13 @@ pip install agent-session-hub
 
 # Confirm which installed release you are running
 agent-archive --version
+
+# Create a private workspace (init requires hub 0.3.0 or newer)
+mkdir my-agent-archive
+cd my-agent-archive
+agent-archive init
+# For VS Code: set agentSessionRouter.outputDir to the directory printed by init.
+# Auto-export is opt-in; otherwise use the router's Export All Sessions command.
 
 # Discover sessions
 agent-archive discover --write docs/DISCOVERY.md
@@ -350,9 +358,10 @@ See [plugins/pr-review-loop/README.md](plugins/pr-review-loop/README.md).
 
 ## Other Machines
 
-Clone this private repo on another machine, follow
-[docs/NEW_MACHINE_SETUP.md](docs/NEW_MACHINE_SETUP.md), commit the new `archive/`
-Markdown/PDF files, and push.
+Install the hub and initialize a separate local workspace on each machine.
+Session bodies and catalogs stay local by default. Only opt into catalog sync
+against your own private remote; do not push session data to the public product repo.
+See [docs/NEW_MACHINE_SETUP.md](docs/NEW_MACHINE_SETUP.md).
 The archive index is merge-aware, so records from other machines remain in the
 unified view when one machine exports only the local sources it can see.
 

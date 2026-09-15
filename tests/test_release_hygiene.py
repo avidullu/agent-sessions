@@ -25,7 +25,7 @@ def _tag_check_script() -> str:
 def test_package_and_project_versions_match() -> None:
     with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
         project_version = tomllib.load(handle)["project"]["version"]
-    assert __version__ == project_version == "0.3.0.dev0"
+    assert __version__ == project_version == "0.3.0"
 
 
 def test_release_workflow_names_distribution_and_checks_tag() -> None:
