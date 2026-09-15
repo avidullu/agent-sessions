@@ -18,6 +18,8 @@ DeepSeek, Grok, and VS Code agents (via the companion
 > **New here?** → [Getting Started](docs/GETTING_STARTED.md) (5-minute guide)  
 > **Agent-assisted setup?** → [Agent-Assisted Setup](#agent-assisted-setup) (give any capable agent a prompt; it sets up the archive on a new machine)  
 > **Questions?** → [FAQ](docs/FAQ.md)  
+> **What comes after export?** → [Review lessons](docs/BASELINE_USER_GUIDE.md)\
+> **Where is this going?** → [Product direction and code map](docs/PRODUCT_DIRECTION.md)\
 > **Want to contribute?** → [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Supported Agents
@@ -87,7 +89,7 @@ owner/session attestations. See
 
 See [Getting Started](docs/GETTING_STARTED.md) for full setup including the VS Code extension, PDF export, and daily automation.
 
-**Prefer to let an agent do the setup?** See [Agent-Assisted Setup](#agent-assisted-setup) — a carefully written prompt that lets Codex, Claude, Gemini, Grok, or another capable agent clone, install, discover, validate, and produce a first archive + structured setup report on a new machine.
+**Prefer to let an agent do the setup?** See [Agent-Assisted Setup](#agent-assisted-setup) — a prompt that lets a capable agent install the hub, initialize a private workspace, check collection, and help produce a first archive without cloning the product repo.
 
 Optional PDF output:
 
@@ -197,39 +199,30 @@ want to add:
 ```text
 Set up my private agent-sessions archive on this computer.
 
-1. Clone or open the repo:
-   https://github.com/avidullu/agent-sessions
-   Pull with `git pull --ff-only` before reading files.
-2. Install local tooling in a Python 3.11+ environment:
-   `python -m pip install -e ".[dev]"`
-3. Validate the repo and report results. Use POSIX-style paths in the prompt;
-   PowerShell users may substitute `.\tools\...` and `docs\DISCOVERY.md` if
-   they prefer:
-   - `python -m pytest --cov=agent_sessions --cov-report=term-missing`
-   - `python -m ruff check .`
-   - `python -m mypy agent_sessions tools`
-   - optional/informational: `python tools/agent_archive.py baseline eval --dry-run`
-4. Discover local agent stores:
-   - `python tools/agent_archive.py discover --write docs/DISCOVERY.md`
-   - `python tools/agent_archive.py status`
-   If defaults miss a local path, create or edit ignored `sources.toml`; do not
-   commit `sources.toml`.
-5. Ask me which sync mode I want before enabling it:
-   - manual: export only when I ask
-   - scheduled: daily Task Scheduler/cron export
-   - triggered: filesystem watcher with debounce
-   Ask separately whether to generate PDFs.
-6. If I approve the first sync, run:
-   `python tools/agent_archive.py export --all --pdf`
-   Then stage only `archive/` changes. Push directly only if I explicitly
-   approve this as a one-time archive sync; otherwise branch and open a PR.
-7. Finish with a short setup report: validation status, agents discovered,
-   total indexed sessions, new/changed files, origin environments, sync mode,
-   and 1-2 promoted guardrails from `baseline/global/` or optional
-   `baseline suggest --dry-run` output that show the value.
+1. Install `agent-session-hub` in an isolated Python environment and check
+   `agent-archive --version`. This setup needs 0.3.0 or newer. If that version
+   is not published yet, report that instead of silently switching to source.
+2. Choose a private workspace outside the product source repo. Run
+   `agent-archive init` there; preserve any existing configuration.
+3. Review sources.toml with me before reading or exporting personal sessions.
+   For VS Code, explain how to set agentSessionRouter.outputDir to the archive
+   directory printed by init. Auto-export is opt-in.
+4. After approval, run `agent-archive discover` and `agent-archive status`.
+   Explain missing roots, inventory-only sources and unknown freshness without
+   claiming that a watcher is active based on the hub's status alone.
+5. Ask before the first export, PDF generation, scheduling, or private catalog
+   sync. For an approved Markdown export use `agent-archive export --all`.
+   Do not add --pdf or --copy-raw unless separately requested.
+6. Check the resulting Markdown and collection health. Summarize the installed
+   version, sources, indexed sessions, new/changed files, archive location,
+   collection problems, and what remains manual.
+7. If I want to review lessons, follow docs/BASELINE_USER_GUIDE.md from the
+   published source. Start with a dry run; candidate suggestions are not my
+   approved instructions. Do not invent useful guardrails for an empty archive.
 
-Do not commit raw logs, `sources.toml`, unrelated files, or merge PRs without
-explicit approval scoped to that PR or project.
+Keep transcripts, catalogs and sources.toml local. Do not stage or push them to
+the public product repo. No scheduling, upload, instruction rewrite or PR merge
+without my explicit approval for that action.
 ```
 
 The final setup report should be plain enough to review at a glance:
@@ -269,7 +262,7 @@ computers. For a step-by-step manual checklist, see
 
 ## Adding Agents
 
-1. Add a source entry in `config/default_sources.toml` or local `sources.toml`.
+1. Add a source entry in packaged `agent_sessions/default_sources.toml` or local `sources.toml`.
 2. Add an extractor module under `agent_sessions/sources/`.
 3. Register it with `@register("<kind>")`.
 4. Run a dry export with `--source <kind> --limit 1 --dry-run`.
@@ -293,6 +286,10 @@ python .\tools\agent_archive.py baseline replay select --dry-run
 ```
 
 ## Engineering Baseline
+
+Start with the [baseline user guide](docs/BASELINE_USER_GUIDE.md) for an exact-run
+review, feedback, promotion and calibration walkthrough. These are local derived
+artifacts, not automatic writes into another agent's instructions or memory.
 
 Create or refresh the baseline scaffold:
 

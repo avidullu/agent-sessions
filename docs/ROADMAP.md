@@ -1,10 +1,27 @@
 # Roadmap
 
-> **Status:** `Active (reference)` · **Owner:** `avidullu` · **Last updated:** `2026-09-03`
+> **Status:** `Active (reference)` · **Owner:** `avidullu` · **Last updated:** `2026-09-15`
 > Future importers and features; intentionally local-first.
 
 This archive is local-first: importers should prefer session data stored on
 owned CPU/RAM and local disks, including Windows and WSL paths.
+
+Start with [Product direction and code map](PRODUCT_DIRECTION.md) for the north
+star and honest shipped-versus-planned boundaries. Priority is a dependable
+first archive, then a useful reviewed lesson—not importer count alone.
+
+## Delivery order
+
+1. **Now:** retain the installed hub/router onboarding and collection-health
+   checks; finish release readiness and the [baseline user journey](BASELINE_USER_GUIDE.md).
+2. **Next design discussion:** single-host, owner-attested handoff bridge (#149).
+   Agree on source binding and stale/concurrent-write refusal before coding
+   external-memory writes. Existing `baseline promote` is not that bridge.
+3. **Then:** bounded local collector slices from the design below; preserve
+   existing export identity and catalog contracts.
+4. **Later:** fleet SSH collection, hosted export inboxes and broader synthesis
+   after the local path is proven. Keep behavior-preserving refactors (#94/#95)
+   separate from new parsing or publication semantics.
 
 Search and live-memory features are intentionally delegated to the compose stack
 instead of rebuilt here; see [COMPOSE_STACK.md](COMPOSE_STACK.md). Curated

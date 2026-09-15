@@ -1,5 +1,26 @@
 # Docs Index
 
+## Start with the user journey
+
+- [Getting Started](GETTING_STARTED.md): install → private workspace → first archive.
+- [FAQ](FAQ.md): supported sources, privacy and troubleshooting.
+- [Baseline user guide](BASELINE_USER_GUIDE.md): review → feedback → local promotion.
+- [Automation](AUTOMATION.md) and [multiple machines](MULTI_MACHINE.md): opt-in operation.
+
+## Understand or change the product
+
+- [Product direction and code map](PRODUCT_DIRECTION.md): north star, shipped limits,
+  ownership and where a change belongs.
+- [Roadmap](ROADMAP.md): sequenced next slices and their detailed plans.
+- [Product boundary](XDSYNC_BOUNDARY.md): archive versus curated instructions/memory.
+- [Local CI](LOCAL_CI.md) and [output contract](OUTPUT_CONTRACT.md): contributor gates.
+- [0.3.0 release readiness](RELEASE_0_3_0.md): release-specific checks.
+
+## Detailed references and historical plans
+
+The launch tracker below is historical, not the current product scorecard.
+An in-progress design is not a claim that its runtime has shipped.
+
 | Doc | Purpose |
 | --- | --- |
 | [FOUNDATION_HARDENING_PLAN.md](FOUNDATION_HARDENING_PLAN.md) | **DONE (pending archive)** — gate strength, local/CI parity, privacy hygiene, and doc lifecycle; H0–H11 all merged (#81–#96). Was the gate on the rules project |
