@@ -42,6 +42,11 @@ machine = "workstation-linux"
 on_export = true
 ```
 
+`directory` supports the same path templates as source roots, including
+`{home}/session-archive`, environment variables such as `$SESSION_BACKUP_ROOT`,
+and `~`. Relative paths resolve from the repository root; overlap checks still
+require an independent destination. The value must be a nonempty string.
+
 With `on_export = true`, `export --all` checks that the backup is available
 before exporting, then creates a backup after a successful export. A backup
 failure makes the command fail; the local export may already have completed.
@@ -100,10 +105,18 @@ agent-archive backup restore --destination /mnt/backup-disk/session-archive \
 
 Use an actual filename from `snapshots/`. Verification checks every referenced
 object, decompresses gzip, checks its full SHA-256 and original size, and exits
-nonzero on corruption or missing data. Restore requires a **new** output
-directory; it never overwrites live agent stores. `restore-map.json` maps
-numbered restored files back to their original paths. If recovery fails, the
-partial output remains for inspection; retry into another new directory.
+nonzero on corruption or missing data. Invalid or unreadable manifests appear
+in its failure list; verification continues through the healthy snapshots.
+Restore reads only the selected manifest, so damage to another snapshot does
+not block recovery. A malformed selected manifest fails before creating output.
+
+Restore requires a **new** output directory; it never overwrites live agent
+stores. It continues past missing or corrupt objects and verifies the bytes
+actually copied. `restore-map.json` maps successful files to their original
+paths and records failed entries under `failures`, with `complete: false`.
+Incomplete file copies are removed. Partial recovery exits nonzero after
+attempting every entry; retain the recovered files and retry failed recovery
+into another new directory after repairing the backup.
 
 Recovery with an explicit destination works without the original checkout or
 source configuration. The format is also readable with standard JSON and gzip
@@ -153,6 +166,13 @@ Reports are local; no metrics or transcripts are uploaded. Output includes:
 For legacy raw gzip copies, reports hash the decoded original bytes to match
 catalog entries even when their raw-file links are absent. This can require
 reading/decompressing old backups. Undecodable raw gzip files are counted.
+
+Malformed historical JSONL lines are skipped while valid rows still contribute
+to the report. JSON output counts invalid catalog lines, unreadable catalog
+objects, and invalid snapshots, with snapshot diagnostics. Missing objects or
+parsing failures set `counts_complete: false`, also shown in Markdown. Counts
+then describe only readable data. If any snapshot is invalid, the unreferenced
+object count is unknown (`null` in JSON), since its references cannot be checked.
 
 Statistics are not a full integrity check; run `backup verify` for
 that. A report can include private source labels and dates: review it before

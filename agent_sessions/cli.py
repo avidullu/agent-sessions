@@ -6,7 +6,6 @@ import argparse
 import json
 import os
 import sys
-import tomllib
 import zlib
 from pathlib import Path
 
@@ -828,7 +827,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         try:
             config = load_config(repo_root, args.config)
-        except (OSError, tomllib.TOMLDecodeError) as exc:
+        except (OSError, ValueError) as exc:
             print(f"Cannot read sources configuration ({type(exc).__name__}). Check --repo-root, --config and TOML syntax.",
                   file=sys.stderr)
             return 2

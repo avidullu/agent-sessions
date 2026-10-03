@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
@@ -18,10 +19,12 @@ from agent_sessions.backup import (
     snapshots,
     store_file,
     verify,
+    writer_lock,
 )
 from agent_sessions.cli import main
 from agent_sessions.config import ArchiveConfig, load_config
 from agent_sessions.models import Source
+from agent_sessions.path_templates import PathTemplateContext
 
 
 @pytest.fixture
@@ -232,3 +235,133 @@ def test_backup_bad_config_uses_safe_onboarding_error(
     assert main(['--repo-root', str(configured.repo_root), 'backup', 'run']) == 2
     error = capsys.readouterr().err
     assert 'TOMLDecodeError' in error and 'private-value' not in error
+
+
+@pytest.mark.parametrize('damage', [
+    'utf8', 'json', 'scalar', 'files', 'entry', 'digest', 'bytes', 'negative', 'boolean', 'machine',
+])
+def test_damaged_snapshot_does_not_block_healthy_recovery(configured: ArchiveConfig, damage: str) -> None:
+    root = destination(configured)
+    initialize(root)
+    result = backup(configured, root)
+    _, manifest = next(snapshots(root))
+    damaged = root / 'snapshots/000-damaged.json'
+    if damage == 'utf8':
+        damaged.write_bytes(b'\xff')
+    elif damage == 'json':
+        damaged.write_text('{')
+    elif damage == 'scalar':
+        damaged.write_text('null')
+    else:
+        if damage == 'files':
+            manifest['files'] = None
+        elif damage == 'entry':
+            manifest['files'] = [None]
+        elif damage == 'digest':
+            del manifest['files'][0]['sha256']
+        elif damage == 'bytes':
+            del manifest['files'][0]['bytes']
+        elif damage == 'negative':
+            manifest['files'][0]['bytes'] = -1
+        elif damage == 'boolean':
+            manifest['files'][0]['bytes'] = True
+        else:
+            manifest['machine'] = []
+        damaged.write_text(json.dumps(manifest))
+    report = verify(root)
+    assert report == {'snapshots': 2, 'objects_checked': 1,
+                      'failures': ['Invalid snapshot: 000-damaged.json'], 'ok': False}
+    assert restore(root, result['snapshot'], root.parent / 'restored') == 1
+    with pytest.raises(ValueError, match='Invalid snapshot'):
+        restore(root, damaged.name, root.parent / 'invalid-output')
+    assert not (root.parent / 'invalid-output').exists()
+
+
+def test_unreadable_snapshot_is_reported(configured: ArchiveConfig) -> None:
+    root = destination(configured)
+    initialize(root)
+    result = backup(configured, root)
+    damaged = root / 'snapshots/unreadable.json'
+    damaged.write_text('{}')
+    read_text = Path.read_text
+
+    def read(path: Path, encoding: str | None = None) -> str:
+        if path == damaged:
+            raise PermissionError
+        return read_text(path, encoding=encoding)
+
+    with patch.object(Path, 'read_text', read):
+        assert verify(root)['failures'] == ['Invalid snapshot: unreadable.json']
+        assert restore(root, result['snapshot'], root.parent / 'restored') == 1
+
+
+@pytest.mark.parametrize('compression', ['gzip', 'none'])
+@pytest.mark.parametrize('damage', ['missing', 'corrupt'])
+def test_restore_continues_after_object_failure(
+    configured: ArchiveConfig, compression: str, damage: str, capsys: pytest.CaptureFixture[str],
+) -> None:
+    (configured.sources[0].roots[0] / 'z-last.jsonl').write_text('recover me\n')
+    root = destination(configured)
+    initialize(root, compression)
+    result = backup(configured, root)
+    _, manifest = next(snapshots(root))
+    first = manifest['files'][0]
+    expected = Path(manifest['files'][1]['path']).read_text()
+    obj = object_path(root, first['sha256'])
+    if damage == 'missing':
+        obj.unlink()
+    else:
+        obj.write_bytes(b'corrupt')
+    output = root.parent / 'partial-restore'
+    assert main(['--repo-root', str(configured.repo_root), 'backup', 'restore', '--destination', str(root),
+                 '--snapshot', result['snapshot'], '--output', str(output)]) == 2
+    assert '1 files restored, 1 failed' in capsys.readouterr().err
+    mapping = json.loads((output / 'restore-map.json').read_text())
+    assert mapping['complete'] is False
+    assert mapping['failures'][0]['sha256'] == first['sha256']
+    assert len(mapping['files']) == len(mapping['failures']) == 1
+    restored_file = output / mapping['files'][0]['restored_file']
+    assert restored_file.read_text() == expected
+    assert set(output.iterdir()) == {output / 'restore-map.json', restored_file}
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='Windows prevents unlinking an open lock')
+@pytest.mark.parametrize('replacement', [False, True])
+def test_writer_cleanup_preserves_replacement_lock(configured: ArchiveConfig, replacement: bool) -> None:
+    root = destination(configured)
+    initialize(root)
+    lock = root / '.write.lock'
+    with pytest.raises(RuntimeError, match='writer failed'), writer_lock(root):
+        assert 'pid=' in lock.read_text()
+        lock.unlink()
+        if replacement:
+            lock.write_text('successor lock')
+        raise RuntimeError('writer failed')
+    assert lock.exists() is replacement
+    if replacement:
+        assert lock.read_text() == 'successor lock'
+
+
+@pytest.mark.parametrize('template', ['{home}/vault', '$BACKUP_TEST_ROOT/vault', '../vault'])
+def test_backup_directory_expands_templates(
+    configured: ArchiveConfig, monkeypatch: pytest.MonkeyPatch, template: str,
+) -> None:
+    base = configured.repo_root.parent
+    monkeypatch.setenv('BACKUP_TEST_ROOT', str(base))
+    (configured.repo_root / 'sources.toml').write_text('[backup]\ndirectory = ' + json.dumps(template))
+    with patch.object(PathTemplateContext, 'from_environment', return_value=PathTemplateContext({'home': str(base)})):
+        assert destination(load_config(configured.repo_root)) == base / 'vault'
+
+
+@pytest.mark.parametrize('settings', [
+    'backup = 42', '[backup]\ndirectory = 42', '[backup]\ndirectory = false',
+    '[backup]\ndirectory = []', '[backup]\ndirectory = { private = "secret" }',
+    '[backup]\ndirectory = ""', '[backup]\ndirectory = "{private-value}/secret"',
+])
+def test_invalid_backup_config_is_safe_cli_error(
+    configured: ArchiveConfig, capsys: pytest.CaptureFixture[str], settings: str,
+) -> None:
+    (configured.repo_root / 'sources.toml').write_text(settings)
+    assert main(['--repo-root', str(configured.repo_root), 'backup', 'run']) == 2
+    error = capsys.readouterr().err
+    assert 'ValueError' in error and 'private' not in error and 'secret' not in error

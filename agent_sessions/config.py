@@ -45,13 +45,23 @@ def load_config(repo_root: Path, config_path: Path | None = None) -> ArchiveConf
     track_artifacts = bool(archive_settings.get("track_artifacts", False))
     sources = tuple(load_source(item, templates) for item in data.get("sources", []) if item.get("enabled", True))
     backup_settings = data.get("backup", {})
+    if not isinstance(backup_settings, dict):
+        raise ValueError("Backup settings must be a TOML table.")
     backup_directory = backup_settings.get("directory")
+    backup_dir = None
+    if backup_directory is not None:
+        if not isinstance(backup_directory, str) or not backup_directory.strip():
+            raise ValueError("Backup directory must be a nonempty path string.")
+        try:
+            backup_dir = repo_path(repo_root, str(templates.resolve(backup_directory)))
+        except (SystemExit, ValueError, AttributeError) as exc:
+            raise ValueError("Invalid backup directory template.") from exc
     return ArchiveConfig(
         repo_root=repo_root,
         archive_dir=archive_dir,
         raw_dir=raw_dir,
         sources=sources,
-        backup_dir=repo_path(repo_root, str(Path(backup_directory).expanduser())) if backup_directory else None,
+        backup_dir=backup_dir,
         backup_machine=backup_settings.get("machine"),
         backup_on_export=bool(backup_settings.get("on_export", False)),
         write_pdfs=write_pdfs,

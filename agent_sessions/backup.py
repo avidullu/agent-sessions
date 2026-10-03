@@ -130,12 +130,21 @@ def writer_lock(root: Path) -> Iterator[None]:
         fd = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError as exc:
         raise ValueError("Backup writer lock exists. Check for an active writer before removing a stale lock.") from exc
+    owned = os.fstat(fd)
     try:
         with os.fdopen(fd, "w") as stream:
             stream.write(f"{socket.gethostname()} pid={os.getpid()}\n")
-        yield
+            stream.flush()
+            yield
     finally:
-        lock.unlink()
+        # Close before unlinking for Windows, but never delete a replacement
+        # created while this writer still held its original descriptor.
+        try:
+            current = lock.lstat()
+            if (current.st_dev, current.st_ino) == (owned.st_dev, owned.st_ino):
+                lock.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def compression_mode(root: Path) -> str:
@@ -286,61 +295,106 @@ def backup(config: ArchiveConfig, root: Path, machine: str | None = None) -> dic
                 "unavailable_source_roots": manifest["unavailable_source_roots"]}
 
 
-def snapshots(root: Path) -> Iterator[tuple[Path, dict[str, Any]]]:
+def read_snapshot(root: Path, name: str) -> dict[str, Any]:
+    if not name or Path(name).name != name or "/" in name or "\\" in name:
+        raise ValueError("Use a snapshot filename, not a path.")
+    try:
+        data = json.loads(safe_path(root, f"snapshots/{name}").read_text(encoding="utf-8"))
+        if (not isinstance(data, dict) or data.get("format") != FORMAT
+                or not isinstance(data.get("machine"), str) or not data["machine"]
+                or not isinstance(data.get("files"), list)):
+            raise ValueError
+        for entry in data["files"]:
+            if (not isinstance(entry, dict)
+                    or not all(isinstance(entry.get(key), str) for key in ("path", "category", "source", "sha256"))
+                    or not re.fullmatch(r"[0-9a-f]{64}", entry["sha256"])
+                    or type(entry.get("bytes")) is not int or entry["bytes"] < 0):
+                raise ValueError
+        return data
+    except FileNotFoundError as exc:
+        raise ValueError(f"Snapshot not found: {name}") from exc
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"Invalid snapshot: {name}") from exc
+
+
+def snapshots(root: Path, *, failures: list[str] | None = None) -> Iterator[tuple[Path, dict[str, Any]]]:
     require_backup(root)
     for path in sorted(safe_path(root, "snapshots").glob("*.json")):
-        safe_path(root, f"snapshots/{path.name}")
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if data.get("format") != FORMAT or not isinstance(data.get("files"), list):
-            raise ValueError(f"Invalid snapshot: {path.name}")
+        try:
+            data = read_snapshot(root, path.name)
+        except ValueError as exc:
+            if failures is None:
+                raise
+            failures.append(str(exc))
+            continue
         yield path, data
 
 
 def verify(root: Path) -> dict[str, Any]:
     checked: dict[str, tuple[str, int] | None] = {}
     failures: set[str] = set()
+    snapshot_failures: list[str] = []
     count = 0
-    for _, snapshot in snapshots(root):
+    for _, snapshot in snapshots(root, failures=snapshot_failures):
         count += 1
         for entry in snapshot["files"]:
             digest = entry["sha256"]
-            path = object_path(root, digest)
             if digest not in checked:
                 try:
-                    checked[digest] = object_digest_size(path)
-                except (OSError, EOFError, zlib.error):
+                    checked[digest] = object_digest_size(object_path(root, digest))
+                except (OSError, ValueError, EOFError, zlib.error):
                     checked[digest] = None
             if checked[digest] != (digest, entry["bytes"]):
                 failures.add(digest)
-    return {"snapshots": count, "objects_checked": len(checked), "failures": sorted(failures),
+    failures.update(snapshot_failures)
+    return {"snapshots": count + len(snapshot_failures), "objects_checked": len(checked), "failures": sorted(failures),
             "ok": not failures}
+
+
+def _restore_object(source: Path, target: Path, digest: str, size: int) -> None:
+    """Validate the bytes actually copied; remove incomplete output on failure."""
+    copied = hashlib.sha256()
+    copied_size = 0
+    with target.open("xb") as output:
+        try:
+            with open_object(source) as stream:
+                while chunk := stream.read(1024 * 1024):
+                    output.write(chunk)
+                    copied.update(chunk)
+                    copied_size += len(chunk)
+            if (copied.hexdigest(), copied_size) != (digest, size):
+                raise ValueError("Corrupt backup object.")
+            output.flush()
+            os.fsync(output.fileno())
+        except (OSError, ValueError, EOFError, zlib.error):
+            output.close()
+            target.unlink(missing_ok=True)
+            raise
 
 
 def restore(root: Path, snapshot_name: str, output: Path) -> int:
     """Restore into a fresh directory, never to original live paths."""
-    import shutil
-
     require_backup(root)
-    if Path(snapshot_name).name != snapshot_name:
-        raise ValueError("Use a snapshot filename, not a path.")
-    matching = [s for p, s in snapshots(root) if p.name == snapshot_name]
-    if not matching:
-        raise ValueError("Snapshot not found.")
+    snapshot = read_snapshot(root, snapshot_name)
     if output.resolve().is_relative_to(root.resolve()):
         raise ValueError("Restore outside the backup directory.")
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     rows = []
-    for index, entry in enumerate(matching[0]["files"]):
-        source = object_path(root, entry["sha256"])
-        if object_digest_size(source) != (entry["sha256"], entry["bytes"]):
-            raise ValueError("Corrupt backup object; restore is incomplete.")
+    failures = []
+    for index, entry in enumerate(snapshot["files"]):
         # Numeric names prevent absolute/traversal paths from a foreign machine.
         suffix = Path(entry["path"].replace("\\", "/")).suffix
         if not re.fullmatch(r"\.[A-Za-z0-9]{1,12}", suffix):
             suffix = ""
         name = f"{index:08d}-{entry['sha256'][:12]}{suffix}"
-        with (output / name).open("xb") as target, open_object(source) as stream:
-            shutil.copyfileobj(stream, target)
+        try:
+            _restore_object(object_path(root, entry["sha256"]), output / name, entry["sha256"], entry["bytes"])
+        except (OSError, ValueError, EOFError, zlib.error) as exc:
+            failures.append({**entry, "error": type(exc).__name__})
+            continue
         rows.append({**entry, "restored_file": name})
-    _write_json(output / "restore-map.json", {"snapshot": snapshot_name, "files": rows})
+    _write_json(output / "restore-map.json", {"snapshot": snapshot_name, "files": rows,
+                                             "failures": failures, "complete": not failures})
+    if failures:
+        raise ValueError(f"Restore incomplete: {len(rows)} files restored, {len(failures)} failed; see restore-map.json.")
     return len(rows)

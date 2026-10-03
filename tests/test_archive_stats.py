@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from agent_sessions.archive_stats import archive_statistics, backup_metrics, catalog_metrics, render_statistics
-from agent_sessions.backup import backup, initialize, object_path, snapshots
+from agent_sessions.backup import backup, initialize, object_path, snapshots, verify
 from agent_sessions.cli import main
 from agent_sessions.config import ArchiveConfig
 from agent_sessions.models import Source
@@ -147,3 +147,52 @@ def test_legacy_raw_backup_coverage_uses_decoded_hash(tmp_path: Path, compressio
     assert stats['catalog_records_without_preserved_transcript'] == 0
     assert stats['decoded_raw_gzip_originals'] == 1
     assert stats['unreadable_raw_gzip_objects'] == 0
+
+
+@pytest.mark.parametrize('compression', ['gzip', 'none'])
+def test_stats_preserve_good_rows_around_invalid_history(tmp_path: Path, compression: str) -> None:
+    repo = tmp_path / 'repo'
+    archive = repo / 'archive'
+    archive.mkdir(parents=True)
+    catalog = archive / 'index.jsonl'
+    catalog.write_bytes(
+        b'{"kind":"codex","metadata":{"session_id":"before"}}\n'
+        b'\nnull\n[1,2]\n{"torn":\n\xff\n'
+        b'{"kind":"codex","sha256":[],"metadata":{"session_id":"after"}}\n'
+    )
+    config = ArchiveConfig(repo, archive, repo / 'raw', ())
+    root = tmp_path / 'vault'
+    initialize(root, compression)
+    backup(config, root)
+    backup(config, root)
+    assert verify(root)['ok'] is True  # Invalid historical content still has a valid object hash.
+    (root / 'snapshots/000-bad.json').write_text('[]')
+    catalog.unlink()
+    report = archive_statistics(config, root)
+    stats = report['backup']
+    assert stats['snapshots'] == 3 and stats['valid_snapshots'] == 2 and stats['invalid_snapshots'] == 1
+    assert stats['snapshot_failures'] == ['Invalid snapshot: 000-bad.json']
+    assert stats['catalog_history']['distinct_identified_sessions'] == 2
+    assert stats['invalid_catalog_lines'] == 4  # Unique catalog object, not multiplied by snapshots.
+    assert stats['unreadable_catalog_objects'] == 1
+    assert stats['counts_complete'] is False
+    assert stats['unreferenced_object_files'] is None
+    rendered = render_statistics(report)
+    assert 'Counts are incomplete' in rendered
+    assert 'unknown (invalid snapshots)' in rendered
+
+
+def test_unreadable_compressed_catalog_does_not_abort_stats(tmp_path: Path) -> None:
+    archive = tmp_path / 'repo/archive'
+    archive.mkdir(parents=True)
+    (archive / 'index.jsonl').write_text('{"kind":"codex"}\n')
+    config = ArchiveConfig(archive.parent, archive, archive.parent / 'raw', ())
+    root = tmp_path / 'vault'
+    initialize(root)
+    backup(config, root)
+    entry = next(snapshots(root))[1]['files'][0]
+    object_path(root, entry['sha256']).write_bytes(b'corrupt gzip')
+    stats = backup_metrics(root)
+    assert stats['unreadable_catalog_objects'] == 1
+    assert stats['counts_complete'] is False
+    assert stats['catalog_history']['catalog_records'] == 0

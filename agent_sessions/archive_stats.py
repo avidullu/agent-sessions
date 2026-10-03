@@ -53,6 +53,34 @@ def catalog_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _catalog_rows(obj: Path) -> tuple[list[dict[str, Any]], int, bool]:
+    """Keep usable historical rows, including those before a torn catalog tail."""
+    rows = []
+    invalid_lines = 0
+    unreadable = False
+    try:
+        with open_object(obj) as stream:
+            for line in stream:
+                if not line.strip():
+                    continue
+                try:
+                    row = json.loads(line.decode("utf-8"))
+                except UnicodeDecodeError:
+                    invalid_lines += 1
+                    unreadable = True
+                    continue
+                except ValueError:
+                    invalid_lines += 1
+                    continue
+                if isinstance(row, dict):
+                    rows.append(row)
+                else:
+                    invalid_lines += 1
+    except (OSError, EOFError, zlib.error):
+        unreadable = True
+    return rows, invalid_lines, unreadable
+
+
 def backup_metrics(root: Path) -> dict[str, Any]:
     objects: dict[str, int] = {}
     versions: dict[tuple[str, str, str], int] = {}
@@ -65,7 +93,10 @@ def backup_metrics(root: Path) -> dict[str, Any]:
     parsed_raw: set[str] = set()
     decoded_originals: set[str] = set()
     unreadable_raw_gzip: set[str] = set()
-    for _, snapshot in snapshots(root):
+    snapshot_failures: list[str] = []
+    invalid_catalog_lines = 0
+    unreadable_catalogs: set[str] = set()
+    for _, snapshot in snapshots(root, failures=snapshot_failures):
         count += 1
         for entry in snapshot["files"]:
             key = entry["sha256"]
@@ -88,10 +119,11 @@ def backup_metrics(root: Path) -> dict[str, Any]:
             if (entry["category"] == "archive" and Path(entry["path"].replace("\\", "/")).name == "index.jsonl"
                     and key not in parsed_catalogs):
                 parsed_catalogs.add(key)
-                with open_object(obj) as stream:
-                    lines = stream.read().decode("utf-8").splitlines()
-                for line in lines:
-                    row = json.loads(line)
+                catalog_rows, invalid_lines, unreadable = _catalog_rows(obj)
+                invalid_catalog_lines += invalid_lines
+                if unreadable:
+                    unreadable_catalogs.add(key)
+                for row in catalog_rows:
                     metadata = row.get("metadata") or {}
                     sid = metadata.get("session_id") if isinstance(metadata, dict) else None
                     identity = (canonical_agent(row), str(sid), str(row.get("sha256"))) if sid else (
@@ -103,7 +135,7 @@ def backup_metrics(root: Path) -> dict[str, Any]:
     for row in rows:
         raw = str(row.get("raw") or "").replace("\\", "/").lstrip("/")
         markdown = str(row.get("markdown") or "").replace("\\", "/").lstrip("/")
-        has_raw = (row.get("sha256") in objects or row.get("sha256") in decoded_originals
+        has_raw = (str(row.get("sha256")) in objects or str(row.get("sha256")) in decoded_originals
                    or bool(raw and any(p.endswith("/" + raw) for p in paths)))
         raw_covered += has_raw
         transcript_covered += has_raw or bool(markdown and any(p.endswith("/" + markdown) for p in paths))
@@ -113,11 +145,16 @@ def backup_metrics(root: Path) -> dict[str, Any]:
     available_content = sum(content_sizes[key] for key in objects)
     all_objects = [p for p in (root / "objects").rglob("*") if p.is_file() and not p.is_symlink()]
     return {
-        "snapshots": count, "distinct_file_paths": len({k[:2] for k in versions}),
+        "snapshots": count + len(snapshot_failures), "valid_snapshots": count,
+        "invalid_snapshots": len(snapshot_failures), "snapshot_failures": snapshot_failures,
+        "counts_complete": not (snapshot_failures or missing or invalid_catalog_lines
+                                or unreadable_catalogs or unreadable_raw_gzip),
+        "invalid_catalog_lines": invalid_catalog_lines, "unreadable_catalog_objects": len(unreadable_catalogs),
+        "distinct_file_paths": len({k[:2] for k in versions}),
         "file_versions": len(versions), "unique_objects": len(objects), "missing_objects": len(missing),
         "logical_file_version_bytes": logical, "stored_object_bytes": physical,
         "object_directory_bytes": sum(p.stat().st_size for p in all_objects),
-        "unreferenced_object_files": len(all_objects) - len(objects),
+        "unreferenced_object_files": None if snapshot_failures else len(all_objects) - len(objects),
         "unique_content_bytes": content, "compression": compression_mode(root),
         "deduplication_saved_fraction": 1 - content / logical if logical else 0.0,
         "compression_saved_fraction": 1 - physical / available_content if available_content else 0.0,
@@ -185,12 +222,17 @@ def render_statistics(report: dict[str, Any]) -> str:
             lines.append(f"| {safe} | {count:,} | {share:.1%} |")
     if "backup" in report:
         b = report["backup"]
+        unreferenced = b["unreferenced_object_files"]
         lines.extend(["", "## Independent backup", "",
+                      "Counts are incomplete; see failures below." if not b["counts_complete"]
+                      else "Counts cover all readable snapshot and catalog entries; integrity is not verified.", "",
                       f"- Snapshots: {b['snapshots']:,}; file versions: {b['file_versions']:,}",
+                      f"- Invalid/unreadable snapshots: {b['invalid_snapshots']:,}",
                       f"- Unique objects: {b['unique_objects']:,}; missing objects: {b['missing_objects']:,}",
                       f"- Referenced stored object bytes: {human_bytes(b['stored_object_bytes'])}",
                       f"- Object-directory bytes: {human_bytes(b['object_directory_bytes'])}",
-                      f"- Unreferenced object files (e.g. interrupted runs): {b['unreferenced_object_files']:,}",
+                      "- Unreferenced object files (e.g. interrupted runs): "
+                      + (f"{unreferenced:,}" if unreferenced is not None else "unknown (invalid snapshots)"),
                       f"- Logical file-version bytes: {human_bytes(b['logical_file_version_bytes'])}",
                       f"- Deduplication saving: {b['deduplication_saved_fraction']:.1%}",
                       f"- Compression ({b['compression']}) saving on unique content: {b['compression_saved_fraction']:.1%}",
@@ -200,5 +242,7 @@ def render_statistics(report: dict[str, Any]) -> str:
                       f"- Records with raw or rendered transcript: {b['catalog_records_with_raw_or_rendered_transcript']:,}",
                       f"- Records without preserved transcript: {b['catalog_records_without_preserved_transcript']:,}",
                       f"- Raw gzip objects that could not be decoded: {b['unreadable_raw_gzip_objects']:,}",
+                      f"- Invalid historical catalog lines: {b['invalid_catalog_lines']:,}",
+                      f"- Unreadable historical catalog objects: {b['unreadable_catalog_objects']:,}",
                       "", b["integrity"]])
     return "\n".join(lines) + "\n"
