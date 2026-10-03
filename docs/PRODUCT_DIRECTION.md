@@ -66,8 +66,10 @@ data, not product source.
 
 ## Next slices
 
-1. Keep onboarding, health and release integrity dependable. Document the
-   existing baseline journey so users can reach a reviewed lesson today.
+1. Execute [durable retention and bounded model research](DURABLE_SESSION_RESEARCH_PROJECT.md),
+   starting with independent backups and periodic recovery. Keep onboarding,
+   health and release integrity dependable, and use reviewed examples to test
+   model value against an untuned retrieval baseline before increasing investment.
 2. Specify and test the single-host attested handoff bridge (#149) before
    implementing external-memory writes. Agree on exact source binding,
    destination ownership, stale evidence and concurrent-edit behavior first.
