@@ -44,3 +44,20 @@ def test_installed_wheel_router_journey(tmp_path: Path) -> None:
     run("export", "--all")
     assert "Answer" in artifact.read_text(encoding="utf-8")
     assert json.loads(run("status", "--json").stdout)["indexed_records"] == 1
+
+    # A wheel-installed workspace can preserve its archive outside the checkout
+    # and recover it even after both the transcript and configuration disappear.
+    vault = tmp_path / "independent backup"
+    run("backup", "init", "--destination", str(vault))
+    snapshot = json.loads(run("backup", "run", "--destination", str(vault)).stdout)
+    assert snapshot["files"] >= 3
+    artifact.unlink()
+    (workspace / "sources.toml").unlink()
+    assert json.loads(run("backup", "verify", "--destination", str(vault)).stdout)["ok"]
+    output = tmp_path / "recovered"
+    run("backup", "restore", "--destination", str(vault),
+        "--snapshot", snapshot["snapshot"], "--output", str(output))
+    mapping = json.loads((output / "restore-map.json").read_text(encoding="utf-8"))
+    restored = next(row for row in mapping["files"] if Path(row["path"]).name == "example.md")
+    assert "Answer" in (output / restored["restored_file"]).read_text(encoding="utf-8")
+    assert json.loads(run("stats", "--destination", str(vault), "--json").stdout)["backup"]["snapshots"] == 1
