@@ -6,6 +6,8 @@
 - [FAQ](FAQ.md): supported sources, privacy and troubleshooting.
 - [Baseline user guide](BASELINE_USER_GUIDE.md): review → feedback → local promotion.
 - [Automation](AUTOMATION.md) and [multiple machines](MULTI_MACHINE.md): opt-in operation.
+- [Durable backups](DURABLE_BACKUPS.md): independent versioned storage, verification,
+  recovery, and private archive statistics.
 
 ## Understand or change the product
 

@@ -209,3 +209,26 @@ def test_initialization_cannot_change_compression(configured: ArchiveConfig) -> 
     initialize(root, 'none')
     with pytest.raises(ValueError, match='different compression'):
         initialize(root, 'gzip')
+
+
+def test_backup_config_preserves_disabled_sources(configured: ArchiveConfig) -> None:
+    config_file = configured.repo_root / 'sources.toml'
+    config_file.write_text(
+        '[backup]\ndirectory = ' + json.dumps(str(configured.backup_dir)) + '\non_export = true\n'
+        '[[sources]]\nname = "disabled-fixture"\nkind = "inventory"\nenabled = false\n'
+        'roots = [' + json.dumps(str(configured.sources[0].roots[0])) + ']\n', encoding='utf-8',
+    )
+    loaded = load_config(configured.repo_root)
+    assert loaded.sources == ()
+    assert loaded.disabled_sources[0].name == 'disabled-fixture'
+    initialize(destination(loaded))
+    assert backup(loaded, destination(loaded))['files'] == 0
+
+
+def test_backup_bad_config_uses_safe_onboarding_error(
+    configured: ArchiveConfig, capsys: pytest.CaptureFixture[str],
+) -> None:
+    (configured.repo_root / 'sources.toml').write_text('private-value = [invalid', encoding='utf-8')
+    assert main(['--repo-root', str(configured.repo_root), 'backup', 'run']) == 2
+    error = capsys.readouterr().err
+    assert 'TOMLDecodeError' in error and 'private-value' not in error
