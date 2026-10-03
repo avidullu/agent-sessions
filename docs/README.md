@@ -12,6 +12,8 @@
 - [Product direction and code map](PRODUCT_DIRECTION.md): north star, shipped limits,
   ownership and where a change belongs.
 - [Roadmap](ROADMAP.md): sequenced next slices and their detailed plans.
+- [Durable sessions and owned-model research](DURABLE_SESSION_RESEARCH_PROJECT.md):
+  periodic recovery, Bheem integration, and a bounded SFT/ONS investment experiment.
 - [Product boundary](XDSYNC_BOUNDARY.md): archive versus curated instructions/memory.
 - [Local CI](LOCAL_CI.md) and [output contract](OUTPUT_CONTRACT.md): contributor gates.
 - [0.3.0 release readiness](RELEASE_0_3_0.md): release-specific checks.

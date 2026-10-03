@@ -1,6 +1,6 @@
 # Roadmap
 
-> **Status:** `Active (reference)` · **Owner:** `avidullu` · **Last updated:** `2026-09-15`
+> **Status:** `Active (reference)` · **Owner:** `avidullu` · **Last updated:** `2026-10-03`
 > Future importers and features; intentionally local-first.
 
 This archive is local-first: importers should prefer session data stored on
@@ -12,12 +12,15 @@ first archive, then a useful reviewed lesson—not importer count alone.
 
 ## Delivery order
 
-1. **Now:** retain the installed hub/router onboarding and collection-health
-   checks; finish release readiness and the [baseline user journey](BASELINE_USER_GUIDE.md).
-2. **Next design discussion:** single-host, owner-attested handoff bridge (#149).
+1. **Now:** execute [durable sessions and owned-model research](DURABLE_SESSION_RESEARCH_PROJECT.md):
+   recover independent backups, prove periodic capture/replication through the
+   existing Bheem integration, and measure reviewed-data usefulness before training.
+   Preserve installed onboarding and collection-health checks throughout.
+2. **Separate design discussion:** single-host, owner-attested handoff bridge (#149).
    Agree on source binding and stale/concurrent-write refusal before coding
    external-memory writes. Existing `baseline promote` is not that bridge.
-3. **Then:** bounded local collector slices from the design below; preserve
+3. **Then:** broader local collector slices from the design below; reuse the
+   retention foundation and preserve
    existing export identity and catalog contracts.
 4. **Later:** fleet SSH collection, hosted export inboxes and broader synthesis
    after the local path is proven. Keep behavior-preserving refactors (#94/#95)
