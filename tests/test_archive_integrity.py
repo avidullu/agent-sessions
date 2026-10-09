@@ -430,3 +430,17 @@ def test_legal_metadata_only_has_distinct_reason(tmp_path: Path) -> None:
     row = read_existing_index_records(config)[0]
     assert not result.unsupported_files
     assert row["parse_status"] == "empty" and row["empty_reason"] == "metadata_only"
+
+
+def test_atomic_flush_failure_preserves_old_artifact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "index.jsonl"
+    target.write_text("prior bytes\n")
+
+    def refuse_flush(_descriptor: int) -> None:
+        raise OSError("synthetic flush failure")
+
+    monkeypatch.setattr("agent_sessions.archive_io.os.fsync", refuse_flush)
+    with pytest.raises(OSError, match="flush failure"):
+        write_text_if_changed(target, "prepared bytes\n")
+    assert target.read_text() == "prior bytes\n"
+    assert not list(tmp_path.glob(".pending-*"))

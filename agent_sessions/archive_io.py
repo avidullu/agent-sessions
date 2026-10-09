@@ -87,7 +87,8 @@ def pending_output(target: Path) -> Iterator[Path]:
     try:
         yield pending
         if pending.exists():
-            with pending.open("rb") as stream:
+            # Windows _commit requires a writable handle even after writers close.
+            with pending.open("rb+") as stream:
                 os.fsync(stream.fileno())
             os.replace(pending, target)
             if os.name != "nt":
