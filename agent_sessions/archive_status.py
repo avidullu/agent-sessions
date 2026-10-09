@@ -47,6 +47,7 @@ class StatusSummary:
     agent_counts: Counter[str]
     origin_counts: Counter[str]
     collection: dict[str, Any] = field(default_factory=dict)
+    content_check: str = "metadata_and_tail"
 
 
 def classify_source_origin(path: str) -> SourceOrigin:
@@ -76,7 +77,7 @@ def classify_source_origin(path: str) -> SourceOrigin:
     return SourceOrigin("unknown", path[:80] or "<empty>")
 
 
-def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> StatusSummary:
+def status_summary(config: ArchiveConfig, selected: list[str] | None = None, *, verify_content: bool = False) -> StatusSummary:
     try:
         indexed = read_existing_index_records(config)
     except OSError:
@@ -160,7 +161,7 @@ def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> 
                                 continue
             new_files += 1
             continue
-        if idx_record.get("size") == size and idx_record.get("mtime") == mtime:
+        if not verify_content and idx_record.get("size") == size and idx_record.get("mtime") == mtime:
             prior_tail = idx_record.get("tail_sha256")
             if not prior_tail or prior_tail == tail_sha256_file(path):
                 continue
@@ -191,12 +192,14 @@ def status_summary(config: ArchiveConfig, selected: list[str] | None = None) -> 
         agent_counts=agent_counts,
         origin_counts=origin_counts,
         collection=collection_health(config, indexed),
+        content_check="full_sha256" if verify_content else "metadata_and_tail",
     )
 
 
 def status_to_dict(summary: StatusSummary) -> dict[str, Any]:
     return {
         "indexed_records": summary.indexed_records,
+        "content_check": summary.content_check,
         "visible_files": summary.visible_files,
         "new_files": summary.new_files,
         "changed_files": summary.changed_files,
@@ -214,6 +217,7 @@ def render_status(summary: StatusSummary) -> str:
         "# Archive Status",
         "",
         f"- Indexed records: `{summary.indexed_records}`",
+        f"- Source content check: `{summary.content_check}`",
         f"- Visible configured files: `{summary.visible_files}`",
         f"- New visible files: `{summary.new_files}`",
         f"- Changed visible files: `{summary.changed_files}`",
@@ -270,8 +274,9 @@ def render_status(summary: StatusSummary) -> str:
     return "\n".join(lines)
 
 
-def archive_status(config: ArchiveConfig, selected: list[str] | None = None, as_json: bool = False) -> int:
-    summary = status_summary(config, selected=selected)
+def archive_status(config: ArchiveConfig, selected: list[str] | None = None, as_json: bool = False, *,
+                   verify_content: bool = False) -> int:
+    summary = status_summary(config, selected=selected, verify_content=verify_content)
     if as_json:
         print(json.dumps(status_to_dict(summary), indent=2, sort_keys=True))
     else:

@@ -54,6 +54,12 @@ def _export_summary_lines(
         lines.extend(f"- {source}" for source in result.skipped_sources)
         if any("(inventory)" in source for source in result.skipped_sources):
             lines.append("Inventory-only sources are expected until transcript files are available.")
+    if result.deferred_files or result.malformed_files:
+        lines.append(f"Partial export: {len(result.deferred_files)} deferred files; "
+                     f"{result.malformed_files} files contain malformed rows.")
+        lines.extend(f"- {reason}" for reason in result.deferred_files)
+    if result.empty_files:
+        lines.append(f"{result.empty_files} files contained no transcript messages (empty or metadata-only).")
     if result.pdf_missing:
         lines.append("PDF export requested but reportlab is not installed. Run: python -m pip install reportlab")
 
@@ -113,7 +119,7 @@ def _handle_export(config: ArchiveConfig, args: argparse.Namespace) -> int:
     )
     if backup_root is not None:
         print("Independent backup: " + json.dumps(backup(config, backup_root), sort_keys=True))
-    return 0
+    return 1 if result.deferred_files or result.malformed_files else 0
 
 
 def _handle_backup(config: ArchiveConfig, args: argparse.Namespace) -> int:
@@ -158,7 +164,7 @@ def _handle_pdf(config: ArchiveConfig, args: argparse.Namespace) -> int:
 
 
 def _handle_status(config: ArchiveConfig, args: argparse.Namespace) -> int:
-    return archive_status(config, selected=args.source, as_json=args.json)
+    return archive_status(config, selected=args.source, as_json=args.json, verify_content=args.verify)
 
 
 def _handle_prune(config: ArchiveConfig, args: argparse.Namespace) -> int:
@@ -472,6 +478,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_status = sub.add_parser("status", help="Show archive freshness and origin summary.")
     p_status.add_argument("--source", action="append", help="Source name or kind to check. Can be repeated.")
     p_status.add_argument("--json", action="store_true", help="Write machine-readable JSON.")
+    p_status.add_argument("--verify", action="store_true", help="Compare full source hashes instead of metadata/tail hints.")
     p_status.set_defaults(func=_handle_status)
 
     p_backup = sub.add_parser("backup", help="Preserve logs on independent storage, with retained versions.")
@@ -828,10 +835,9 @@ def main(argv: list[str] | None = None) -> int:
         try:
             config = load_config(repo_root, args.config)
         except (OSError, ValueError) as exc:
-            print(f"Cannot read sources configuration ({type(exc).__name__}). Check --repo-root, --config and TOML syntax.",
-                  file=sys.stderr)
+            print(f"Cannot read sources configuration ({type(exc).__name__}): {exc}", file=sys.stderr)
             return 2
-    if args.cmd in {"backup", "stats"} or (args.cmd == "export" and config.backup_on_export):
+    if args.cmd in {"backup", "stats", "export", "prune", "pdf", "status"}:
         try:
             return int(args.func(config, args))
         except (OSError, ValueError, EOFError, zlib.error) as exc:

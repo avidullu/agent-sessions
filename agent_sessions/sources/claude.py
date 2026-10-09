@@ -14,7 +14,8 @@ from .registry import register
 def extract(path: Path) -> ExtractedSession:
     metadata: dict[str, Any] = {"session_id": path.stem, "project": path.parent.name}
     messages: list[SessionMessage] = []
-    for obj in jsonl_objects(path):
+    diagnostics: dict[str, int] = {}
+    for obj in jsonl_objects(path, diagnostics=diagnostics):
         if obj.get("sessionId"):
             metadata["session_id"] = obj.get("sessionId")
         message = obj.get("message")
@@ -28,4 +29,4 @@ def extract(path: Path) -> ExtractedSession:
             messages.append(
                 SessionMessage(role="summary", text=text_from_content(obj.get("content")), timestamp=obj.get("timestamp", ""))
             )
-    return ExtractedSession(metadata=metadata, messages=messages)
+    return ExtractedSession(metadata=metadata, messages=messages, **diagnostics)

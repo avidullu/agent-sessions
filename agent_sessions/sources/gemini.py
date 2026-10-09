@@ -14,11 +14,12 @@ from .registry import register
 def extract(path: Path) -> ExtractedSession:
     metadata: dict[str, Any] = {"session_id": path.parents[2].name if len(path.parents) > 2 else path.stem}
     messages: list[SessionMessage] = []
-    for obj in jsonl_objects(path):
+    diagnostics: dict[str, int] = {}
+    for obj in jsonl_objects(path, diagnostics=diagnostics):
         content = text_from_content(obj.get("content"))
         if not content:
             continue
         role = obj.get("source") or obj.get("type") or "message"
         timestamp = obj.get("created_at") or obj.get("timestamp") or ""
         messages.append(SessionMessage(role=role, text=content, timestamp=timestamp))
-    return ExtractedSession(metadata=metadata, messages=messages)
+    return ExtractedSession(metadata=metadata, messages=messages, **diagnostics)

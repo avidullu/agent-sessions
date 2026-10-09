@@ -269,3 +269,30 @@ catalog row.
   its CI fails.
 
 Together these guarantee neither side can move without the other noticing.
+
+## 10. Hub format v2 extension (0.4 candidate)
+
+New hub-exported rows carry `format_version: 2`. Version 1 Router catalogs and
+historical hub artifacts remain readable; version 1 golden fixtures are unchanged.
+The Markdown transcript layout and short artifact names remain byte-compatible.
+This extension does not claim the Router emits version 2.
+
+For names whose normalized v1 stem exceeds 90 characters, the hub now reserves
+suffixes instead of truncating away the content digest:
+
+```text
+slugify(date + session_id + source_file_stem, 64)
+  + "-" + sha256(session_id + NUL + source_file_stem)[:12]
+  + "-" + source_sha256[:12]
+```
+
+The total is at most 90 characters. Full-hash metadata detects an existing
+filename conflict and preserves its bytes. Existing files are never bulk-renamed.
+Version 2 long-name goldens live at `tests/fixtures/contract/v2/long-naming.json`.
+
+New optional fields report parsing explicitly: `parse_status` is `complete`,
+`partial` (malformed source rows), or `empty` (no transcript messages);
+`malformed_rows` and `input_records` are nonnegative integers. Missing fields in
+old records remain unknown rather than being inferred from filesystem times.
+A valid metadata-only input is distinguished from malformed input; raw backup
+coverage is separate from readable conversation coverage.

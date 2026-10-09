@@ -1,0 +1,26 @@
+{
+  "format_version": 2,
+  "cases": [
+    {
+      "date": "20261010",
+      "session_id": "same-session",
+      "filename": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_stem": "20261010-same-session-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-93463a38242d-aaaaaaaaaaaa"
+    },
+    {
+      "date": "20261010",
+      "session_id": "same-session",
+      "filename": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxa",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expected_stem": "20261010-same-session-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-93463a38242d-bbbbbbbbbbbb"
+    },
+    {
+      "date": "20261010",
+      "session_id": "same-session",
+      "filename": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxb",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_stem": "20261010-same-session-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-172000ff7f43-aaaaaaaaaaaa"
+    }
+  ]
+}

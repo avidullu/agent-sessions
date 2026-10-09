@@ -27,3 +27,5 @@ class SessionMessage:
 class ExtractedSession:
     metadata: dict[str, Any]
     messages: list[SessionMessage]
+    malformed_rows: int = 0
+    input_records: int = 0
