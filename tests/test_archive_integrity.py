@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import json
 import os
+import stat
 import threading
 from pathlib import Path
 
@@ -443,4 +444,23 @@ def test_atomic_flush_failure_preserves_old_artifact(tmp_path: Path, monkeypatch
     with pytest.raises(OSError, match="flush failure"):
         write_text_if_changed(target, "prepared bytes\n")
     assert target.read_text() == "prior bytes\n"
+    assert not list(tmp_path.glob(".pending-*"))
+
+
+def test_atomic_publication_satisfies_writable_handle_flush(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "artifact.md"
+    target.write_text("prior")
+    original_fsync = os.fsync
+    file_flushes: list[int] = []
+
+    def require_writable_file(descriptor: int) -> None:
+        if stat.S_ISREG(os.fstat(descriptor).st_mode):
+            # Emulate Windows _commit: a read-only descriptor fails this check.
+            os.write(descriptor, b"")
+            file_flushes.append(descriptor)
+        original_fsync(descriptor)
+
+    monkeypatch.setattr("agent_sessions.archive_io.os.fsync", require_writable_file)
+    assert write_text_if_changed(target, "published")
+    assert file_flushes and target.read_text() == "published"
     assert not list(tmp_path.glob(".pending-*"))
