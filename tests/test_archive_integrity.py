@@ -348,7 +348,7 @@ def test_catalog_writers_preserve_corruption_and_refuse_before_artifacts(
 
 
 def test_cached_alias_does_not_overwrite_a_changed_primary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from agent_sessions.archive import index_record_keys, sha256_file
+    from agent_sessions.archive import index_record_key, index_record_keys, sha256_file
 
     config = configuration(tmp_path)
     a, b = tmp_path / "inputs/a.jsonl", tmp_path / "inputs/b.jsonl"
@@ -365,8 +365,8 @@ def test_cached_alias_does_not_overwrite_a_changed_primary(tmp_path: Path, monke
     rows = read_existing_index_records(config)
     assert len(rows) == 2
     by_key = {key: row for row in rows for key in index_record_keys(row)}
-    assert by_key[("first", str(a))]["sha256"] == sha256_file(a)
-    assert by_key[("first", str(b))]["sha256"] == sha256_file(b)
+    assert by_key[index_record_key({"source": "first", "source_file": str(a)})]["sha256"] == sha256_file(a)
+    assert by_key[index_record_key({"source": "first", "source_file": str(b)})]["sha256"] == sha256_file(b)
 
 
 def test_status_does_not_count_missing_alias_as_missing_session(tmp_path: Path) -> None:
@@ -499,8 +499,9 @@ def test_capture_refuses_change_within_open_descriptor(tmp_path: Path, monkeypat
     def changing_fstat(descriptor: int) -> os.stat_result:
         observed = original_fstat(descriptor)
         extras = {"st_mtime_ns": observed.st_mtime_ns, "st_ctime_ns": observed.st_ctime_ns + next(counter)}
-        if hasattr(observed, "st_birthtime_ns"):
-            extras["st_birthtime_ns"] = observed.st_birthtime_ns
+        birth_time = getattr(observed, "st_birthtime_ns", None)
+        if birth_time is not None:
+            extras["st_birthtime_ns"] = int(birth_time)
         return os.stat_result(tuple(observed), extras)
 
     monkeypatch.setattr("agent_sessions.archive_io.os.fstat", changing_fstat)
