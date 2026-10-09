@@ -23,7 +23,10 @@ class CapturedSource:
 
 
 def signature(stat: os.stat_result) -> tuple[int, int, int, int]:
-    return stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_ino
+    # On Windows path stat reports creation ctime while fstat reports change
+    # ctime. Birth time has consistent semantics across both APIs.
+    timestamp = getattr(stat, "st_birthtime_ns", 0) if os.name == "nt" else stat.st_ctime_ns
+    return stat.st_size, stat.st_mtime_ns, timestamp, stat.st_ino
 
 
 @contextmanager
@@ -45,7 +48,8 @@ def capture_source(path: Path, attempts: int = 3) -> Iterator[CapturedSource]:
                     size += len(chunk)
                 finished = os.fstat(source.fileno())
             after = path.stat()
-            if signature(before) == signature(opened) == signature(finished) == signature(after) and size == after.st_size:
+            if (signature(before) == signature(opened) == signature(finished) == signature(after)
+                    and opened.st_ctime_ns == finished.st_ctime_ns and size == after.st_size):
                 os.utime(staged, ns=(after.st_atime_ns, after.st_mtime_ns))
                 captured = CapturedSource(staged, digest.hexdigest(), after)
                 break

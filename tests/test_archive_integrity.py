@@ -158,9 +158,16 @@ def test_concurrent_writer_refuses_then_retry_preserves_both_rows(
 def test_writer_does_not_remove_replacement_lock(tmp_path: Path) -> None:
     with archive_writer(tmp_path):
         lock = tmp_path / ".archive-write.lock"
-        lock.rename(tmp_path / "old-lock")
-        lock.write_text("replacement")
-    assert lock.read_text() == "replacement"
+        if os.name == "nt":
+            with pytest.raises(PermissionError):
+                lock.rename(tmp_path / "old-lock")
+        else:
+            lock.rename(tmp_path / "old-lock")
+            lock.write_text("replacement")
+    if os.name == "nt":
+        assert not lock.exists()
+    else:
+        assert lock.read_text() == "replacement"
 
 
 def test_atomic_write_failure_preserves_previous_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -305,7 +312,11 @@ def test_export_reparses_legacy_cache_to_report_damage(tmp_path: Path) -> None:
 
 def test_writer_cleanup_tolerates_already_removed_lock(tmp_path: Path) -> None:
     with archive_writer(tmp_path):
-        (tmp_path / ".archive-write.lock").unlink()
+        if os.name == "nt":
+            with pytest.raises(PermissionError):
+                (tmp_path / ".archive-write.lock").unlink()
+        else:
+            (tmp_path / ".archive-write.lock").unlink()
     assert not (tmp_path / ".archive-write.lock").exists()
 
 
@@ -464,3 +475,35 @@ def test_atomic_publication_satisfies_writable_handle_flush(tmp_path: Path, monk
     assert write_text_if_changed(target, "published")
     assert file_flushes and target.read_text() == "published"
     assert not list(tmp_path.glob(".pending-*"))
+
+
+def test_capture_accepts_rewritten_stable_source(tmp_path: Path) -> None:
+    source = tmp_path / "session.jsonl"
+    session(source, "original")
+    for number in range(5):
+        session(source, f"rewritten {number}")
+        expected = source.read_bytes()
+        with capture_source(source) as captured:
+            assert captured.path.read_bytes() == expected
+            assert captured.digest == hashlib.sha256(expected).hexdigest()
+
+
+def test_capture_refuses_change_within_open_descriptor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from agent_sessions.archive_io import SourceChangingError
+
+    source = tmp_path / "session.jsonl"
+    session(source, "same")
+    original_fstat = os.fstat
+    counter = iter(range(20))
+
+    def changing_fstat(descriptor: int) -> os.stat_result:
+        observed = original_fstat(descriptor)
+        extras = {"st_mtime_ns": observed.st_mtime_ns, "st_ctime_ns": observed.st_ctime_ns + next(counter)}
+        if hasattr(observed, "st_birthtime_ns"):
+            extras["st_birthtime_ns"] = observed.st_birthtime_ns
+        return os.stat_result(tuple(observed), extras)
+
+    monkeypatch.setattr("agent_sessions.archive_io.os.fstat", changing_fstat)
+    with pytest.raises(SourceChangingError):
+        with capture_source(source):
+            pytest.fail("changed descriptor must not publish a snapshot")
