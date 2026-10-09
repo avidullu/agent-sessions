@@ -12,8 +12,8 @@ one artifact. The candidate is proposed for evaluation, not a stable release.
 
 | Work package | Findings | Acceptance | State |
 | --- | --- | --- | --- |
-| Catalog/configuration | B03, B06, B07, B08, B09 | Damage-preserving write refusal, schema-aware health, strict booleans, alias-safe merges and selector failures | In progress |
-| Export integrity | B01, B02, B04, B05, B10, B12 | Stable byte binding, serialized/atomic writes, collision-safe naming, explicit parse outcomes and read-only dry runs | In progress |
+| Catalog/configuration | B03, B06, B07, B08, B09 | Damage-preserving write refusal, schema-aware health, strict booleans, alias-safe merges and selector failures | Complete |
+| Export integrity | B01, B02, B04, B05, B10, B12 | Stable byte binding, serialized/atomic writes, collision-safe naming, explicit parse outcomes and read-only dry runs | Complete |
 | Candidate artifact | BB9 | Green local and exact-head Linux/Windows CI, fresh wheel journey and prerelease artifacts | In progress |
 
 ## Changed behavior
@@ -38,8 +38,11 @@ one artifact. The candidate is proposed for evaluation, not a stable release.
 - Long hub artifact names retain identity/content suffixes under the version 2
   extension. Existing short-name outputs, Router version 1 ingestion, and
   `agent-sessions-backup-v1` remain readable. No bulk archive migration occurs.
-- Parser damage and metadata-only inputs are explicit; partial exports return
+- Parser damage, unsupported schemas and metadata-only inputs are explicit; partial exports return
   nonzero. Quoted boolean settings fail instead of silently enabling behavior.
+  An all-unmatched selector fails before writes; mixed valid/invalid selectors
+  warn and export valid matches. Catalog aliases persist alternate source paths;
+  legacy missing counts/fingerprints remain readable and unknown counts stay unknown.
 
 ## Candidate validation and publication
 

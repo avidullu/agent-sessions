@@ -274,7 +274,7 @@ Together these guarantee neither side can move without the other noticing.
 
 New hub-exported rows carry `format_version: 2`. Version 1 Router catalogs and
 historical hub artifacts remain readable; version 1 golden fixtures are unchanged.
-The Markdown transcript layout and short artifact names remain byte-compatible.
+The Markdown transcript layout and unambiguous short artifact names remain byte-compatible.
 This extension does not claim the Router emits version 2.
 
 For names whose normalized v1 stem exceeds 90 characters, the hub now reserves
@@ -288,11 +288,27 @@ slugify(date + session_id + source_file_stem, 64)
 
 The total is at most 90 characters. Full-hash metadata detects an existing
 filename conflict and preserves its bytes. Existing files are never bulk-renamed.
+Short names whose distinct identities normalize to the same stem use the same
+identity suffix when a collision is observed. Existing Markdown without a bound
+full SHA-256 is preserved and export refuses to replace it. Raw-copy names retain
+their digest prefix while limiting their human suffix to the filesystem byte budget.
 Version 2 long-name goldens live at `tests/fixtures/contract/v2/long-naming.json`.
 
 New optional fields report parsing explicitly: `parse_status` is `complete`,
-`partial` (malformed source rows), or `empty` (no transcript messages);
-`malformed_rows` and `input_records` are nonnegative integers. Missing fields in
+`partial` (malformed or unsupported source rows), or `empty` (no transcript messages);
+`malformed_rows`, `unsupported_rows` and `input_records` are nonnegative integers.
+For zero-message inputs, `empty_reason` is `unsupported_schema`, `metadata_only`
+or `no_transcript`; message-bearing inputs use null. Missing fields in
 old records remain unknown rather than being inferred from filesystem times.
 A valid metadata-only input is distinguished from malformed input; raw backup
 coverage is separate from readable conversation coverage.
+
+Content-deduplicated rows may carry optional `source_aliases`: alternate
+`source`/`source_file` references with an optional string `source_origin`.
+Readers normalize alias home paths just like primary paths. Upserting one
+observed path never removes content still referenced by another alias.
+
+Writers validate core source/kind/source_file/markdown fields before changing
+catalogs; legacy optional counts/fingerprints remain readable. Read-only
+inspection preserves usable rows and labels counts incomplete when required
+schema/encoding/JSON data is damaged. Missing message counts render as unknown.

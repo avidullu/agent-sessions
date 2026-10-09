@@ -29,3 +29,5 @@ class ExtractedSession:
     messages: list[SessionMessage]
     malformed_rows: int = 0
     input_records: int = 0
+    unsupported_rows: int = 0
+    metadata_records: int = 0

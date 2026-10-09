@@ -306,3 +306,127 @@ def test_writer_cleanup_tolerates_already_removed_lock(tmp_path: Path) -> None:
     with archive_writer(tmp_path):
         (tmp_path / ".archive-write.lock").unlink()
     assert not (tmp_path / ".archive-write.lock").exists()
+
+
+@pytest.mark.parametrize("catalog_name", ["index.jsonl", ".router-index.jsonl"])
+@pytest.mark.parametrize("operation", ["export", "prune", "pdf"])
+def test_catalog_writers_preserve_corruption_and_refuse_before_artifacts(
+    tmp_path: Path, catalog_name: str, operation: str
+) -> None:
+    from dataclasses import replace
+
+    from agent_sessions.archive import pdf_existing, prune_index_records
+
+    config = replace(configuration(tmp_path), track_artifacts=True)
+    session(tmp_path / "inputs/s.jsonl", "hello")
+    export_sources(config)
+    catalog = config.archive_dir / catalog_name
+    previous = catalog.read_bytes() if catalog.exists() else b""
+    damaged = previous + b"{truncated\n"
+    catalog.write_bytes(damaged)
+    before = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    with pytest.raises(ValueError, match="Original bytes are preserved"):
+        if operation == "export":
+            export_sources(config)
+        elif operation == "prune":
+            prune_index_records(config)
+        else:
+            pdf_existing(config)
+    assert {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
+
+
+def test_cached_alias_does_not_overwrite_a_changed_primary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from agent_sessions.archive import index_record_keys, sha256_file
+
+    config = configuration(tmp_path)
+    a, b = tmp_path / "inputs/a.jsonl", tmp_path / "inputs/b.jsonl"
+    session(a, "old")
+    b.write_bytes(a.read_bytes())
+    stat = a.stat()
+    os.utime(b, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    export_sources(config)
+    initial = read_existing_index_records(config)
+    assert len(initial) == 1 and len(index_record_keys(initial[0])) == 2
+    session(b, "new")
+    monkeypatch.setattr("agent_sessions.archive.iter_source_files", lambda _source: iter([b, a]))
+    export_sources(config)
+    rows = read_existing_index_records(config)
+    assert len(rows) == 2
+    by_key = {key: row for row in rows for key in index_record_keys(row)}
+    assert by_key[("first", str(a))]["sha256"] == sha256_file(a)
+    assert by_key[("first", str(b))]["sha256"] == sha256_file(b)
+
+
+def test_status_does_not_count_missing_alias_as_missing_session(tmp_path: Path) -> None:
+    from agent_sessions.archive_status import status_summary
+
+    config = configuration(tmp_path)
+    a, b = tmp_path / "inputs/a.jsonl", tmp_path / "inputs/b.jsonl"
+    session(a, "hello")
+    b.write_bytes(a.read_bytes())
+    export_sources(config)
+    b.unlink()
+    report = status_summary(config)
+    assert report.indexed_records == 1 and report.visible_files == 1
+    assert report.not_visible_records == 0 and report.new_files == 0
+
+
+def test_unbound_existing_artifact_is_preserved(tmp_path: Path) -> None:
+    config = configuration(tmp_path)
+    session(tmp_path / "inputs/s.jsonl", "hello")
+    export_sources(config)
+    row = read_existing_index_records(config)[0]
+    target = tmp_path / row["markdown"]
+    (config.archive_dir / "index.jsonl").unlink()
+    target.write_text("synthetic owner notes\n")
+    with pytest.raises(ValueError, match="no valid source binding"):
+        export_sources(config)
+    assert target.read_text() == "synthetic owner notes\n"
+
+
+def test_sanitized_short_names_preserve_distinct_session_identities(tmp_path: Path) -> None:
+    config = configuration(tmp_path)
+    content = '{"type":"response_item","payload":{"role":"user","content":"hello"}}\n'
+    for name in ("a b.jsonl", "a-b.jsonl"):
+        (tmp_path / "inputs" / name).write_text(content)
+    result = export_sources(config)
+    rows = read_existing_index_records(config)
+    assert result.exported == 2 and len(rows) == 2
+    assert len({row["markdown"] for row in rows}) == 2
+    for row in rows:
+        assert f"# first / {row['metadata']['session_id']}\n" in (tmp_path / row["markdown"]).read_text()
+    assert export_sources(config).exported == 2
+
+
+def test_raw_copy_accepts_long_legal_input_name(tmp_path: Path) -> None:
+    config = configuration(tmp_path)
+    source = tmp_path / "inputs" / ("x" * 235 + ".jsonl")
+    session(source, "hello")
+    result = export_sources(config, copy_raw_files=True)
+    row = read_existing_index_records(config)[0]
+    assert result.exported == 1 and not result.deferred_files
+    target = tmp_path / row["raw"]
+    assert len(target.name.encode()) <= 255
+    assert gzip.decompress(target.read_bytes()) == source.read_bytes()
+
+
+@pytest.mark.parametrize("kind", ["codex", "claude", "grok", "gemini_antigravity"])
+def test_unsupported_provider_shape_has_distinct_reason(tmp_path: Path, kind: str) -> None:
+    from dataclasses import replace
+
+    config = configuration(tmp_path)
+    config = replace(config, sources=(replace(config.sources[0], kind=kind),))
+    (tmp_path / "inputs/s.jsonl").write_text('{"unexpected_schema":true}\n')
+    result = export_sources(config)
+    row = read_existing_index_records(config)[0]
+    assert result.unsupported_files == 1 and result.malformed_files == 0
+    assert row["parse_status"] == "partial" and row["empty_reason"] == "unsupported_schema"
+
+
+def test_legal_metadata_only_has_distinct_reason(tmp_path: Path) -> None:
+    config = configuration(tmp_path)
+    (tmp_path / "inputs/s.jsonl").write_text('{"type":"session_meta","payload":{"id":"empty"}}\n')
+    result = export_sources(config)
+    row = read_existing_index_records(config)[0]
+    assert not result.unsupported_files
+    assert row["parse_status"] == "empty" and row["empty_reason"] == "metadata_only"

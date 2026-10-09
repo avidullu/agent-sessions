@@ -38,6 +38,7 @@ class ExportResult:
     deferred_files: tuple[str, ...] = ()
     malformed_files: int = 0
     empty_files: int = 0
+    unsupported_files: int = 0
 
 
 def iter_source_files(source: Source) -> Iterable[Path]:
@@ -75,7 +76,9 @@ def tail_sha256_file(path: Path, max_bytes: int = TAIL_HASH_BYTES) -> str:
 
 
 def copy_raw(config: ArchiveConfig, path: Path, source: Source, digest: str) -> Path:
-    raw_target = config.raw_dir / source.name / f"{digest[:16]}-{path.name}.gz"
+    # Leave room for the digest prefix and gzip suffix under filesystem name limits.
+    raw_name = path.name.encode()[:235].decode("utf-8", errors="ignore")
+    raw_target = config.raw_dir / source.name / f"{digest[:16]}-{raw_name}.gz"
     raw_target.parent.mkdir(parents=True, exist_ok=True)
     with pending_output(raw_target) as pending, path.open("rb") as src, gzip.open(pending, "wb") as dst:
         shutil.copyfileobj(src, dst)
@@ -141,7 +144,9 @@ def export_sources(
     select_sources(config, selected)
     if dry_run:
         return _export_sources(config, selected, limit, write_pdfs, copy_raw_files, dry_run)
+    validate_archive_catalog(config)
     with archive_writer(config.archive_dir):
+        validate_archive_catalog(config)
         return _export_sources(config, selected, limit, write_pdfs, copy_raw_files, dry_run)
 
 
@@ -155,12 +160,12 @@ def _export_sources(
 ) -> ExportResult:
     sources = select_sources(config, selected)
     existing_records = read_existing_index_records(config)
-    prior_by_key = {index_record_key(record): record for record in existing_records}
+    prior_by_key = {key: record for record in existing_records for key in index_record_keys(record)}
     records: list[dict[str, Any]] = []
     pdf_missing = False
     skipped_sources: list[str] = []
     deferred: list[str] = []
-    malformed_files = empty_files = exported = 0
+    malformed_files = empty_files = unsupported_files = exported = 0
 
     for source in sources:
         extractor = get_extractor(source.kind)
@@ -183,8 +188,13 @@ def _export_sources(
                     if (prior is not None and prior.get("format_version") == 2 and prior.get("sha256") == digest
                             and _can_reuse_record(config, prior, size, mtime, write_pdfs,
                                                   copy_raw_files, tail_digest)):
-                        records.append(prior)
-                        malformed_files += int(prior.get("parse_status") == "partial")
+                        reused = dict(prior)
+                        reused.update(source=source.name, source_file=portable_path(str(path)),
+                                      source_origin=portable_origin(str(path)))
+                        reused.pop("source_aliases", None)
+                        records.append(reused)
+                        malformed_files += int(prior.get("malformed_rows", 0) > 0)
+                        unsupported_files += int(prior.get("unsupported_rows", 0) > 0)
                         empty_files += int(prior.get("parse_status") == "empty")
                         exported += 1
                         continue
@@ -193,11 +203,22 @@ def _export_sources(
                     changed = dt.datetime.fromtimestamp(mtime, dt.UTC).strftime("%Y%m%d")
                     stem = artifact_stem(changed, session_id, path.stem, digest)
                     md_path = config.archive_dir / source.name / f"{stem}.md"
-                    if md_path.exists():
+                    expected_title = f"# {source.name} / {session_id}"
+                    for naming_attempt in range(2):
+                        if not md_path.exists():
+                            break
                         previous = md_path.read_text(encoding="utf-8", errors="replace")
-                        previous_digest = re.search(r"^- SHA-256: `([^`]+)`$", previous, re.MULTILINE)
-                        if previous_digest and previous_digest.group(1) != digest:
+                        previous_digest = re.search(r"^- SHA-256: `([0-9a-f]{64})`$", previous, re.MULTILINE)
+                        if previous_digest is None:
+                            raise ValueError("Existing artifact has no valid source binding; its content was preserved.")
+                        if previous_digest.group(1) != digest:
                             raise ValueError("Artifact filename conflict; existing content was preserved.")
+                        if previous.splitlines()[0] == expected_title:
+                            break
+                        if naming_attempt:
+                            raise ValueError("Artifact identity conflict; existing content was preserved.")
+                        stem = artifact_stem(changed, session_id, path.stem, digest, force_identity=True)
+                        md_path = config.archive_dir / source.name / f"{stem}.md"
                     markdown = markdown_for_session(
                         source, path, session, digest, imported_at=existing_imported_at(md_path),
                         source_modified=dt.datetime.fromtimestamp(mtime, dt.UTC).isoformat(timespec="seconds"),
@@ -218,6 +239,7 @@ def _export_sources(
                     if copy_raw_files and not dry_run:
                         raw_path = copy_raw(config, captured.path, source, digest)
                     malformed_files += int(session.malformed_rows > 0)
+                    unsupported_files += int(session.unsupported_rows > 0)
                     empty_files += int(not session.messages)
                     records.append({
                         "format_version": 2, "source": source.name, "kind": source.kind,
@@ -228,8 +250,12 @@ def _export_sources(
                         "pdf": as_repo_relative(config, pdf_path) if pdf_path else None,
                         "raw": as_repo_relative(config, raw_path) if raw_path else None,
                         "metadata": portable_metadata(session.metadata),
-                        "parse_status": "partial" if session.malformed_rows else "complete" if session.messages else "empty",
+                        "parse_status": "partial" if session.malformed_rows or session.unsupported_rows else "complete" if session.messages else "empty",
                         "malformed_rows": session.malformed_rows, "input_records": session.input_records,
+                        "unsupported_rows": session.unsupported_rows,
+                        "empty_reason": ("unsupported_schema" if session.unsupported_rows else
+                                         "metadata_only" if session.input_records and session.metadata_records == session.input_records else
+                                         "no_transcript") if not session.messages else None,
                     })
                     exported += 1
             except (OSError, SourceChangingError) as exc:
@@ -244,7 +270,8 @@ def _export_sources(
         if router_records:
             records = merge_index_records(records, router_records)
         write_indexes(config, merge_index_records(existing_records, records))
-    return ExportResult(exported, pdf_missing, tuple(skipped_sources), tuple(deferred), malformed_files, empty_files)
+    return ExportResult(exported, pdf_missing, tuple(skipped_sources), tuple(deferred),
+                        malformed_files, empty_files, unsupported_files)
 
 
 def index_record_key(record: dict[str, Any]) -> tuple[str, str]:
@@ -420,7 +447,9 @@ def load_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
 def prune_index_records(config: ArchiveConfig, dry_run: bool = False) -> int:
     if dry_run or not config.track_artifacts:
         return _prune_index_records(config, dry_run)
+    validate_archive_catalog(config)
     with archive_writer(config.archive_dir):
+        validate_archive_catalog(config)
         return _prune_index_records(config, dry_run)
 
 

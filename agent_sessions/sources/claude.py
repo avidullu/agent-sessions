@@ -29,4 +29,8 @@ def extract(path: Path) -> ExtractedSession:
             messages.append(
                 SessionMessage(role="summary", text=text_from_content(obj.get("content")), timestamp=obj.get("timestamp", ""))
             )
+        elif obj.get("sessionId") and obj.get("type") not in ("user", "assistant"):
+            diagnostics["metadata_records"] = diagnostics.get("metadata_records", 0) + 1
+        elif obj.get("type") not in ("progress", "file-history-snapshot", "queue-operation", "last-prompt"):
+            diagnostics["unsupported_rows"] = diagnostics.get("unsupported_rows", 0) + 1
     return ExtractedSession(metadata=metadata, messages=messages, **diagnostics)

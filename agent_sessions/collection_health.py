@@ -35,7 +35,8 @@ def collection_health(config: ArchiveConfig, records: list[dict[str, Any]]) -> d
     for source in config.disabled_sources:
         sources[source.name] = "router_managed" if source.kind == "router_index" else "disabled"
     for record in records:
-        if record.get("parse_status") == "partial" or record.get("malformed_rows", 0) > 0:
+        if (record.get("parse_status") == "partial" or record.get("malformed_rows", 0) > 0
+                or record.get("unsupported_rows", 0) > 0):
             partial_parses += 1
         if record.get("parse_status") == "empty":
             empty_parses += 1

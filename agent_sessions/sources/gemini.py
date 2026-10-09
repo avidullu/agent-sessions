@@ -18,6 +18,10 @@ def extract(path: Path) -> ExtractedSession:
     for obj in jsonl_objects(path, diagnostics=diagnostics):
         content = text_from_content(obj.get("content"))
         if not content:
+            if obj.get("type") in ("metadata", "session_meta"):
+                diagnostics["metadata_records"] = diagnostics.get("metadata_records", 0) + 1
+            elif not any(key in obj for key in ("content", "type", "source", "role")):
+                diagnostics["unsupported_rows"] = diagnostics.get("unsupported_rows", 0) + 1
             continue
         role = obj.get("source") or obj.get("type") or "message"
         timestamp = obj.get("created_at") or obj.get("timestamp") or ""

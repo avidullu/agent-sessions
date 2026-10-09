@@ -54,9 +54,10 @@ def _export_summary_lines(
         lines.extend(f"- {source}" for source in result.skipped_sources)
         if any("(inventory)" in source for source in result.skipped_sources):
             lines.append("Inventory-only sources are expected until transcript files are available.")
-    if result.deferred_files or result.malformed_files:
+    if result.deferred_files or result.malformed_files or result.unsupported_files:
         lines.append(f"Partial export: {len(result.deferred_files)} deferred files; "
-                     f"{result.malformed_files} files contain malformed rows.")
+                     f"{result.malformed_files} files contain malformed rows; "
+                     f"{result.unsupported_files} files contain unsupported rows.")
         lines.extend(f"- {reason}" for reason in result.deferred_files)
     if result.empty_files:
         lines.append(f"{result.empty_files} files contained no transcript messages (empty or metadata-only).")
@@ -119,7 +120,7 @@ def _handle_export(config: ArchiveConfig, args: argparse.Namespace) -> int:
     )
     if backup_root is not None:
         print("Independent backup: " + json.dumps(backup(config, backup_root), sort_keys=True))
-    return 1 if result.deferred_files or result.malformed_files else 0
+    return 1 if result.deferred_files or result.malformed_files or result.unsupported_files else 0
 
 
 def _handle_backup(config: ArchiveConfig, args: argparse.Namespace) -> int:
@@ -835,7 +836,8 @@ def main(argv: list[str] | None = None) -> int:
         try:
             config = load_config(repo_root, args.config)
         except (OSError, ValueError) as exc:
-            print(f"Cannot read sources configuration ({type(exc).__name__}): {exc}", file=sys.stderr)
+            detail = str(exc) if isinstance(exc, ValueError) else "Check --repo-root, --config and permissions."
+            print(f"Cannot read sources configuration ({type(exc).__name__}): {detail}", file=sys.stderr)
             return 2
     if args.cmd in {"backup", "stats", "export", "prune", "pdf", "status"}:
         try:

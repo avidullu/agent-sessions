@@ -11,7 +11,7 @@ from typing import Any
 
 from .archive import (
     index_identity_key,
-    index_record_key,
+    index_record_keys,
     iter_source_files,
     merge_index_records,
     read_existing_index_records,
@@ -90,7 +90,7 @@ def status_summary(config: ArchiveConfig, selected: list[str] | None = None, *, 
         # used by export/index writes.
         indexed = merge_index_records(indexed, router_records)
 
-    indexed_by_key = {index_record_key(record): record for record in indexed}
+    indexed_by_key = {key: record for record in indexed for key in index_record_keys(record)}
     indexed_identity_keys = {index_identity_key(record) for record in indexed}
     indexed_by_size: dict[int, list[dict[str, Any]]] = {}
     for record in indexed:
@@ -168,7 +168,8 @@ def status_summary(config: ArchiveConfig, selected: list[str] | None = None, *, 
         if str(idx_record.get("sha256", "")) != sha256_file(path):
             changed_files += 1
 
-    not_visible_records = sum(1 for key in indexed_by_key if key not in visible_by_key)
+    not_visible_records = sum(1 for record in indexed if not any(
+        key in visible_by_key for key in index_record_keys(record)))
     source_counts = Counter(str(record.get("source", "")) for record in indexed)
     from .utils import canonical_agent_counts
 

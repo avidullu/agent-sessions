@@ -100,12 +100,12 @@ def pending_output(target: Path) -> Iterator[Path]:
         pending.unlink(missing_ok=True)
 
 
-def artifact_stem(date: str, session_id: str, filename: str, digest: str) -> str:
+def artifact_stem(date: str, session_id: str, filename: str, digest: str, *, force_identity: bool = False) -> str:
     """Keep v1 short names; reserve content and identity suffixes for long names."""
     from .utils import slugify
 
     full = f"{date}-{session_id}-{filename}-{digest[:12]}"
-    if len(slugify(full, max_len=len(full))) <= 90:
+    if not force_identity and len(slugify(full, max_len=len(full))) <= 90:
         return slugify(full)
     identity = hashlib.sha256(f"{session_id}\0{filename}".encode()).hexdigest()[:12]
     prefix = slugify(f"{date}-{session_id}-{filename}", max_len=64)
