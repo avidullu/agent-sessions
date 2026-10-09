@@ -508,3 +508,35 @@ def test_capture_refuses_change_within_open_descriptor(tmp_path: Path, monkeypat
     with pytest.raises(SourceChangingError):
         with capture_source(source):
             pytest.fail("changed descriptor must not publish a snapshot")
+
+
+@pytest.mark.parametrize("available", [True, False])
+def test_windows_change_time_query_returns_kernel_value_or_refuses(
+    monkeypatch: pytest.MonkeyPatch, available: bool
+) -> None:
+    import ctypes
+    import sys
+    from typing import Any
+    from unittest.mock import MagicMock
+
+    from agent_sessions.archive_io import windows_change_time
+
+    def query(handle: int, info_class: int, pointer: Any, size: int) -> int:
+        assert handle == 123 and info_class == 0 and size == 40
+        ctypes.cast(pointer, ctypes.POINTER(ctypes.c_int64))[3] = 456
+        return int(available)
+
+    function = MagicMock(side_effect=query)
+    kernel = MagicMock(GetFileInformationByHandleEx=function)
+    loader = MagicMock(return_value=kernel)
+    monkeypatch.setattr(ctypes, "WinDLL", loader, raising=False)
+    monkeypatch.setattr(ctypes, "get_last_error", lambda: 5, raising=False)
+    monkeypatch.setitem(sys.modules, "msvcrt", MagicMock(get_osfhandle=lambda _descriptor: 123))
+    if available:
+        assert windows_change_time(7) == 456
+    else:
+        with pytest.raises(OSError, match="observation unavailable"):
+            windows_change_time(7)
+    loader.assert_called_once_with("kernel32", use_last_error=True)
+    assert function.argtypes == (ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32)
+    assert function.restype == ctypes.c_int

@@ -29,6 +29,30 @@ def signature(stat: os.stat_result) -> tuple[int, int, int, int]:
     return stat.st_size, stat.st_mtime_ns, timestamp, stat.st_ino
 
 
+def windows_change_time(descriptor: int) -> int:
+    """Read descriptor ChangeTime consistently across Windows Python versions."""
+    import ctypes
+    import importlib
+
+    windows_crt = importlib.import_module("msvcrt")
+    windows_api = importlib.import_module("ctypes")
+
+    class FileBasicInfo(ctypes.Structure):
+        ChangeTime: int
+        _fields_ = [("CreationTime", ctypes.c_int64), ("LastAccessTime", ctypes.c_int64),
+                    ("LastWriteTime", ctypes.c_int64), ("ChangeTime", ctypes.c_int64),
+                    ("FileAttributes", ctypes.c_uint32)]
+
+    kernel = windows_api.WinDLL("kernel32", use_last_error=True)
+    query = kernel.GetFileInformationByHandleEx
+    query.argtypes = (ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32)
+    query.restype = ctypes.c_int
+    information = FileBasicInfo()
+    if not query(windows_crt.get_osfhandle(descriptor), 0, ctypes.byref(information), ctypes.sizeof(information)):
+        raise OSError(windows_api.get_last_error(), "Source change-time observation unavailable.")
+    return int(information.ChangeTime)
+
+
 @contextmanager
 def capture_source(path: Path, attempts: int = 3) -> Iterator[CapturedSource]:
     """Hash and parse the same copied bytes; preserve provider filename ancestry."""
@@ -42,14 +66,18 @@ def capture_source(path: Path, attempts: int = 3) -> Iterator[CapturedSource]:
             size = 0
             with path.open("rb") as source, staged.open("wb") as output:
                 opened = os.fstat(source.fileno())
+                windows = os.name == "nt"
+                change_before = windows_change_time(source.fileno()) if windows else opened.st_ctime_ns
                 while chunk := source.read(1024 * 1024):
                     digest.update(chunk)
                     output.write(chunk)
                     size += len(chunk)
                 finished = os.fstat(source.fileno())
+                change_after = windows_change_time(source.fileno()) if windows else finished.st_ctime_ns
             after = path.stat()
             if (signature(before) == signature(opened) == signature(finished) == signature(after)
-                    and opened.st_ctime_ns == finished.st_ctime_ns and size == after.st_size):
+                    and opened.st_ctime_ns == finished.st_ctime_ns and change_before == change_after
+                    and size == after.st_size):
                 os.utime(staged, ns=(after.st_atime_ns, after.st_mtime_ns))
                 captured = CapturedSource(staged, digest.hexdigest(), after)
                 break
