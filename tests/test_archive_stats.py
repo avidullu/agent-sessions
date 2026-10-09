@@ -44,9 +44,11 @@ def test_backup_metrics_and_coverage(tmp_path: Path, compression: str) -> None:
     transcript.write_text('an archived conversation\n' * 100)
     (raw / 'saved.gz').write_bytes(b'pre-existing backup' * 100)
     rows = [
-        {'kind': 'codex', 'source': 'a', 'metadata': {'session_id': 'one'}, 'sha256': '1' * 64,
+        {'kind': 'codex', 'source': 'a', 'source_file': 'inputs/a',
+         'metadata': {'session_id': 'one'}, 'sha256': '1' * 64,
          'markdown': 'archive/example.md', 'raw': 'raw/saved.gz', 'size': 500, 'messages': 2},
-        {'kind': 'claude', 'source': 'b', 'metadata': {'session_id': 'two'}, 'sha256': '2' * 64,
+        {'kind': 'claude', 'source': 'b', 'source_file': 'inputs/b',
+         'metadata': {'session_id': 'two'}, 'sha256': '2' * 64,
          'markdown': 'archive/missing.md'},
     ]
     (archive / 'index.jsonl').write_text(''.join(json.dumps(row) + '\n' for row in rows))
@@ -112,7 +114,10 @@ def test_windows_catalog_in_portable_backup(tmp_path: Path) -> None:
     repo = tmp_path / 'repo'
     archive = repo / 'archive'
     archive.mkdir(parents=True)
-    (archive / 'index.jsonl').write_text(json.dumps({'kind': 'codex', 'metadata': {'session_id': 'one'}}) + '\n')
+    (archive / 'index.jsonl').write_text(json.dumps({
+        'kind': 'codex', 'source': 'fixture', 'source_file': 'inputs/a', 'markdown': 'archive/missing.md',
+        'metadata': {'session_id': 'one'},
+    }) + '\n')
     config = ArchiveConfig(repo, archive, repo / 'raw', ())
     root = tmp_path / 'vault'
     initialize(root)
@@ -135,7 +140,7 @@ def test_legacy_raw_backup_coverage_uses_decoded_hash(tmp_path: Path, compressio
     raw.mkdir()
     original = b'legacy source log\n' * 100
     (raw / 'old-copy.jsonl.gz').write_bytes(gzip.compress(original))
-    row = {'kind': 'codex', 'metadata': {'session_id': 'legacy'},
+    row = {'kind': 'codex', 'source': 'fixture', 'source_file': 'inputs/a', 'metadata': {'session_id': 'legacy'},
            'sha256': hashlib.sha256(original).hexdigest(), 'raw': None, 'markdown': 'archive/missing.md'}
     (archive / 'index.jsonl').write_text(json.dumps(row) + '\n')
     config = ArchiveConfig(repo, archive, raw, ())
@@ -156,9 +161,12 @@ def test_stats_preserve_good_rows_around_invalid_history(tmp_path: Path, compres
     archive.mkdir(parents=True)
     catalog = archive / 'index.jsonl'
     catalog.write_bytes(
-        b'{"kind":"codex","metadata":{"session_id":"before"}}\n'
+        b'{"source":"fixture","kind":"codex","source_file":"before","markdown":"archive/before.md",'
+        b'"metadata":{"session_id":"before"}}\n'
         b'\nnull\n[1,2]\n{"torn":\n\xff\n'
-        b'{"kind":"codex","sha256":[],"metadata":{"session_id":"after"}}\n'
+        b'{"source":"fixture","kind":"codex","source_file":"after","markdown":"archive/after.md",'
+        b'"metadata":{"session_id":"after"}}\n'
+        b'{"source":"fixture","kind":"codex","source_file":"bad","markdown":"archive/bad.md","sha256":[]}\n'
     )
     config = ArchiveConfig(repo, archive, repo / 'raw', ())
     root = tmp_path / 'vault'
@@ -173,7 +181,7 @@ def test_stats_preserve_good_rows_around_invalid_history(tmp_path: Path, compres
     assert stats['snapshots'] == 3 and stats['valid_snapshots'] == 2 and stats['invalid_snapshots'] == 1
     assert stats['snapshot_failures'] == ['Invalid snapshot: 000-bad.json']
     assert stats['catalog_history']['distinct_identified_sessions'] == 2
-    assert stats['invalid_catalog_lines'] == 4  # Unique catalog object, not multiplied by snapshots.
+    assert stats['invalid_catalog_lines'] == 5  # Unique catalog object, not multiplied by snapshots.
     assert stats['unreadable_catalog_objects'] == 1
     assert stats['counts_complete'] is False
     assert stats['unreferenced_object_files'] is None

@@ -17,6 +17,61 @@ from agent_sessions.models import Source
 from agent_sessions.path_templates import PathTemplateContext
 
 
+@pytest.mark.parametrize("setting", ["write_pdfs", "track_artifacts"])
+@pytest.mark.parametrize("value", ['"false"', '"true"', "0", "1", "[]", "{}"])
+def test_archive_boolean_types_are_strict(tmp_path: Path, setting: str, value: str) -> None:
+    (tmp_path / "sources.toml").write_text(f"[archive]\n{setting} = {value}\n")
+    with pytest.raises(ValueError, match=f"archive.{setting} must be a TOML boolean"):
+        load_config(tmp_path)
+    assert not (tmp_path / "archive").exists()
+
+
+@pytest.mark.parametrize("value", ['"false"', "0", "[]", "{}"])
+def test_backup_and_enabled_boolean_types_are_strict(tmp_path: Path, value: str) -> None:
+    path = tmp_path / "sources.toml"
+    path.write_text(f"[backup]\non_export = {value}\n")
+    with pytest.raises(ValueError, match="backup.on_export"):
+        load_config(tmp_path)
+    path.write_text(f'[[sources]]\nname="off"\nkind="codex"\nenabled={value}\n')
+    with pytest.raises(ValueError, match="enabled must be a TOML boolean"):
+        load_config(tmp_path)
+
+
+@pytest.mark.parametrize("contents,error", [
+    ('archive="wrong"', "Archive settings"), ('backup=[]', "Backup settings"),
+    ('sources="wrong"', "Sources settings"), ('sources=["wrong"]', r"sources\[1\]"),
+    ('[archive]\narchive_dir=3', "archive.archive_dir"), ('[archive]\nraw_dir=[]', "archive.raw_dir"),
+    ('[backup]\nmachine=3', "backup.machine"),
+])
+def test_config_tables_and_paths_are_validated(tmp_path: Path, contents: str, error: str) -> None:
+    (tmp_path / "sources.toml").write_text(contents)
+    with pytest.raises(ValueError, match=error):
+        load_config(tmp_path)
+
+
+@pytest.mark.parametrize("extra,error", [
+    ({"name": 7}, "name"), ({"kind": []}, "kind"), ({"roots": "/tmp"}, "roots"),
+    ({"roots": [3]}, "roots"), ({"glob": []}, "glob"), ({"description": True}, "description"),
+])
+def test_source_field_types_are_validated(extra: dict, error: str, tmp_path: Path) -> None:
+    templates = PathTemplateContext.from_environment(tmp_path)
+    with pytest.raises(ValueError, match=error):
+        load_source({"name": "fixture", "kind": "codex", **extra}, templates)
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_native_boolean_settings_keep_their_value(tmp_path: Path, enabled: bool) -> None:
+    value = str(enabled).lower()
+    (tmp_path / "sources.toml").write_text(
+        f'[archive]\nwrite_pdfs={value}\ntrack_artifacts={value}\n[backup]\non_export={value}\n'
+        f'[[sources]]\nname="fixture"\nkind="codex"\nenabled={value}\n'
+    )
+    config = load_config(tmp_path)
+    assert config.write_pdfs is enabled and config.track_artifacts is enabled and config.backup_on_export is enabled
+    assert bool(config.sources) is enabled
+    assert bool(config.disabled_sources) is not enabled
+
+
 class TestRepoPath:
     def test_relative_path(self, tmp_path: Path) -> None:
         result = repo_path(tmp_path, "subdir/file.txt")
