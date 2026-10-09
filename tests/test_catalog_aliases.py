@@ -50,8 +50,8 @@ def test_last_alias_supersedes_content_and_same_id_forks_survive() -> None:
 def test_alias_references_survive_catalog_roundtrip_and_remain_portable(tmp_path: Path) -> None:
     config = ArchiveConfig(tmp_path, tmp_path / "archive", tmp_path / "raw", ())
     records = merge_index_records([], [
-        row("/home/fixture/.codex/a.jsonl", "old", "linux"),
-        row(r"C:\Users\fixture\.codex\a.jsonl", "old", "windows"),
+        row("/home/alice/.codex/a.jsonl", "old", "linux"),
+        row(r"C:\Users\alice\.codex\a.jsonl", "old", "windows"),
     ])
     write_indexes(config, records)
     restored = read_existing_index_records(config)
@@ -60,7 +60,7 @@ def test_alias_references_survive_catalog_roundtrip_and_remain_portable(tmp_path
     )
     assert restored[0]["source_origin"] == "windows-user:C"
     assert restored[0]["source_aliases"][0]["source_origin"] == "posix-home"
-    changed = merge_index_records(restored, [row(r"C:\Users\fixture\.codex\a.jsonl", "new", "windows")])
+    changed = merge_index_records(restored, [row(r"C:\Users\alice\.codex\a.jsonl", "new", "windows")])
     assert paths_by_digest(changed) == {
         "old": {("linux", "~/.codex/a.jsonl")}, "new": {("windows", r"~\.codex\a.jsonl")},
     }
