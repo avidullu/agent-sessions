@@ -358,7 +358,11 @@ def merge_index_records(existing: list[dict[str, Any]], current: list[dict[str, 
             # Carried aliases are references, not new observations. A cached
             # row must not overwrite another path's explicit changed record.
             by_path.setdefault(index_record_key(alternate), alternate)
-        by_path[index_record_key(primary)] = primary
+        primary_key = index_record_key(primary)
+        # An explicit observation also refreshes the representative metadata
+        # when content is unchanged; an older alias must not hide new counts.
+        by_path.pop(primary_key, None)
+        by_path[primary_key] = primary
     groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
     for record in by_path.values():
         groups.setdefault(index_identity_key(record), []).append(record)

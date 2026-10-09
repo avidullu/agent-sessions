@@ -47,6 +47,18 @@ def test_last_alias_supersedes_content_and_same_id_forks_survive() -> None:
     assert merge_index_records(changed, []) == changed
 
 
+def test_refreshed_alias_retains_latest_parse_diagnostics_without_content_change() -> None:
+    old = merge_index_records([], [row("a", "same"), row("b", "same")])
+    refreshed = {**row("a", "same"), "format_version": 2, "parse_status": "partial", "malformed_rows": 1,
+                 "exported_at": "2026-10-09T19:00:00Z"}
+    merged = merge_index_records(old, [refreshed])
+    assert len(merged) == 1 and merged[0]["source_file"] == "a"
+    assert merged[0]["format_version"] == 2 and merged[0]["parse_status"] == "partial"
+    assert merged[0]["malformed_rows"] == 1 and merged[0]["exported_at"] == refreshed["exported_at"]
+    assert set(index_record_keys(merged[0])) == {("codex", "a"), ("codex", "b")}
+    assert merge_index_records(merged, [refreshed]) == merge_index_records(merged, []) == merged
+
+
 def test_alias_references_survive_catalog_roundtrip_and_remain_portable(tmp_path: Path) -> None:
     config = ArchiveConfig(tmp_path, tmp_path / "archive", tmp_path / "raw", ())
     records = merge_index_records([], [
