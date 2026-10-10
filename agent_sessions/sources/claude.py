@@ -11,10 +11,12 @@ from .registry import register
 
 
 @register("claude")
-def extract(path: Path) -> ExtractedSession:
-    metadata: dict[str, Any] = {"session_id": path.stem, "project": path.parent.name}
+def extract(path: Path, *, source_path: Path | None = None) -> ExtractedSession:
+    identity = source_path if source_path is not None else path
+    metadata: dict[str, Any] = {"session_id": identity.stem, "project": identity.parent.name}
     messages: list[SessionMessage] = []
-    for obj in jsonl_objects(path):
+    diagnostics: dict[str, int] = {}
+    for obj in jsonl_objects(path, diagnostics=diagnostics):
         if obj.get("sessionId"):
             metadata["session_id"] = obj.get("sessionId")
         message = obj.get("message")
@@ -28,4 +30,8 @@ def extract(path: Path) -> ExtractedSession:
             messages.append(
                 SessionMessage(role="summary", text=text_from_content(obj.get("content")), timestamp=obj.get("timestamp", ""))
             )
-    return ExtractedSession(metadata=metadata, messages=messages)
+        elif obj.get("sessionId") and obj.get("type") not in ("user", "assistant"):
+            diagnostics["metadata_records"] = diagnostics.get("metadata_records", 0) + 1
+        elif obj.get("type") not in ("progress", "file-history-snapshot", "queue-operation", "last-prompt"):
+            diagnostics["unsupported_rows"] = diagnostics.get("unsupported_rows", 0) + 1
+    return ExtractedSession(metadata=metadata, messages=messages, **diagnostics)

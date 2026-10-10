@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import Protocol
 
 from ..models import ExtractedSession
 
-Extractor = Callable[[Path], ExtractedSession]
+
+class Extractor(Protocol):
+    def __call__(self, path: Path, *, source_path: Path | None = None) -> ExtractedSession: ...
 
 _EXTRACTORS: dict[str, Extractor] = {}
 

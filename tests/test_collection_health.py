@@ -105,3 +105,11 @@ def test_export_records_time_without_changing_it_on_reuse(archive_config: Archiv
     assert first["last_successful_export"] is not None
     export_sources(archive_config)
     assert status_summary(archive_config).collection["last_successful_export"] == first["last_successful_export"]
+
+
+def test_unsupported_feeder_rows_mark_counts_incomplete_without_parse_status(tmp_path: Path) -> None:
+    config = ArchiveConfig(tmp_path, tmp_path / "archive", tmp_path / "raw", ())
+    health = collection_health(config, [{"messages": 0, "unsupported_rows": 1}])
+    assert health["sessions_with_partial_parse"] == 1
+    assert health["counts_complete"] is False
+    assert health["state"] == "attention_required"

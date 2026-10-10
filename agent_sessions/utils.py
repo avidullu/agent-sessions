@@ -169,18 +169,24 @@ def read_jsonl_dicts(path: Path, *, label: str | None = None) -> list[dict[str, 
     return records
 
 
-def jsonl_objects(path: Path) -> Iterable[dict[str, Any]]:
-    with path.open("r", encoding="utf-8", errors="replace") as f:
+def jsonl_objects(path: Path, *, diagnostics: dict[str, int] | None = None) -> Iterable[dict[str, Any]]:
+    with path.open("rb") as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
             try:
                 obj = json.loads(line)
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                if diagnostics is not None:
+                    diagnostics["malformed_rows"] = diagnostics.get("malformed_rows", 0) + 1
                 continue
             if isinstance(obj, dict):
+                if diagnostics is not None:
+                    diagnostics["input_records"] = diagnostics.get("input_records", 0) + 1
                 yield obj
+            elif diagnostics is not None:
+                diagnostics["malformed_rows"] = diagnostics.get("malformed_rows", 0) + 1
 
 
 def text_from_content(value: Any) -> str:

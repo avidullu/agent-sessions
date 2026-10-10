@@ -15,18 +15,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .archive_io import SourceChangingError, archive_writer, artifact_stem, capture_source, pending_output
 from .catalog import read_catalog, validate_archive_catalog
 from .config import ArchiveConfig
 from .models import Source
 from .portable_paths import portable_metadata, portable_origin, portable_path, portable_record
 from .render import markdown_for_session, write_pdf
 from .sources.registry import get_extractor
-from .utils import now_utc, slugify
+from .utils import now_utc
 
 IMPORTED_AT_RE = re.compile(r"^- Imported at: `([^`]+)`$", re.MULTILINE)
 GENERATED_RE = re.compile(r"^Generated: `([^`]+)`$", re.MULTILINE)
 ROUTER_INDEX_FILENAME = ".router-index.jsonl"
 TAIL_HASH_BYTES = 64 * 1024
+EXTRACTOR_REVISION = 1
 
 
 @dataclass(frozen=True)
@@ -34,6 +36,10 @@ class ExportResult:
     exported: int
     pdf_missing: bool = False
     skipped_sources: tuple[str, ...] = ()
+    deferred_files: tuple[str, ...] = ()
+    malformed_files: int = 0
+    empty_files: int = 0
+    unsupported_files: int = 0
 
 
 def iter_source_files(source: Source) -> Iterable[Path]:
@@ -71,9 +77,11 @@ def tail_sha256_file(path: Path, max_bytes: int = TAIL_HASH_BYTES) -> str:
 
 
 def copy_raw(config: ArchiveConfig, path: Path, source: Source, digest: str) -> Path:
-    raw_target = config.raw_dir / source.name / f"{digest[:16]}-{path.name}.gz"
+    # Leave room for the digest prefix and gzip suffix under filesystem name limits.
+    raw_name = path.name.encode()[:235].decode("utf-8", errors="ignore")
+    raw_target = config.raw_dir / source.name / f"{digest[:16]}-{raw_name}.gz"
     raw_target.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("rb") as src, gzip.open(raw_target, "wb") as dst:
+    with pending_output(raw_target) as pending, path.open("rb") as src, gzip.open(pending, "wb") as dst:
         shutil.copyfileobj(src, dst)
     return raw_target
 
@@ -92,7 +100,7 @@ def select_sources(config: ArchiveConfig, selected: list[str] | None) -> list[So
 
 
 def _index_path_exists(config: ArchiveConfig, rel: Any) -> bool:
-    return isinstance(rel, str) and bool(rel) and (config.repo_root / rel.replace("\\", "/")).exists()
+    return isinstance(rel, str) and bool(rel) and (config.repo_root / rel.replace("\\", "/")).is_file()
 
 
 def _can_reuse_record(
@@ -133,16 +141,32 @@ def export_sources(
     copy_raw_files: bool = False,
     dry_run: bool = False,
 ) -> ExportResult:
-    sources = select_sources(config, selected)
-    if not dry_run:
+    # Validate selectors before creating the archive or writer lock.
+    select_sources(config, selected)
+    if dry_run:
+        return _export_sources(config, selected, limit, write_pdfs, copy_raw_files, dry_run)
+    validate_archive_catalog(config)
+    with archive_writer(config.archive_dir):
         validate_archive_catalog(config)
-    config.archive_dir.mkdir(parents=True, exist_ok=True)
+        return _export_sources(config, selected, limit, write_pdfs, copy_raw_files, dry_run)
+
+
+def _export_sources(
+    config: ArchiveConfig,
+    selected: list[str] | None,
+    limit: int | None,
+    write_pdfs: bool,
+    copy_raw_files: bool,
+    dry_run: bool,
+) -> ExportResult:
+    sources = select_sources(config, selected)
     existing_records = read_existing_index_records(config)
-    prior_by_key = {} if dry_run else {index_record_key(record): record for record in existing_records}
+    prior_by_key = {key: record for record in existing_records for key in index_record_keys(record)}
     records: list[dict[str, Any]] = []
     pdf_missing = False
     skipped_sources: list[str] = []
-    exported = 0
+    deferred: list[str] = []
+    malformed_files = empty_files = unsupported_files = exported = 0
 
     for source in sources:
         extractor = get_extractor(source.kind)
@@ -151,74 +175,96 @@ def export_sources(
             continue
         for root in source.roots:
             if "__missing_" in str(root):
-                print(
-                    f"warning: source {source.name!r} has an unresolved path template "
-                    f"({root}); skipping that root. Set it in sources.toml if this machine has it.",
-                    file=sys.stderr,
-                )
+                print(f"warning: source {source.name!r} has an unresolved path template; skipping that root.",
+                      file=sys.stderr)
         for path in iter_source_files(source):
             if limit and exported >= limit:
                 break
-            stat_result = path.stat()
-            size, mtime = stat_result.st_size, stat_result.st_mtime
-            prior = prior_by_key.get((source.name, portable_path(str(path))))
-            tail_digest = None
-            if (
-                prior is not None
-                and prior.get("tail_sha256")
-                and prior.get("size") == size
-                and prior.get("mtime") == mtime
-            ):
-                tail_digest = tail_sha256_file(path)
-            if _can_reuse_record(config, prior, size, mtime, write_pdfs, copy_raw_files, tail_digest):
-                assert prior is not None  # _can_reuse_record returns False for None
-                records.append(prior)  # unchanged since last export: skip hashing/extraction/render
-                exported += 1
-                continue
-            digest = sha256_file(path)
-            session = extractor(path)
-            session_id = str(session.metadata.get("session_id") or path.stem)
-            changed = source_modified_date(path)
-            stem = slugify(f"{changed}-{session_id}-{path.stem}-{digest[:12]}")
-            out_dir = config.archive_dir / source.name
-            out_dir.mkdir(parents=True, exist_ok=True)
-            md_path = out_dir / f"{stem}.md"
-            markdown = markdown_for_session(source, path, session, digest, imported_at=existing_imported_at(md_path))
-            md_changed = True
-            if not dry_run:
-                md_changed = write_text_if_changed(md_path, markdown)
-            pdf_path = None
-            if write_pdfs:
-                pdf_path = md_path.with_suffix(".pdf")
-                should_write_pdf = md_changed or not pdf_path.exists()
-                if not dry_run and should_write_pdf and not write_pdf(markdown, pdf_path):
-                    pdf_missing = True
+            try:
+                with capture_source(path) as captured:
+                    size, mtime = captured.stat.st_size, captured.stat.st_mtime
+                    digest = captured.digest
+                    prior = prior_by_key.get((source.name, portable_path(str(path))))
+                    tail_digest = tail_sha256_file(captured.path)
+                    if (prior is not None and prior.get("format_version") == 2
+                            and prior.get("extractor_revision") == EXTRACTOR_REVISION and prior.get("sha256") == digest
+                            and _can_reuse_record(config, prior, size, mtime, write_pdfs,
+                                                  copy_raw_files, tail_digest)):
+                        reused = dict(prior)
+                        reused.update(source=source.name, source_file=portable_path(str(path)),
+                                      source_origin=portable_origin(str(path)))
+                        reused.pop("source_aliases", None)
+                        records.append(reused)
+                        malformed_files += int(prior.get("malformed_rows", 0) > 0)
+                        unsupported_files += int(prior.get("unsupported_rows", 0) > 0)
+                        empty_files += int(prior.get("parse_status") == "empty")
+                        exported += 1
+                        continue
+                    session = extractor(captured.path, source_path=path)
+                    session_id = str(session.metadata.get("session_id") or path.stem)
+                    changed = dt.datetime.fromtimestamp(mtime, dt.UTC).strftime("%Y%m%d")
+                    stem = artifact_stem(changed, session_id, path.stem, digest)
+                    md_path = config.archive_dir / source.name / f"{stem}.md"
+                    expected_title = f"# {source.name} / {session_id}"
+                    for naming_attempt in range(2):
+                        if not md_path.exists():
+                            break
+                        previous = md_path.read_text(encoding="utf-8", errors="replace")
+                        previous_digest = re.search(r"^- SHA-256: `([0-9a-f]{64})`$", previous, re.MULTILINE)
+                        if previous_digest is None:
+                            raise ValueError("Existing artifact has no valid source binding; its content was preserved.")
+                        if previous_digest.group(1) != digest:
+                            raise ValueError("Artifact filename conflict; existing content was preserved.")
+                        if previous.splitlines()[0] == expected_title:
+                            break
+                        if naming_attempt:
+                            raise ValueError("Artifact identity conflict; existing content was preserved.")
+                        stem = artifact_stem(changed, session_id, path.stem, digest, force_identity=True)
+                        md_path = config.archive_dir / source.name / f"{stem}.md"
+                    markdown = markdown_for_session(
+                        source, path, session, digest, imported_at=existing_imported_at(md_path),
+                        source_modified=dt.datetime.fromtimestamp(mtime, dt.UTC).isoformat(timespec="seconds"),
+                    )
+                    md_changed = True
+                    if not dry_run:
+                        md_changed = write_text_if_changed(md_path, markdown)
                     pdf_path = None
-            raw_path = None
-            if copy_raw_files and not dry_run:
-                raw_path = copy_raw(config, path, source, digest)
-            records.append(
-                {
-                    "source": source.name,
-                    "kind": source.kind,
-                    # Tracked catalogs must stay PII-free: the home prefix is
-                    # rewritten to "~" and the origin environment is captured
-                    # separately, username-free (docs/archives/PUBLIC_LAUNCH_TRACKER.md L1).
-                    "source_file": portable_path(str(path)),
-                    "source_origin": portable_origin(str(path)),
-                    "sha256": digest,
-                    "tail_sha256": tail_sha256_file(path),
-                    "size": size,
-                    "mtime": mtime,
-                    "messages": len(session.messages),
-                    "exported_at": now_utc(),
-                    "markdown": as_repo_relative(config, md_path),
-                    "pdf": as_repo_relative(config, pdf_path) if pdf_path else None,
-                    "raw": as_repo_relative(config, raw_path) if raw_path else None,
-                    "metadata": portable_metadata(session.metadata),
-                }
-            )
-            exported += 1
+                    if write_pdfs:
+                        pdf_path = md_path.with_suffix(".pdf")
+                        if not dry_run and (md_changed or not pdf_path.exists()):
+                            with pending_output(pdf_path) as pending:
+                                if not write_pdf(markdown, pending):
+                                    pending.unlink()
+                                    pdf_missing = True
+                                    pdf_path = None
+                    raw_path = None
+                    if copy_raw_files and not dry_run:
+                        raw_path = copy_raw(config, captured.path, source, digest)
+                    malformed_files += int(session.malformed_rows > 0)
+                    unsupported_files += int(session.unsupported_rows > 0)
+                    empty_files += int(not session.messages)
+                    records.append({
+                        "format_version": 2, "extractor_revision": EXTRACTOR_REVISION,
+                        "source": source.name, "kind": source.kind,
+                        "source_file": portable_path(str(path)), "source_origin": portable_origin(str(path)),
+                        "sha256": digest, "tail_sha256": tail_digest, "size": size, "mtime": mtime,
+                        "messages": len(session.messages), "exported_at": now_utc(),
+                        "markdown": as_repo_relative(config, md_path),
+                        "pdf": as_repo_relative(config, pdf_path) if pdf_path else None,
+                        "raw": as_repo_relative(config, raw_path) if raw_path else None,
+                        "metadata": portable_metadata(session.metadata),
+                        "parse_status": "partial" if session.malformed_rows or session.unsupported_rows else "complete" if session.messages else "empty",
+                        "malformed_rows": session.malformed_rows, "input_records": session.input_records,
+                        "unsupported_rows": session.unsupported_rows,
+                        "empty_reason": ("unsupported_schema" if session.unsupported_rows else
+                                         "metadata_only" if session.input_records and session.metadata_records == session.input_records else
+                                         "no_transcript") if not session.messages else None,
+                    })
+                    exported += 1
+            except (OSError, SourceChangingError) as exc:
+                reason = "changing_source" if isinstance(exc, SourceChangingError) else "source_or_output_unavailable"
+                deferred.append(f"{source.name}: {reason}")
+                print(f"warning: {source.name!r} capture deferred ({reason}).", file=sys.stderr)
         if limit and exported >= limit:
             break
 
@@ -227,7 +273,8 @@ def export_sources(
         if router_records:
             records = merge_index_records(records, router_records)
         write_indexes(config, merge_index_records(existing_records, records))
-    return ExportResult(exported=exported, pdf_missing=pdf_missing, skipped_sources=tuple(skipped_sources))
+    return ExportResult(exported, pdf_missing, tuple(skipped_sources), tuple(deferred),
+                        malformed_files, empty_files, unsupported_files)
 
 
 def index_record_key(record: dict[str, Any]) -> tuple[str, str]:
@@ -338,7 +385,6 @@ def write_indexes(config: ArchiveConfig, records: list[dict[str, Any]]) -> None:
     records = [_posix_index_record(record) for record in records]
     jsonl_path = config.archive_dir / "index.jsonl"
     jsonl_text = "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in records)
-    write_text_if_changed(jsonl_path, jsonl_text)
 
     lines = [
         "# Agent Session Archive",
@@ -367,6 +413,7 @@ def write_indexes(config: ArchiveConfig, records: list[dict[str, Any]]) -> None:
         )
     index_path = config.archive_dir / "INDEX.md"
     index_text = preserve_generated_at(index_path, "\n".join(lines) + "\n")
+    write_text_if_changed(jsonl_path, jsonl_text)
     write_text_if_changed(index_path, index_text)
 
 
@@ -392,8 +439,8 @@ def preserve_generated_at(path: Path, text: str) -> str:
 def write_text_if_changed(path: Path, text: str) -> bool:
     if path.exists() and path.read_text(encoding="utf-8", errors="replace") == text:
         return False
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8", newline="\n")
+    with pending_output(path) as pending:
+        pending.write_text(text, encoding="utf-8", newline="\n")
     return True
 
 
@@ -405,6 +452,15 @@ def load_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
 
 
 def prune_index_records(config: ArchiveConfig, dry_run: bool = False) -> int:
+    if dry_run or not config.track_artifacts:
+        return _prune_index_records(config, dry_run)
+    validate_archive_catalog(config)
+    with archive_writer(config.archive_dir):
+        validate_archive_catalog(config)
+        return _prune_index_records(config, dry_run)
+
+
+def _prune_index_records(config: ArchiveConfig, dry_run: bool = False) -> int:
     """Drop index records whose tracked archive Markdown no longer exists.
 
     Safe GC for artifact-tracking exports where a source file's digest changed
@@ -419,8 +475,6 @@ def prune_index_records(config: ArchiveConfig, dry_run: bool = False) -> int:
             "Set [archive] track_artifacts = true to prune by artifact presence."
         )
         return 0
-    if not dry_run:
-        validate_archive_catalog(config)
     records = read_existing_index_records(config)
     kept: list[dict[str, Any]] = []
     dropped: list[dict[str, Any]] = []
@@ -450,6 +504,12 @@ def pdf_existing(
     force: bool = False,
 ) -> int:
     validate_archive_catalog(config)
+    with archive_writer(config.archive_dir):
+        validate_archive_catalog(config)
+        return _pdf_existing(config, selected, limit, force)
+
+
+def _pdf_existing(config: ArchiveConfig, selected: list[str] | None, limit: int | None, force: bool) -> int:
     records = load_index_records(config)
     wanted = set(selected or [])
     made = 0
@@ -461,8 +521,10 @@ def pdf_existing(
             continue
         if limit and made >= limit:
             break
-        md_path = config.repo_root / record["markdown"]
-        if not md_path.exists():
+        md_path = (config.repo_root / record["markdown"].replace("\\", "/")).resolve()
+        if not md_path.is_relative_to(config.archive_dir.resolve()):
+            raise ValueError("Catalog Markdown path escapes the configured archive; existing files were preserved.")
+        if not md_path.is_file():
             skipped += 1
             continue
         pdf_path = md_path.with_suffix(".pdf")
@@ -471,8 +533,11 @@ def pdf_existing(
             skipped += 1
             continue
         markdown = md_path.read_text(encoding="utf-8", errors="replace")
-        if not write_pdf(markdown, pdf_path):
-            missing_renderer = True
+        with pending_output(pdf_path) as pending:
+            if not write_pdf(markdown, pending):
+                pending.unlink()
+                missing_renderer = True
+        if missing_renderer:
             break
         record["pdf"] = as_repo_relative(config, pdf_path)
         made += 1

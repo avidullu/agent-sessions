@@ -11,7 +11,7 @@ from agent_sessions.sources.registry import get_extractor, known_kinds, register
 class TestRegister:
     def test_register_and_retrieve(self) -> None:
         @register("test-kind")
-        def dummy_extractor(path: Path) -> ExtractedSession:
+        def dummy_extractor(path: Path, *, source_path: Path | None = None) -> ExtractedSession:
             return ExtractedSession(metadata={}, messages=[])
 
         extractor = get_extractor("test-kind")
@@ -21,11 +21,11 @@ class TestRegister:
 
     def test_register_overwrites(self) -> None:
         @register("overwrite-kind")
-        def first(path: Path) -> ExtractedSession:
+        def first(path: Path, *, source_path: Path | None = None) -> ExtractedSession:
             return ExtractedSession(metadata={"v": 1}, messages=[])
 
         @register("overwrite-kind")
-        def second(path: Path) -> ExtractedSession:
+        def second(path: Path, *, source_path: Path | None = None) -> ExtractedSession:
             return ExtractedSession(metadata={"v": 2}, messages=[])
 
         extractor = get_extractor("overwrite-kind")
@@ -35,7 +35,7 @@ class TestRegister:
 
     def test_register_returns_function(self) -> None:
         @register("return-test")
-        def my_func(path: Path) -> ExtractedSession:
+        def my_func(path: Path, *, source_path: Path | None = None) -> ExtractedSession:
             return ExtractedSession(metadata={}, messages=[])
 
         # The decorator should return the original function

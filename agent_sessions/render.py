@@ -17,6 +17,7 @@ def markdown_for_session(
     session: ExtractedSession,
     digest: str,
     imported_at: str | None = None,
+    source_modified: str | None = None,
 ) -> str:
     title_bits = [source.name, str(session.metadata.get("session_id") or path.stem)]
     title = " / ".join(x for x in title_bits if x)
@@ -29,7 +30,7 @@ def markdown_for_session(
         f"- Kind: `{source.kind}`",
         f"- Source file: `{path}`",
         f"- SHA-256: `{digest}`",
-        f"- Source modified: `{modified_timestamp(path)}`",
+        f"- Source modified: `{source_modified or modified_timestamp(path)}`",
         f"- Imported at: `{imported_at or now_utc()}`",
     ]
     for key in sorted(session.metadata):

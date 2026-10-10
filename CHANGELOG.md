@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0rc1] — 2026-10-10
+
+Reliability prerelease candidate; stable release remains 0.3.0.
+
+- Bind exports to one stable source snapshot; verify full content before reuse.
+- Serialize archive catalog writers and atomically replace output files.
+- Preserve content identity in long filenames through the format-v2 extension.
+- Report malformed/empty inputs explicitly and keep export dry runs read-only.
+- Refuse damaged catalogs and invalid configuration rather than silently changing
+  meaning; preserve aliases when one same-content source changes.
+- Preserve old archives, Router v1 ingestion and backup-v1 recovery.
+
+See [candidate notes](docs/RELEASE_CANDIDATE_0_4_0.md) for validation,
+compatibility and the Forgejo prerelease distribution path.
+
 ## [0.3.0] — 2026-09-15
 
 ### First-run setup

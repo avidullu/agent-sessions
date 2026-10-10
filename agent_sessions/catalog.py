@@ -34,7 +34,7 @@ def catalog_record_error(record: Any) -> str | None:
             return f"missing required field {name!r}"
         if not _text(record[name]):
             return f"{name!r} must be a nonempty string"
-    for name in ("messages", "size", "malformed_rows", "input_records", "mtime_ns", "ctime_ns", "inode"):
+    for name in ("messages", "size", "malformed_rows", "unsupported_rows", "input_records", "extractor_revision", "mtime_ns", "ctime_ns", "inode"):
         if name in record:
             value = record[name]
             if not isinstance(value, int) or isinstance(value, bool) or value < 0:
@@ -58,6 +58,8 @@ def catalog_record_error(record: Any) -> str | None:
             return f"{name!r} must be an object"
     if "parse_status" in record and record["parse_status"] not in ("complete", "partial", "empty"):
         return "'parse_status' must be complete, partial, or empty"
+    if record.get("empty_reason") not in (None, "unsupported_schema", "metadata_only", "no_transcript"):
+        return "'empty_reason' must describe an empty or unsupported input"
     if "source_aliases" in record:
         aliases = record["source_aliases"]
         if not isinstance(aliases, list):

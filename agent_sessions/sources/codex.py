@@ -9,15 +9,29 @@ from ..models import ExtractedSession, SessionMessage
 from ..utils import jsonl_objects, session_id_from_name, text_from_content
 from .registry import register
 
+# Known non-transcript ResponseItem variants in the upstream Codex protocol.
+# Tool-aware Markdown remains separate; unknown shapes still report damage.
+NON_TRANSCRIPT_ITEMS = frozenset({
+    "function_call", "custom_tool_call", "function_call_output", "custom_tool_call_output",
+    "reasoning", "local_shell_call", "web_search_call", "image_generation_call",
+    "tool_search_call", "tool_search_output", "additional_tools", "compaction",
+    "compaction_summary", "context_compaction", "configuration_update", "compaction_trigger",
+})
+
 
 @register("codex")
-def extract(path: Path) -> ExtractedSession:
-    metadata: dict[str, Any] = {"session_id": session_id_from_name(path)}
+def extract(path: Path, *, source_path: Path | None = None) -> ExtractedSession:
+    identity = source_path if source_path is not None else path
+    metadata: dict[str, Any] = {"session_id": session_id_from_name(identity)}
     messages: list[SessionMessage] = []
-    for obj in jsonl_objects(path):
+    diagnostics: dict[str, int] = {}
+    for obj in jsonl_objects(path, diagnostics=diagnostics):
         payload_raw = obj.get("payload")
         payload: dict[str, Any] = payload_raw if isinstance(payload_raw, dict) else {}
         if obj.get("type") == "session_meta":
+            diagnostics["metadata_records"] = diagnostics.get("metadata_records", 0) + 1
+            if not isinstance(payload_raw, dict):
+                diagnostics["unsupported_rows"] = diagnostics.get("unsupported_rows", 0) + 1
             metadata.update(
                 {
                     "session_id": payload.get("session_id") or payload.get("id") or metadata["session_id"],
@@ -30,6 +44,8 @@ def extract(path: Path) -> ExtractedSession:
             continue
         role = payload.get("role")
         content = text_from_content(payload.get("content"))
-        if role and content:
+        if isinstance(role, str) and role and content:
             messages.append(SessionMessage(role=role, text=content, timestamp=obj.get("timestamp", "")))
-    return ExtractedSession(metadata=metadata, messages=messages)
+        elif not (isinstance(role, str) and role) and obj.get("type") not in ("event_msg", "turn_context") and payload.get("type") not in NON_TRANSCRIPT_ITEMS:
+            diagnostics["unsupported_rows"] = diagnostics.get("unsupported_rows", 0) + 1
+    return ExtractedSession(metadata=metadata, messages=messages, **diagnostics)

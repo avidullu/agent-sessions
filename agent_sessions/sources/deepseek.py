@@ -9,8 +9,9 @@ from .registry import register
 
 
 @register("deepseek_request_dump")
-def extract(path: Path) -> ExtractedSession:
-    metadata = {"session_id": path.parent.name, "request_file": path.name}
+def extract(path: Path, *, source_path: Path | None = None) -> ExtractedSession:
+    identity = source_path if source_path is not None else path
+    metadata = {"session_id": identity.parent.name, "request_file": identity.name}
     text = path.read_text(encoding="utf-8", errors="replace")
     messages = [SessionMessage(role="request-prompt", text=text)] if text.strip() else []
     return ExtractedSession(metadata=metadata, messages=messages)
