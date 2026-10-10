@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Document native Grok as `grok-local` (`{home}/.grok/sessions`, `**/chat_history.jsonl`) in checkout defaults and `sources.example.toml`, beside the existing WSL source.
+- Collection health reports an unresolved path template as `unresolved_template` and requires attention even when other sources have sessions. A missing directory stays `roots_missing`.
+- Grok extraction counts encrypted rows and textless assistant or tool calls as unsupported, so those files export as `partial` instead of `complete`. Cached parses refresh at extractor revision 2.
+
 ## [0.4.0rc1] — 2026-10-10
 
 Reliability prerelease candidate; stable release remains 0.3.0.

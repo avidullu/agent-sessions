@@ -52,6 +52,13 @@ roots = ["{home}/.gemini/antigravity/brain"]
 glob = "**/transcript*.jsonl"
 
 [[sources]]
+name = "grok-local"
+kind = "grok"
+description = "Native Grok chat history under the home directory. Same source as the packaged default."
+roots = ["{home}/.grok/sessions"]
+glob = "**/chat_history.jsonl"
+
+[[sources]]
 name = "grok-wsl-ubuntu"
 kind = "grok"
 description = "From Windows: Grok sessions inside the default WSL distro."
@@ -146,8 +153,9 @@ glob = "**/*"
 # ]
 # glob = "**/*.jsonl"
 
+# Native Grok is already enabled above as grok-local. Do not enable this copy too.
 # [[sources]]
-# name = "grok-linux"
+# name = "grok-local"
 # kind = "grok"
 # roots = ["{home}/.grok/sessions"]
 # glob = "**/chat_history.jsonl"

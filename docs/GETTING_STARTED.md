@@ -52,7 +52,8 @@ agent-archive init
 
 This uses a template shipped inside the package, preserves existing configuration,
 and does not collect or upload anything. Review `sources.toml` before exporting.
-The default CLI sources are Codex, Claude Code, and Grok; additional sources can be
+The default CLI sources are Codex, Claude Code, and native Grok
+(`{home}/.grok/sessions`); additional sources, including Grok under WSL, can be
 configured using the [source examples](../sources.example.toml).
 
 For the VS Code router, run **Agent Session Router: Set Output Directory** and
@@ -111,7 +112,11 @@ Match the displayed directory to VS Code's `agentSessionRouter.outputDir`.
 `no_sessions` means no catalog records were found here, not proof that no source
 conversations exist. A missing router index can mean a different output directory
 or that no router export has run yet. Sources can be `disabled`, `roots_missing`,
-`available`, `inventory_only`, or `router_managed` (fed by the router sidecar).
+`unresolved_template`, `available`, `inventory_only`, or `router_managed` (fed by
+the router sidecar). `unresolved_template` means a path such as `{wsl_home}` could
+not be rendered and needs attention even when other sources have sessions. A
+directory that is simply absent stays `roots_missing` and does not by itself
+change an empty archive from `no_sessions`.
 
 Last successful export is recorded only by versions that write `exported_at`;
 legacy records show **unknown**, never a guess from the source file's age. Missing
