@@ -134,6 +134,8 @@ def export_sources(
     dry_run: bool = False,
 ) -> ExportResult:
     sources = select_sources(config, selected)
+    if not dry_run:
+        validate_archive_catalog(config)
     config.archive_dir.mkdir(parents=True, exist_ok=True)
     existing_records = read_existing_index_records(config)
     prior_by_key = {} if dry_run else {index_record_key(record): record for record in existing_records}
@@ -417,6 +419,8 @@ def prune_index_records(config: ArchiveConfig, dry_run: bool = False) -> int:
             "Set [archive] track_artifacts = true to prune by artifact presence."
         )
         return 0
+    if not dry_run:
+        validate_archive_catalog(config)
     records = read_existing_index_records(config)
     kept: list[dict[str, Any]] = []
     dropped: list[dict[str, Any]] = []

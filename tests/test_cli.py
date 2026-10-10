@@ -473,6 +473,36 @@ class TestMain:
         assert result == 0
         assert "Dry run only" in capsys.readouterr().out
 
+    @pytest.mark.parametrize("dry_run", [False, True])
+    def test_export_unmatched_source_returns_actionable_error_without_outputs(
+        self, repo_root: Path, capsys: pytest.CaptureFixture[str], dry_run: bool,
+    ) -> None:
+        (repo_root / "sources.toml").write_text(
+            '[[sources]]\nname="first"\nkind="codex"\nroots=["inputs"]\n', encoding="utf-8",
+        )
+        before = {path.relative_to(repo_root): path.read_bytes() for path in repo_root.rglob("*") if path.is_file()}
+        before_paths = {path.relative_to(repo_root) for path in repo_root.rglob("*")}
+        args = ["export", "--source", "missing", *(["--dry-run"] if dry_run else [])]
+        assert main(args) == 2
+        error = capsys.readouterr().err
+        assert "No configured sources matched --source" in error
+        assert "Traceback" not in error
+        assert {path.relative_to(repo_root) for path in repo_root.rglob("*")} == before_paths
+        assert {path.relative_to(repo_root): path.read_bytes() for path in repo_root.rglob("*") if path.is_file()} == before
+
+    @pytest.mark.parametrize("setting", ["write_pdfs", "track_artifacts"])
+    def test_config_boolean_error_names_the_quoted_key(
+        self, repo_root: Path, capsys: pytest.CaptureFixture[str], setting: str,
+    ) -> None:
+        (repo_root / "sources.toml").write_text(f'[archive]\n{setting} = "false"\n', encoding="utf-8")
+        before_paths = {path.relative_to(repo_root) for path in repo_root.rglob("*")}
+        assert main(["export", "--all", "--dry-run"]) == 2
+        error = capsys.readouterr().err
+        assert f"archive.{setting} must be a TOML boolean" in error
+        assert "without quotes" in error
+        assert "Traceback" not in error
+        assert {path.relative_to(repo_root) for path in repo_root.rglob("*")} == before_paths
+
     def test_export_reports_skipped_sources_and_pdf_hint(
         self,
         repo_root: Path,
