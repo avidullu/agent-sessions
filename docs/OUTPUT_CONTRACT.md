@@ -294,6 +294,11 @@ full SHA-256 is preserved and export refuses to replace it. Raw-copy names retai
 their digest prefix while limiting their human suffix to the filesystem byte budget.
 Version 2 long-name goldens live at `tests/fixtures/contract/v2/long-naming.json`.
 
+The optional integer `extractor_revision` identifies cached parser results.
+Missing or older revisions are re-extracted from the stable source snapshot on
+next export, even when its bytes are unchanged. Content hashes and format version
+remain independent of this cache revision.
+
 New optional fields report parsing explicitly: `parse_status` is `complete`,
 `partial` (malformed or unsupported source rows), or `empty` (no transcript messages);
 `malformed_rows`, `unsupported_rows` and `input_records` are nonnegative integers.

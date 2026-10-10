@@ -28,6 +28,7 @@ IMPORTED_AT_RE = re.compile(r"^- Imported at: `([^`]+)`$", re.MULTILINE)
 GENERATED_RE = re.compile(r"^Generated: `([^`]+)`$", re.MULTILINE)
 ROUTER_INDEX_FILENAME = ".router-index.jsonl"
 TAIL_HASH_BYTES = 64 * 1024
+EXTRACTOR_REVISION = 1
 
 
 @dataclass(frozen=True)
@@ -185,7 +186,8 @@ def _export_sources(
                     digest = captured.digest
                     prior = prior_by_key.get((source.name, portable_path(str(path))))
                     tail_digest = tail_sha256_file(captured.path)
-                    if (prior is not None and prior.get("format_version") == 2 and prior.get("sha256") == digest
+                    if (prior is not None and prior.get("format_version") == 2
+                            and prior.get("extractor_revision") == EXTRACTOR_REVISION and prior.get("sha256") == digest
                             and _can_reuse_record(config, prior, size, mtime, write_pdfs,
                                                   copy_raw_files, tail_digest)):
                         reused = dict(prior)
@@ -198,7 +200,7 @@ def _export_sources(
                         empty_files += int(prior.get("parse_status") == "empty")
                         exported += 1
                         continue
-                    session = extractor(captured.path)
+                    session = extractor(captured.path, source_path=path)
                     session_id = str(session.metadata.get("session_id") or path.stem)
                     changed = dt.datetime.fromtimestamp(mtime, dt.UTC).strftime("%Y%m%d")
                     stem = artifact_stem(changed, session_id, path.stem, digest)
@@ -242,7 +244,8 @@ def _export_sources(
                     unsupported_files += int(session.unsupported_rows > 0)
                     empty_files += int(not session.messages)
                     records.append({
-                        "format_version": 2, "source": source.name, "kind": source.kind,
+                        "format_version": 2, "extractor_revision": EXTRACTOR_REVISION,
+                        "source": source.name, "kind": source.kind,
                         "source_file": portable_path(str(path)), "source_origin": portable_origin(str(path)),
                         "sha256": digest, "tail_sha256": tail_digest, "size": size, "mtime": mtime,
                         "messages": len(session.messages), "exported_at": now_utc(),

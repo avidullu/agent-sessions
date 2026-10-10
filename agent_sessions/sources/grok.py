@@ -11,8 +11,9 @@ from .registry import register
 
 
 @register("grok")
-def extract(path: Path) -> ExtractedSession:
-    metadata: dict[str, Any] = {"session_id": path.parent.name, "project": path.parent.parent.name}
+def extract(path: Path, *, source_path: Path | None = None) -> ExtractedSession:
+    identity = source_path if source_path is not None else path
+    metadata: dict[str, Any] = {"session_id": identity.parent.name, "project": identity.parent.parent.name}
     messages: list[SessionMessage] = []
     diagnostics: dict[str, int] = {}
     for obj in jsonl_objects(path, diagnostics=diagnostics):

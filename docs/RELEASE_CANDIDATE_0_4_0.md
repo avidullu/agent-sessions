@@ -90,3 +90,20 @@ Avi retains default-branch merge and stable-release authority.
 
 Changelog: 2026-10-10 IST — reliability candidate implementation split and
 publication contract recorded.
+
+
+## Review follow-up after rc1 publication
+
+The published rc1 artifacts remain bound to their original commit. Review found
+that shallow source paths could inherit snapshot directory names as provider
+identity, and known Codex web-search/tool envelopes could incorrectly mark an
+otherwise complete transcript partial. The proposed follow-up uses the original
+source path explicitly for extractor identity while reading captured bytes, and
+recognizes known non-transcript Codex response items. Synthetic regressions cover
+shallow paths, identity stability across edits, and successful CLI exports with
+these tool events. Unknown payload shapes still report unsupported input.
+Earlier content-hashed artifact versions remain retained by design. Old cached
+parser results are re-extracted once via an additive extraction revision.
+
+Changelog: 2026-10-10 IST — PR review identity and tool-envelope corrections
+complete in the proposed source; revised artifact qualification remains pending.

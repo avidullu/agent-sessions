@@ -45,9 +45,9 @@ def test_capture_binds_render_and_raw_to_copied_bytes(tmp_path: Path, monkeypatc
     session(source, "before")
     expected = source.read_bytes()
 
-    def changing_source(staged: Path) -> ExtractedSession:
+    def changing_source(staged: Path, *, source_path: Path | None = None) -> ExtractedSession:
         session(source, "after")
-        return extract(staged)
+        return extract(staged, source_path=source_path)
 
     monkeypatch.setattr("agent_sessions.archive.get_extractor", lambda _kind: changing_source)
     result = export_sources(config, copy_raw_files=True)
@@ -128,10 +128,10 @@ def test_concurrent_writer_refuses_then_retry_preserves_both_rows(
     errors: list[Exception] = []
     original = extract
 
-    def paused_extract(path: Path) -> ExtractedSession:
+    def paused_extract(path: Path, *, source_path: Path | None = None) -> ExtractedSession:
         entered.set()
         assert release.wait(timeout=10)
-        return original(path)
+        return original(path, source_path=source_path)
 
     def first_writer() -> None:
         try:
@@ -540,3 +540,108 @@ def test_windows_change_time_query_returns_kernel_value_or_refuses(
     loader.assert_called_once_with("kernel32", use_last_error=True)
     assert function.argtypes == (ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32)
     assert function.restype == ctypes.c_int
+
+
+@pytest.mark.parametrize("kind,original", [
+    ("grok", "/dir/session.jsonl"),
+    ("gemini_antigravity", "/dir/session/session.jsonl"),
+    ("gemini_antigravity", "/dir/session.jsonl"),
+    ("claude", "/dir/session.jsonl"),
+    ("deepseek_request_dump", "/dir/session.jsonl"),
+    ("codex", "/dir/session.jsonl"),
+])
+def test_snapshot_identity_uses_original_shallow_path(tmp_path: Path, kind: str, original: str) -> None:
+    from agent_sessions.sources.registry import get_extractor
+
+    extractor = get_extractor(kind)
+    assert extractor is not None
+    staged = tmp_path / "capture/project/session/staged.jsonl"
+    staged.parent.mkdir(parents=True)
+    staged.write_text('{"source":"user","type":"user","content":"first"}\n')
+    identity = Path(original)
+    # The identity path deliberately does not exist: only captured bytes are read.
+    expected = extractor(staged, source_path=identity).metadata
+    staged.write_text('{"source":"user","type":"user","content":"second"}\n')
+    assert extractor(staged, source_path=identity).metadata == expected
+    if kind == "grok":
+        assert expected == {"session_id": identity.parent.name, "project": identity.parent.parent.name}
+    elif kind == "gemini_antigravity":
+        assert expected["session_id"] == ((identity.parents[2].name if len(identity.parents) > 2 else "") or identity.stem)
+    assert "capture" not in json.dumps(expected)
+
+
+@pytest.mark.parametrize("kind", ["grok", "gemini_antigravity"])
+def test_export_keeps_provider_identity_after_source_edit(tmp_path: Path, kind: str) -> None:
+    from agent_sessions.sources.registry import get_extractor
+
+    config = configuration(tmp_path)
+    source = tmp_path / "inputs/session.jsonl"
+    config = ArchiveConfig(config.repo_root, config.archive_dir, config.raw_dir,
+                           (Source("first", kind, (source.parent,), "*.jsonl"),))
+    extractor = get_extractor(kind)
+    assert extractor is not None
+    rows = []
+    for text in ("first", "second"):
+        source.write_text(json.dumps({"source": "user", "type": "user", "content": text}) + "\n")
+        expected = extractor(source).metadata
+        export_sources(config)
+        rows.append(read_existing_index_records(config)[0])
+        assert rows[-1]["metadata"] == expected
+        assert "agent-archive-capture-" not in (tmp_path / rows[-1]["markdown"]).read_text()
+    assert rows[0]["metadata"] == rows[1]["metadata"]
+    # Digest-addressed old versions remain available by design, with stable titles.
+    assert rows[0]["markdown"] != rows[1]["markdown"]
+    export_sources(config)
+    assert len(list(config.archive_dir.rglob("*.md"))) == 3  # two versions plus INDEX.md
+
+
+@pytest.mark.parametrize("item_type", [
+    "web_search_call", "local_shell_call", "image_generation_call", "tool_search_call",
+    "tool_search_output", "additional_tools", "compaction", "compaction_summary",
+    "context_compaction", "configuration_update", "compaction_trigger",
+])
+def test_known_codex_non_transcript_items_do_not_fail_export(
+    tmp_path: Path, item_type: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from agent_sessions.cli import main
+
+    config = configuration(tmp_path)
+    source = tmp_path / "inputs/session.jsonl"
+    session(source, "archived user message")
+    with source.open("a") as stream:
+        stream.write(json.dumps({"type": "response_item", "payload": {"type": item_type}}) + "\n")
+    monkeypatch.setattr("agent_sessions.cli.load_config", lambda *_args, **_kwargs: config)
+    assert main(["--repo-root", str(tmp_path), "export", "--all"]) == 0
+    row = read_existing_index_records(config)[0]
+    assert row["parse_status"] == "complete"
+    assert row["unsupported_rows"] == 0
+    assert row["messages"] == 1
+
+
+@pytest.mark.parametrize("kind", ["gemini_antigravity", "codex"])
+def test_rc1_cached_extraction_is_refreshed_without_source_edits(tmp_path: Path, kind: str) -> None:
+    config = configuration(tmp_path)
+    source = tmp_path / "inputs/session.jsonl"
+    config = ArchiveConfig(config.repo_root, config.archive_dir, config.raw_dir,
+                           (Source("first", kind, (source.parent,), "*.jsonl"),))
+    if kind == "codex":
+        session(source, "hello")
+        with source.open("a") as stream:
+            stream.write('{"type":"response_item","payload":{"type":"web_search_call"}}\n')
+    else:
+        source.write_text('{"source":"user","content":"hello"}\n')
+    export_sources(config)
+    row = read_existing_index_records(config)[0]
+    expected_metadata = row["metadata"]
+    row.pop("extractor_revision")
+    if kind == "codex":
+        row.update(parse_status="partial", unsupported_rows=1)
+    else:
+        row["metadata"] = {"session_id": "agent-archive-capture-obsolete"}
+    (config.archive_dir / "index.jsonl").write_text(json.dumps(row) + "\n")
+    result = export_sources(config)
+    refreshed = read_existing_index_records(config)[0]
+    assert not result.unsupported_files
+    assert refreshed["metadata"] == expected_metadata
+    assert refreshed["parse_status"] == "complete"
+    assert refreshed["extractor_revision"] == 1

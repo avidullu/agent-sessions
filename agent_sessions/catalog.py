@@ -34,7 +34,7 @@ def catalog_record_error(record: Any) -> str | None:
             return f"missing required field {name!r}"
         if not _text(record[name]):
             return f"{name!r} must be a nonempty string"
-    for name in ("messages", "size", "malformed_rows", "unsupported_rows", "input_records", "mtime_ns", "ctime_ns", "inode"):
+    for name in ("messages", "size", "malformed_rows", "unsupported_rows", "input_records", "extractor_revision", "mtime_ns", "ctime_ns", "inode"):
         if name in record:
             value = record[name]
             if not isinstance(value, int) or isinstance(value, bool) or value < 0:

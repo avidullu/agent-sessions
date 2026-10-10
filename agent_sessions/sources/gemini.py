@@ -11,8 +11,9 @@ from .registry import register
 
 
 @register("gemini_antigravity")
-def extract(path: Path) -> ExtractedSession:
-    metadata: dict[str, Any] = {"session_id": path.parents[2].name if len(path.parents) > 2 else path.stem}
+def extract(path: Path, *, source_path: Path | None = None) -> ExtractedSession:
+    identity = source_path if source_path is not None else path
+    metadata: dict[str, Any] = {"session_id": (identity.parents[2].name if len(identity.parents) > 2 else "") or identity.stem}
     messages: list[SessionMessage] = []
     diagnostics: dict[str, int] = {}
     for obj in jsonl_objects(path, diagnostics=diagnostics):
