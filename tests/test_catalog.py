@@ -13,6 +13,7 @@ from agent_sessions.archive import (
     export_sources,
     load_index_records,
     pdf_existing,
+    prune_index_records,
     read_existing_index_records,
     read_router_index_records,
     select_sources,
@@ -23,6 +24,7 @@ from agent_sessions.archive_stats import archive_statistics
 from agent_sessions.catalog import catalog_record_error, parse_catalog_lines, read_catalog
 from agent_sessions.collection_health import collection_health
 from agent_sessions.config import ArchiveConfig
+from agent_sessions.models import Source
 
 
 def legacy_record() -> dict[str, Any]:
@@ -51,6 +53,40 @@ def test_corrupt_catalog_keeps_good_rows_and_original_bytes(tmp_path: Path, name
     report = archive_statistics(config)
     assert report["catalog"]["catalog_records"] == 1
     assert report["catalog"]["counts_complete"] is False
+
+
+@pytest.mark.parametrize("operation", ["export", "prune"])
+@pytest.mark.parametrize("name", ["index.jsonl", ".router-index.jsonl"])
+@pytest.mark.parametrize("damaged_row", [
+    b'{"source":"first","source_file":"inputs/orphan.jsonl"}\n', b'{"truncated":\n',
+])
+def test_export_and_prune_preserve_invalid_catalogs_before_outputs(
+    tmp_path: Path, operation: str, name: str, damaged_row: bytes,
+) -> None:
+    inputs = tmp_path / "inputs"
+    inputs.mkdir()
+    transcript = json.dumps({"type": "response_item", "payload": {
+        "type": "message", "role": "user", "content": [{"type": "input_text", "text": "synthetic session"}],
+    }}) + "\n"
+    (inputs / "first.jsonl").write_text(transcript, encoding="utf-8")
+    config = ArchiveConfig(tmp_path, tmp_path / "archive", tmp_path / "raw",
+                           (Source("first", "codex", (inputs,), "*.jsonl"),), track_artifacts=True)
+    assert export_sources(config, copy_raw_files=True).exported == 1
+    catalog = config.archive_dir / name
+    valid_catalog = (config.archive_dir / "index.jsonl").read_bytes()
+    catalog.write_bytes(valid_catalog + damaged_row)
+    if operation == "prune":
+        record = read_existing_index_records(config)[0]
+        (config.repo_root / record["markdown"]).unlink()
+    else:
+        (inputs / "second.jsonl").write_text(transcript, encoding="utf-8")
+    before = {path.relative_to(tmp_path): path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+    with pytest.raises(ValueError, match="Original bytes are preserved"):
+        if operation == "export":
+            export_sources(config, copy_raw_files=True)
+        else:
+            prune_index_records(config)
+    assert {path.relative_to(tmp_path): path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()} == before
 
 
 @pytest.mark.parametrize("field", ["source", "kind", "source_file", "markdown"])
