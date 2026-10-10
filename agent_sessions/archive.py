@@ -15,12 +15,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .catalog import read_catalog, validate_archive_catalog
 from .config import ArchiveConfig
 from .models import Source
 from .portable_paths import portable_metadata, portable_origin, portable_path, portable_record
 from .render import markdown_for_session, write_pdf
 from .sources.registry import get_extractor
-from .utils import now_utc, read_jsonl_dicts, slugify
+from .utils import now_utc, slugify
 
 IMPORTED_AT_RE = re.compile(r"^- Imported at: `([^`]+)`$", re.MULTILINE)
 GENERATED_RE = re.compile(r"^Generated: `([^`]+)`$", re.MULTILINE)
@@ -84,7 +85,10 @@ def select_sources(config: ArchiveConfig, selected: list[str] | None) -> list[So
     known = {source.name for source in config.sources} | {source.kind for source in config.sources}
     for selector in sorted(wanted - known):
         print(f"warning: --source {selector!r} matched no configured source name or kind.", file=sys.stderr)
-    return [source for source in config.sources if source.name in wanted or source.kind in wanted]
+    matches = [source for source in config.sources if source.name in wanted or source.kind in wanted]
+    if not matches:
+        raise ValueError("No configured sources matched --source. Use discover to list available names and kinds.")
+    return matches
 
 
 def _index_path_exists(config: ArchiveConfig, rel: Any) -> bool:
@@ -130,6 +134,8 @@ def export_sources(
     dry_run: bool = False,
 ) -> ExportResult:
     sources = select_sources(config, selected)
+    if not dry_run:
+        validate_archive_catalog(config)
     config.archive_dir.mkdir(parents=True, exist_ok=True)
     existing_records = read_existing_index_records(config)
     prior_by_key = {} if dry_run else {index_record_key(record): record for record in existing_records}
@@ -232,6 +238,11 @@ def index_record_key(record: dict[str, Any]) -> tuple[str, str]:
     return (str(record.get("source", "")), portable_path(str(record.get("source_file", ""))))
 
 
+def index_record_keys(record: dict[str, Any]) -> tuple[tuple[str, str], ...]:
+    """All portable path references for a deduplicated content record."""
+    return tuple(dict.fromkeys(index_record_key(alias) for alias in [record, *record.get("source_aliases", [])]))
+
+
 def index_identity_key(record: dict[str, Any]) -> tuple[str, ...]:
     # Merge identity: machine-independent for the same logical content exported
     # from Windows and WSL (different absolute source_file paths), but not so
@@ -250,7 +261,7 @@ def index_identity_key(record: dict[str, Any]) -> tuple[str, ...]:
 def _posix_index_record(record: dict[str, Any]) -> dict[str, Any]:
     # Repo-relative archive paths are written POSIX-normalized once, here, so
     # downstream consumers never have to compensate for OS separators.
-    normalized = dict(record)
+    normalized = _portable_catalog_record(record)
     for key in ("markdown", "pdf", "raw"):
         value = normalized.get(key)
         if isinstance(value, str):
@@ -264,7 +275,14 @@ def read_existing_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
         return []
     # Normalize on load so indexes written before the portable-path convention
     # are upgraded transparently on the next export/status run.
-    return [portable_record(record) for record in read_jsonl_dicts(index_path, label="archive/index.jsonl")]
+    return [_portable_catalog_record(record) for record in read_catalog(index_path, warn=True).records]
+
+
+def _portable_catalog_record(record: dict[str, Any]) -> dict[str, Any]:
+    normalized = portable_record(record)
+    if "source_aliases" in record:
+        normalized["source_aliases"] = [portable_record(alias) for alias in record["source_aliases"]]
+    return normalized
 
 
 def read_router_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
@@ -274,40 +292,46 @@ def read_router_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
     Markdown files. This function reads those records so they can be merged into
     the main ``archive/index.jsonl`` without requiring a full re-extraction.
 
-    Returns an empty list if the file does not exist or is malformed.
+    Keeps valid rows when other rows are malformed; writes must validate first.
     """
     router_index_path = config.archive_dir / ROUTER_INDEX_FILENAME
     if not router_index_path.exists():
         return []
-    try:
-        # Router-produced records carry the extension's local absolute paths;
-        # normalize them the same way our own records are.
-        return [
-            portable_record(record)
-            for record in read_jsonl_dicts(router_index_path, label=f"archive/{ROUTER_INDEX_FILENAME}")
-        ]
-    except Exception:
-        print(f"warning: failed to read {router_index_path}; skipping router index records.", file=sys.stderr)
-        return []
+    return [_portable_catalog_record(record) for record in read_catalog(router_index_path, warn=True).records]
 
 
 def merge_index_records(existing: list[dict[str, Any]], current: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    merged: dict[tuple[str, ...], dict[str, Any]] = {}
-    order: list[tuple[str, ...]] = []
-    path_to_identity: dict[tuple[str, str], tuple[str, ...]] = {}
+    # Upsert paths first, before deduplicating content. Persist alternate path
+    # references so a later call can supersede one alias without erasing another.
+    by_path: dict[tuple[str, str], dict[str, Any]] = {}
     for record in [*existing, *current]:
-        path_key = index_record_key(record)
-        key = index_identity_key(record)
-        old_key_for_path = path_to_identity.get(path_key)
-        if old_key_for_path is not None and old_key_for_path != key:
-            # Same local source path changed content: supersede the old digest
-            # record instead of accumulating stale index entries.
-            merged.pop(old_key_for_path, None)
-        if key not in merged:
-            order.append(key)
-        merged[key] = record
-        path_to_identity[path_key] = key
-    return [merged[key] for key in order if key in merged]
+        primary = dict(record)
+        primary.pop("source_aliases", None)
+        for alias in record.get("source_aliases", []):
+            alternate = dict(primary)
+            alternate.pop("source_origin", None)
+            alternate.update(alias)
+            # Carried aliases are references, not new observations. A cached
+            # row must not overwrite another path's explicit changed record.
+            by_path.setdefault(index_record_key(alternate), alternate)
+        primary_key = index_record_key(primary)
+        # An explicit observation also refreshes the representative metadata
+        # when content is unchanged; an older alias must not hide new counts.
+        by_path.pop(primary_key, None)
+        by_path[primary_key] = primary
+    groups: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    for record in by_path.values():
+        groups.setdefault(index_identity_key(record), []).append(record)
+    merged = []
+    for aliases in groups.values():
+        primary = dict(aliases[-1])
+        if len(aliases) > 1:
+            primary["source_aliases"] = [
+                {key: alias[key] for key in ("source", "source_file", "source_origin") if key in alias}
+                for alias in aliases[:-1]
+            ]
+        merged.append(primary)
+    return merged
 
 
 def write_indexes(config: ArchiveConfig, records: list[dict[str, Any]]) -> None:
@@ -338,7 +362,7 @@ def write_indexes(config: ArchiveConfig, records: list[dict[str, Any]]) -> None:
                 pdf_rel = os.path.relpath(config.repo_root / pdf_norm, config.archive_dir).replace("\\", "/")
                 pdf_cell = f"[PDF]({pdf_rel})"
         lines.append(
-            f"| {record['source']} | {record['kind']} | {record['messages']} | "
+            f"| {record['source']} | {record['kind']} | {record.get('messages', 'unknown')} | "
             f"{markdown_cell} | {pdf_cell} |"
         )
     index_path = config.archive_dir / "INDEX.md"
@@ -377,7 +401,7 @@ def load_index_records(config: ArchiveConfig) -> list[dict[str, Any]]:
     index_path = config.archive_dir / "index.jsonl"
     if not index_path.exists():
         raise SystemExit("archive/index.jsonl does not exist. Run export first.")
-    return read_jsonl_dicts(index_path, label="archive/index.jsonl")
+    return [_portable_catalog_record(record) for record in read_catalog(index_path, warn=True).records]
 
 
 def prune_index_records(config: ArchiveConfig, dry_run: bool = False) -> int:
@@ -395,6 +419,8 @@ def prune_index_records(config: ArchiveConfig, dry_run: bool = False) -> int:
             "Set [archive] track_artifacts = true to prune by artifact presence."
         )
         return 0
+    if not dry_run:
+        validate_archive_catalog(config)
     records = read_existing_index_records(config)
     kept: list[dict[str, Any]] = []
     dropped: list[dict[str, Any]] = []
@@ -423,6 +449,7 @@ def pdf_existing(
     limit: int | None = None,
     force: bool = False,
 ) -> int:
+    validate_archive_catalog(config)
     records = load_index_records(config)
     wanted = set(selected or [])
     made = 0

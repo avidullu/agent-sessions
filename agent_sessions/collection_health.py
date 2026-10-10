@@ -3,30 +3,16 @@
 from __future__ import annotations
 
 import datetime as dt
-import json
 from pathlib import Path
 from typing import Any
 
+from .catalog import CATALOG_NAMES, read_catalog
 from .config import ArchiveConfig
 from .sources.registry import get_extractor
 
 
 def index_state(path: Path) -> str:
-    if not path.exists():
-        return "missing"
-    try:
-        with path.open(encoding="utf-8") as stream:
-            for line in stream:
-                if not line.strip():
-                    continue
-                record = json.loads(line)
-                if not isinstance(record, dict) or not all(key in record for key in ("source", "source_file")):
-                    return "malformed"
-    except (ValueError, UnicodeError):
-        return "malformed"
-    except OSError:
-        return "unreadable"
-    return "readable"
+    return read_catalog(path).state
 
 
 def collection_health(config: ArchiveConfig, records: list[dict[str, Any]]) -> dict[str, Any]:
@@ -35,6 +21,8 @@ def collection_health(config: ArchiveConfig, records: list[dict[str, Any]]) -> d
     unknown_messages = 0
     artifact_bytes = 0
     missing_artifacts = 0
+    partial_parses = 0
+    empty_parses = 0
     export_times: list[dt.datetime] = []
     sources: dict[str, str] = {}
     for source in config.sources:
@@ -47,6 +35,10 @@ def collection_health(config: ArchiveConfig, records: list[dict[str, Any]]) -> d
     for source in config.disabled_sources:
         sources[source.name] = "router_managed" if source.kind == "router_index" else "disabled"
     for record in records:
+        if record.get("parse_status") == "partial" or record.get("malformed_rows", 0) > 0:
+            partial_parses += 1
+        if record.get("parse_status") == "empty":
+            empty_parses += 1
         count = record.get("messages")
         if isinstance(count, int) and not isinstance(count, bool) and count >= 0:
             total_messages += count
@@ -74,17 +66,29 @@ def collection_health(config: ArchiveConfig, records: list[dict[str, Any]]) -> d
                     export_times.append(timestamp.astimezone(dt.UTC))
             except ValueError:
                 pass
-    indexes = {name: index_state(archive / name) for name in ("index.jsonl", ".router-index.jsonl")}
+    catalogs = {name: read_catalog(archive / name) for name in CATALOG_NAMES}
+    indexes = {name: catalog.state for name, catalog in catalogs.items()}
     problems = [f"{name}: {state}" for name, state in indexes.items() if state in {"malformed", "unreadable"}]
     if missing_artifacts:
         problems.append(f"{missing_artifacts} catalogued Markdown artifacts unavailable in this local archive")
+    if partial_parses:
+        problems.append(f"{partial_parses} sessions have partial source parses; message counts are incomplete")
+    if unknown_messages:
+        problems.append(f"{unknown_messages} sessions have no known message count")
+    if empty_parses:
+        problems.append(f"{empty_parses} source files contain no extracted transcript messages (empty or metadata-only)")
     return {
         "schema_version": 1,
         "archive_dir": str(archive),
         "state": "attention_required" if problems else "collected" if records else "no_sessions",
         "sessions": None if "unreadable" in indexes.values() else len(records),
         "messages": None if "unreadable" in indexes.values() else total_messages,
-        "counts_complete": not any(state in {"malformed", "unreadable"} for state in indexes.values()),
+        "counts_complete": not (partial_parses or unknown_messages) and not any(
+            state in {"malformed", "unreadable"} for state in indexes.values()),
+        "invalid_catalog_rows": sum(catalog.invalid_rows for catalog in catalogs.values()),
+        "catalog_problems": [problem for catalog in catalogs.values() for problem in catalog.problems],
+        "sessions_with_partial_parse": partial_parses,
+        "empty_source_files": empty_parses,
         "sessions_with_unknown_message_count": unknown_messages,
         "local_markdown_bytes": artifact_bytes,
         "missing_local_artifacts": missing_artifacts,

@@ -39,14 +39,30 @@ def load_config(repo_root: Path, config_path: Path | None = None) -> ArchiveConf
     data = read_toml(path)
     templates = PathTemplateContext.from_environment(repo_root)
     archive_settings = data.get("archive", {})
-    archive_dir = repo_path(repo_root, archive_settings.get("archive_dir", "archive"))
-    raw_dir = repo_path(repo_root, archive_settings.get("raw_dir", "raw"))
-    write_pdfs = bool(archive_settings.get("write_pdfs", False))
-    track_artifacts = bool(archive_settings.get("track_artifacts", False))
-    sources = tuple(load_source(item, templates) for item in data.get("sources", []) if item.get("enabled", True))
+    if not isinstance(archive_settings, dict):
+        raise ValueError("Archive settings must be a TOML table.")
+    archive_dir = repo_path(repo_root, config_string(archive_settings, "archive_dir", "archive", "archive"))
+    raw_dir = repo_path(repo_root, config_string(archive_settings, "raw_dir", "raw", "archive"))
+    write_pdfs = config_boolean(archive_settings, "write_pdfs", False, "archive")
+    track_artifacts = config_boolean(archive_settings, "track_artifacts", False, "archive")
+    source_settings = data.get("sources", [])
+    if not isinstance(source_settings, list):
+        raise ValueError("Sources settings must be an array of TOML tables ([[sources]]).")
+    enabled_sources: list[Source] = []
+    disabled_sources: list[Source] = []
+    for number, item in enumerate(source_settings, 1):
+        if not isinstance(item, dict):
+            raise ValueError(f"sources[{number}] must be a TOML table.")
+        enabled = config_boolean(item, "enabled", True, f"sources[{number}]")
+        source = load_source(item, templates)
+        (enabled_sources if enabled else disabled_sources).append(source)
     backup_settings = data.get("backup", {})
     if not isinstance(backup_settings, dict):
         raise ValueError("Backup settings must be a TOML table.")
+    backup_on_export = config_boolean(backup_settings, "on_export", False, "backup")
+    backup_machine = backup_settings.get("machine")
+    if backup_machine is not None:
+        backup_machine = config_string(backup_settings, "machine", "", "backup")
     backup_directory = backup_settings.get("directory")
     backup_dir = None
     if backup_directory is not None:
@@ -60,14 +76,13 @@ def load_config(repo_root: Path, config_path: Path | None = None) -> ArchiveConf
         repo_root=repo_root,
         archive_dir=archive_dir,
         raw_dir=raw_dir,
-        sources=sources,
+        sources=tuple(enabled_sources),
         backup_dir=backup_dir,
-        backup_machine=backup_settings.get("machine"),
-        backup_on_export=bool(backup_settings.get("on_export", False)),
+        backup_machine=backup_machine,
+        backup_on_export=backup_on_export,
         write_pdfs=write_pdfs,
         track_artifacts=track_artifacts,
-        disabled_sources=tuple(load_source(item, templates) for item in data.get("sources", [])
-                               if not item.get("enabled", True)),
+        disabled_sources=tuple(disabled_sources),
     )
 
 
@@ -79,13 +94,30 @@ def load_source(item: dict[str, Any], templates: PathTemplateContext) -> Source:
     for required in ("name", "kind"):
         if required not in item:
             raise SystemExit(f"Invalid source entry in config: missing required key {required!r}. Entry: {item!r}")
-    return Source(
-        name=item["name"],
-        kind=item["kind"],
-        roots=tuple(templates.resolve(root) for root in item.get("roots", [])),
-        glob=item.get("glob", "**/*"),
-        description=item.get("description", ""),
-    )
+    name = config_string(item, "name", "", "source")
+    kind = config_string(item, "kind", "", f"source {name!r}")
+    roots = item.get("roots", [])
+    if not isinstance(roots, list) or not all(isinstance(root, str) and root.strip() for root in roots):
+        raise ValueError(f"source {name!r}.roots must be an array of nonempty path strings.")
+    description = item.get("description", "")
+    if not isinstance(description, str):
+        raise ValueError(f"source {name!r}.description must be a string.")
+    return Source(name=name, kind=kind, roots=tuple(templates.resolve(root) for root in roots),
+                  glob=config_string(item, "glob", "**/*", f"source {name!r}"), description=description)
+
+
+def config_boolean(settings: dict[str, Any], key: str, default: bool, section: str) -> bool:
+    value = settings.get(key, default)
+    if not isinstance(value, bool):
+        raise ValueError(f"{section}.{key} must be a TOML boolean (true or false, without quotes).")
+    return value
+
+
+def config_string(settings: dict[str, Any], key: str, default: str, section: str) -> str:
+    value = settings.get(key, default)
+    if not isinstance(value, str) or not value.strip() or "\x00" in value:
+        raise ValueError(f"{section}.{key} must be a nonempty string.")
+    return value
 
 
 def repo_path(repo_root: Path, raw: str) -> Path:

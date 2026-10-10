@@ -233,8 +233,8 @@ class TestSelectSources:
     def test_unknown_selector_warns(
         self, multi_source_config: ArchiveConfig, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        result = select_sources(multi_source_config, ["does-not-exist"])
-        assert result == []
+        with pytest.raises(ValueError, match="No configured sources matched"):
+            select_sources(multi_source_config, ["does-not-exist"])
         assert "matched no configured source name or kind" in capsys.readouterr().err
 
     def test_filter_by_kind(self, multi_source_config: ArchiveConfig) -> None:
@@ -247,8 +247,8 @@ class TestSelectSources:
         assert len(result) == 2
 
     def test_filter_no_match(self, multi_source_config: ArchiveConfig) -> None:
-        result = select_sources(multi_source_config, ["nonexistent"])
-        assert result == []
+        with pytest.raises(ValueError, match="No configured sources matched"):
+            select_sources(multi_source_config, ["nonexistent"])
 
 
 class TestExportResult:

@@ -45,7 +45,7 @@ def test_router_counts_errors_and_unknown_times(tmp_path: Path) -> None:
     artifact = archive / "routed.md"
     artifact.write_text("## user\nQuestion\n## assistant\nAnswer\n")
     config = ArchiveConfig(tmp_path, archive, tmp_path / "raw", ())
-    record = {"source": "zai", "source_file": "fixture", "messages": 2,
+    record = {"source": "zai", "kind": "copilot_chat", "source_file": "fixture", "messages": 2,
               "markdown": "archive/routed.md", "metadata": {"session_id": "test"}}
     index = archive / ".router-index.jsonl"
     index.write_text(json.dumps(record) + "\n")

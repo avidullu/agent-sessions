@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import gzip
 import hashlib
-import json
 import math
 import zlib
 from collections import Counter
@@ -12,8 +11,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from .archive import read_existing_index_records
+from .archive import merge_index_records, read_existing_index_records, read_router_index_records
 from .backup import compression_mode, object_path, open_object, snapshots
+from .catalog import parse_catalog_lines
+from .collection_health import collection_health
 from .config import ArchiveConfig
 from .utils import canonical_agent
 
@@ -55,30 +56,12 @@ def catalog_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _catalog_rows(obj: Path) -> tuple[list[dict[str, Any]], int, bool]:
     """Keep usable historical rows, including those before a torn catalog tail."""
-    rows = []
-    invalid_lines = 0
-    unreadable = False
     try:
         with open_object(obj) as stream:
-            for line in stream:
-                if not line.strip():
-                    continue
-                try:
-                    row = json.loads(line.decode("utf-8"))
-                except UnicodeDecodeError:
-                    invalid_lines += 1
-                    unreadable = True
-                    continue
-                except ValueError:
-                    invalid_lines += 1
-                    continue
-                if isinstance(row, dict):
-                    rows.append(row)
-                else:
-                    invalid_lines += 1
+            result = parse_catalog_lines(stream, "backup catalog")
     except (OSError, EOFError, zlib.error):
-        unreadable = True
-    return rows, invalid_lines, unreadable
+        return [], 0, True
+    return result.records, result.invalid_rows, result.unreadable or bool(result.encoding_errors)
 
 
 def backup_metrics(root: Path) -> dict[str, Any]:
@@ -169,9 +152,11 @@ def backup_metrics(root: Path) -> dict[str, Any]:
 
 
 def archive_statistics(config: ArchiveConfig, root: Path | None = None) -> dict[str, Any]:
-    rows = read_existing_index_records(config)
+    rows = merge_index_records(read_existing_index_records(config), read_router_index_records(config))
+    health = collection_health(config, rows)
     report: dict[str, Any] = {"schema_version": 1, "catalog": catalog_metrics(rows),
-                              "catalog_scope": "current local catalog"}
+                              "catalog_scope": "current local catalog", "catalog_health": health}
+    report["catalog"]["counts_complete"] = health["counts_complete"]
     available: dict[str, int] = {}
     missing = 0
     for row in rows:
@@ -185,7 +170,8 @@ def archive_statistics(config: ArchiveConfig, root: Path | None = None) -> dict[
     if root is not None:
         report["backup"] = backup_metrics(root)
         if not rows:
-            report["catalog"] = report["backup"]["catalog_history"]
+            report["catalog"] = dict(report["backup"]["catalog_history"])
+            report["catalog"]["counts_complete"] = health["counts_complete"] and report["backup"]["counts_complete"]
             report["catalog_scope"] = "all retained backup catalogs (no local catalog available)"
     return report
 
@@ -202,6 +188,8 @@ def human_bytes(value: int) -> str:
 def render_statistics(report: dict[str, Any]) -> str:
     catalog = report["catalog"]
     lines = ["# Agent session archive statistics", "", f"Catalog scope: {report['catalog_scope']}.", "",
+             "Catalog counts are incomplete; see catalog health diagnostics." if not catalog["counts_complete"]
+             else "Catalog counts cover readable rows; source integrity is not verified.", "",
              f"- Catalog records: **{catalog['catalog_records']:,}**",
              f"- Distinct identified sessions (agent + session ID): **{catalog['distinct_identified_sessions']:,}**",
              f"- Records without session ID: {catalog['records_without_session_id']:,}",

@@ -828,10 +828,10 @@ def main(argv: list[str] | None = None) -> int:
         try:
             config = load_config(repo_root, args.config)
         except (OSError, ValueError) as exc:
-            print(f"Cannot read sources configuration ({type(exc).__name__}). Check --repo-root, --config and TOML syntax.",
-                  file=sys.stderr)
+            detail = str(exc) if isinstance(exc, ValueError) else "Check --repo-root, --config and permissions."
+            print(f"Cannot read sources configuration ({type(exc).__name__}): {detail}", file=sys.stderr)
             return 2
-    if args.cmd in {"backup", "stats"} or (args.cmd == "export" and config.backup_on_export):
+    if args.cmd in {"backup", "stats", "export", "prune", "pdf"}:
         try:
             return int(args.func(config, args))
         except (OSError, ValueError, EOFError, zlib.error) as exc:
