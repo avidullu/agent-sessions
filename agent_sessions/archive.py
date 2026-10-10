@@ -28,7 +28,7 @@ IMPORTED_AT_RE = re.compile(r"^- Imported at: `([^`]+)`$", re.MULTILINE)
 GENERATED_RE = re.compile(r"^Generated: `([^`]+)`$", re.MULTILINE)
 ROUTER_INDEX_FILENAME = ".router-index.jsonl"
 TAIL_HASH_BYTES = 64 * 1024
-EXTRACTOR_REVISION = 1
+EXTRACTOR_REVISION = 2
 
 
 @dataclass(frozen=True)

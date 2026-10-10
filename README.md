@@ -34,7 +34,7 @@ DeepSeek, Grok, and VS Code agents (via the companion
 | Claude Code | Windows, macOS, Linux, WSL | Direct Python importer |
 | Codex CLI | Windows, macOS, Linux | Direct Python importer |
 | Gemini Antigravity | Windows, macOS | Direct Python importer |
-| Grok | WSL, Linux | Direct Python importer |
+| Grok | Windows, macOS, Linux, WSL | Direct Python importer |
 | DeepSeek V4 | VS Code (all platforms) | Direct Python importer |
 | GitHub Copilot Chat | VS Code (all platforms) | [Router extension](https://marketplace.visualstudio.com/items?itemName=avidullu.agent-session-router) |
 | Continue, Cline, Cody, Aider, Tabby | VS Code (all platforms) | [Router extension](https://marketplace.visualstudio.com/items?itemName=avidullu.agent-session-router) |

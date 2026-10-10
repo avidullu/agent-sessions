@@ -107,6 +107,57 @@ def test_export_records_time_without_changing_it_on_reuse(archive_config: Archiv
     assert status_summary(archive_config).collection["last_successful_export"] == first["last_successful_export"]
 
 
+def test_unresolved_wsl_home_template_requires_attention(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """{wsl_home} on a machine with no WSL is unresolved_template, not a missing directory."""
+
+    def no_wsl() -> str:
+        return ""
+
+    monkeypatch.delenv("AGENT_ARCHIVE_WSL_DISTRO", raising=False)
+    monkeypatch.delenv("AGENT_ARCHIVE_WSL_USER", raising=False)
+    monkeypatch.setattr("agent_sessions.path_templates.discover_wsl_distro", no_wsl)
+    local_root = tmp_path / "local-root"
+    local_root.mkdir()
+    (tmp_path / "sources.toml").write_text(
+        "\n".join([
+            "[[sources]]",
+            'name = "grok-wsl"',
+            'kind = "grok"',
+            'roots = ["{wsl_home}/.grok/sessions"]',
+            'glob = "**/chat_history.jsonl"',
+            "",
+            "[[sources]]",
+            'name = "local"',
+            'kind = "claude"',
+            f"roots = [{json.dumps(local_root.as_posix())}]",
+            'glob = "**/*.jsonl"',
+            "",
+        ]),
+        encoding="utf-8",
+    )
+    config = load_config(tmp_path)
+    rendered = next(source for source in config.sources if source.name == "grok-wsl").roots[0]
+    assert "__missing_wsl_home__" in str(rendered)
+    empty = collection_health(config, [])
+    assert empty["sources"]["grok-wsl"] == "unresolved_template"
+    assert empty["sources"]["local"] == "available"
+    assert empty["state"] == "attention_required"
+    assert any("unresolved path template" in problem for problem in empty["problems"])
+
+    archive = tmp_path / "archive"
+    archive.mkdir()
+    (archive / "session.md").write_text("## user\nHi\n", encoding="utf-8")
+    collected = collection_health(config, [{
+        "messages": 1,
+        "markdown": "archive/session.md",
+        "exported_at": "2026-10-10T00:00:00+00:00",
+    }])
+    assert collected["missing_local_artifacts"] == 0
+    assert collected["sessions"] == 1
+    assert collected["sources"]["grok-wsl"] == "unresolved_template"
+    assert collected["state"] == "attention_required"
+
+
 def test_unsupported_feeder_rows_mark_counts_incomplete_without_parse_status(tmp_path: Path) -> None:
     config = ArchiveConfig(tmp_path, tmp_path / "archive", tmp_path / "raw", ())
     health = collection_health(config, [{"messages": 0, "unsupported_rows": 1}])

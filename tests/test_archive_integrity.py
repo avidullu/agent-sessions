@@ -644,4 +644,4 @@ def test_rc1_cached_extraction_is_refreshed_without_source_edits(tmp_path: Path,
     assert not result.unsupported_files
     assert refreshed["metadata"] == expected_metadata
     assert refreshed["parse_status"] == "complete"
-    assert refreshed["extractor_revision"] == 1
+    assert refreshed["extractor_revision"] == 2

@@ -8,11 +8,27 @@ from typing import Any
 
 from .catalog import CATALOG_NAMES, read_catalog
 from .config import ArchiveConfig
+from .models import Source
 from .sources.registry import get_extractor
 
 
 def index_state(path: Path) -> str:
     return read_catalog(path).state
+
+
+def _unresolved_template(root: Path) -> bool:
+    # path_templates renders a missing WSL value as __missing_<name>__ / remainder.
+    return "__missing_" in str(root)
+
+
+def _source_state(source: Source) -> str:
+    if get_extractor(source.kind) is None:
+        return "inventory_only"
+    if any(_unresolved_template(root) for root in source.roots):
+        return "unresolved_template"
+    if not any(root.exists() for root in source.roots):
+        return "roots_missing"
+    return "available"
 
 
 def collection_health(config: ArchiveConfig, records: list[dict[str, Any]]) -> dict[str, Any]:
@@ -26,12 +42,7 @@ def collection_health(config: ArchiveConfig, records: list[dict[str, Any]]) -> d
     export_times: list[dt.datetime] = []
     sources: dict[str, str] = {}
     for source in config.sources:
-        if get_extractor(source.kind) is None:
-            sources[source.name] = "inventory_only"
-        elif not any(root.exists() for root in source.roots):
-            sources[source.name] = "roots_missing"
-        else:
-            sources[source.name] = "available"
+        sources[source.name] = _source_state(source)
     for source in config.disabled_sources:
         sources[source.name] = "router_managed" if source.kind == "router_index" else "disabled"
     for record in records:
@@ -69,7 +80,8 @@ def collection_health(config: ArchiveConfig, records: list[dict[str, Any]]) -> d
                 pass
     catalogs = {name: read_catalog(archive / name) for name in CATALOG_NAMES}
     indexes = {name: catalog.state for name, catalog in catalogs.items()}
-    problems = [f"{name}: {state}" for name, state in indexes.items() if state in {"malformed", "unreadable"}]
+    problems = [f"{name}: unresolved path template" for name, state in sources.items() if state == "unresolved_template"]
+    problems.extend(f"{name}: {state}" for name, state in indexes.items() if state in {"malformed", "unreadable"})
     if missing_artifacts:
         problems.append(f"{missing_artifacts} catalogued Markdown artifacts unavailable in this local archive")
     if partial_parses:

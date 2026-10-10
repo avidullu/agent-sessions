@@ -204,3 +204,25 @@ class TestArchiveConfig:
         assert config.sources == sources
         assert config.write_pdfs is False
         assert config.track_artifacts is False
+
+
+def test_native_grok_source_matches_package_default() -> None:
+    root = Path(__file__).resolve().parents[1]
+    paths = (
+        root / "agent_sessions" / "default_sources.toml",
+        root / "config" / "default_sources.toml",
+        root / "sources.example.toml",
+    )
+    grok_local = []
+    for path in paths:
+        matches = [item for item in read_toml(path)["sources"] if item.get("name") == "grok-local"]
+        assert len(matches) == 1
+        grok_local.append(matches[0])
+    for source in grok_local:
+        assert source["kind"] == "grok"
+        assert source["roots"] == ["{home}/.grok/sessions"]
+        assert source["glob"] == "**/chat_history.jsonl"
+    for path in paths[1:]:
+        names = [item.get("name") for item in read_toml(path)["sources"]]
+        assert "grok-wsl-ubuntu" in names
+        assert names.count("grok-local") == 1

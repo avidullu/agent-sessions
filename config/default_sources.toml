@@ -36,6 +36,13 @@ roots = ["{home}/.gemini/antigravity/brain"]
 glob = "**/transcript*.jsonl"
 
 [[sources]]
+name = "grok-local"
+kind = "grok"
+description = "Grok chat history files in the native home directory."
+roots = ["{home}/.grok/sessions"]
+glob = "**/chat_history.jsonl"
+
+[[sources]]
 name = "grok-wsl-ubuntu"
 kind = "grok"
 description = "Grok chat history files in the default WSL distribution."
