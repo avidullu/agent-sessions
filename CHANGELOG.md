@@ -7,11 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0rc2] — 2026-10-11
+
+Second prerelease candidate; stable release remains 0.3.0. This source prepares
+new artifacts after owner merge and qualification; published rc1 is unchanged.
+
+- Preserve original provider paths when parsing captured bytes, keeping shallow-path
+  identities stable and temporary capture paths out of rendered metadata.
+- Recognize known Codex tool/web-search envelopes without falsely reporting a
+  partial transcript; refresh cached extraction results. Tool-aware Markdown
+  rendering remains deferred.
+- Close the SQLite connection used by the provenance schema-rejection test while
+  preserving its transaction commit, removing the Python 3.13 ResourceWarning.
+
 - Document native Grok as `grok-local` (`{home}/.grok/sessions`, `**/chat_history.jsonl`) in checkout defaults and `sources.example.toml`, beside the existing WSL source.
 - Collection health reports an unresolved path template as `unresolved_template` and requires attention even when other sources have sessions. A missing directory stays `roots_missing`.
 - Grok extraction counts encrypted rows and textless assistant or tool calls as unsupported, so those files export as `partial` instead of `complete`. Cached parses refresh at extractor revision 2.
 
 - Local `efficiency report|render|demo` dashboard joining nullable collection health, opaque exact-checkpoint/package declarations and Bheem plan/workload observations, with no fetch fallback or inferred resource savings.
+
+See [candidate notes](docs/RELEASE_CANDIDATE_0_4_0.md) for the rc2
+qualification/publication procedure and remaining capability limits.
 
 ## [0.4.0rc1] — 2026-10-10
 

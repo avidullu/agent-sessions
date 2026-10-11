@@ -1,6 +1,6 @@
-# Agent Sessions 0.4.0rc1 reliability candidate
+# Agent Sessions 0.4.0rc2 release candidate
 
-Status: IN PROGRESS. Owner: avidullu. Created: 2026-10-10 IST.
+Status: IN PROGRESS. Owner: avidullu. Created: 2026-10-10 IST. Updated: 2026-10-11 IST.
 Lifecycle: DRAFT → IN PROGRESS → DONE → ARCHIVED.
 
 ## Scope and ownership
@@ -8,12 +8,16 @@ Lifecycle: DRAFT → IN PROGRESS → DONE → ARCHIVED.
 This candidate addresses the eleven synthetic reliability failures recorded in
 Forgejo issue #179. Two isolated Codex worktrees split export/source integrity
 and catalog/configuration correctness; the combined candidate is validated as
-one artifact. The candidate is proposed for evaluation, not a stable release.
+one artifact. Their fixes are merged. The rc2 preparation includes the subsequent
+provider-identity/tool-envelope corrections, native Grok collection diagnostics,
+the local Bheem checkpoint/resource dashboard and SQLite test cleanup. The
+candidate is proposed for evaluation, not a stable release.
 
 | Work package | Findings | Acceptance | State |
 | --- | --- | --- | --- |
 | Catalog/configuration | B03, B06, B07, B08, B09 | Damage-preserving write refusal, schema-aware health, strict booleans, alias-safe merges and selector failures | Complete |
 | Export integrity | B01, B02, B04, B05, B10, B12 | Stable byte binding, serialized/atomic writes, collision-safe naming, explicit parse outcomes and read-only dry runs | Complete |
+| rc2 source preparation | Follow-up | Version 0.4.0rc2, updated release notes and explicit SQLite fixture cleanup | Complete |
 | Candidate artifact | BB9 | Green local and exact-head Linux/Windows CI, fresh wheel journey and prerelease artifacts | In progress |
 
 ## Changed behavior
@@ -53,7 +57,8 @@ Build both wheel and sdist, check distribution metadata, install the wheel in a
 fresh workspace outside the checkout, and exercise version/init/export/status,
 partial failures and a tiny synthetic backup/verify/restore roundtrip.
 
-Publish `v0.4.0rc1` as a Forgejo prerelease with the wheel, source distribution,
+After Avi merges the rc2 preparation PR and exact merged-head CI is green,
+publish `v0.4.0rc2` as a Forgejo prerelease with the wheel, source distribution,
 release notes and artifact hashes bound to the validated commit. A publication
 permission failure must be reported; do not switch to Avi's identity. GitHub
 Actions remain disabled. The existing PyPI Trusted Publishing workflow rejects
@@ -63,7 +68,7 @@ To try the downloaded wheel:
 
 ```bash
 python -m venv candidate-env
-candidate-env/bin/python -m pip install /path/to/agent_session_hub-0.4.0rc1-py3-none-any.whl
+candidate-env/bin/python -m pip install /path/to/agent_session_hub-0.4.0rc2-py3-none-any.whl
 candidate-env/bin/agent-archive --version
 ```
 
@@ -76,7 +81,7 @@ additive fields, but their original integrity bugs remain.
 
 ## Acceptance and remaining work
 
-- [ ] Eleven findings have meaningful synthetic regressions and green full gates.
+- [x] Eleven findings have meaningful synthetic regressions and green full gates on merged main.
 - [ ] Exact candidate-head Linux/Windows CI and native PowerShell failure test pass.
 - [ ] Fresh distribution installation, partial-outcome and backup recovery journey pass.
 - [ ] Prerelease artifacts are published and downloaded bytes match the built distributions.
@@ -92,12 +97,15 @@ Changelog: 2026-10-10 IST — reliability candidate implementation split and
 publication contract recorded.
 
 
-## Review follow-up after rc1 publication
+## Historical review follow-up after rc1 publication
 
-The published rc1 artifacts remain bound to their original commit. Review found
+The published rc1 artifacts remain bound to original commit
+`96888d825b759a2165ac449e8a6e9fc2474074d9`. Its tag and assets must not be
+rewritten. rc1 does not include the following corrections; rc2 must be freshly
+built and qualified from the final merged source. Review found
 that shallow source paths could inherit snapshot directory names as provider
 identity, and known Codex web-search/tool envelopes could incorrectly mark an
-otherwise complete transcript partial. The proposed follow-up uses the original
+otherwise complete transcript partial. The merged follow-up uses the original
 source path explicitly for extractor identity while reading captured bytes, and
 recognizes known non-transcript Codex response items. Synthetic regressions cover
 shallow paths, identity stability across edits, and successful CLI exports with
@@ -106,4 +114,26 @@ Earlier content-hashed artifact versions remain retained by design. Old cached
 parser results are re-extracted once via an additive extraction revision.
 
 Changelog: 2026-10-10 IST — PR review identity and tool-envelope corrections
-complete in the proposed source; revised artifact qualification remains pending.
+merged in source; revised artifact qualification remains pending.
+
+## Additional rc2 release notes
+
+- Native Grok is documented consistently in checkout defaults and source examples.
+  Unresolved templates require attention. Encrypted rows and textless tool calls
+  produce explicit partial diagnostics; extractor revision 2 refreshes cached rows.
+- `efficiency report|render|demo` adds a local, private checkpoint/resource view
+  joining collection health with Bheem plans and workload observations. Missing
+  evidence remains unknown or blocked. Package declarations are not proof of
+  package-content verification, no-egress execution or resource savings; production
+  scheduler adoption remains follow-up work. See the
+  [dashboard walkthrough](BHEEM_EFFICIENCY_DASHBOARD.md).
+- The provenance schema-rejection fixture explicitly closes its SQLite connection
+  after committing the test mutation, eliminating its unclosed-connection warning.
+
+Router v1, backup v1 and the additive archive output contract remain compatible.
+No bulk archive rewrite, live scheduler installation or automatic memory promotion
+is part of this preparation. The remaining artifact acceptance items above stay
+open until rc2 is qualified and published. Release notes are not publication proof.
+
+Changelog: 2026-10-11 IST — rc2 version, release notes and SQLite fixture cleanup
+prepared; rc1 preserved and rc2 publication remains pending.
