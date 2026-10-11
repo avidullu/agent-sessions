@@ -9,6 +9,7 @@ import sqlite3
 import stat
 import urllib.error
 from collections.abc import Iterator
+from contextlib import closing
 from email.message import Message
 from pathlib import Path
 from typing import Any
@@ -215,8 +216,9 @@ def test_store_rejects_symlink_and_unknown_schema(tmp_path: Path) -> None:
     with pytest.raises(ProvenanceError, match="non-symlink"):
         Store(link).open()
 
-    with sqlite3.connect(target) as db:
-        db.execute("PRAGMA user_version=99")
+    with closing(sqlite3.connect(target)) as db:
+        with db:
+            db.execute("PRAGMA user_version=99")
     with pytest.raises(ProvenanceError, match="unsupported provenance schema"):
         Store(target).open()
 
