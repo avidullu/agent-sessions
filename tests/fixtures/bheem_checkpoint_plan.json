@@ -1,0 +1,142 @@
+{
+  "schema": "bheem.checkpoint.plan.v1",
+  "now": "2026-10-11T10:30:00Z",
+  "mode": "shadow",
+  "status": "PLANNED",
+  "actions": [
+    {
+      "kind": "supersede",
+      "checkpoint_id": "ff264426a5ea6202423218bc708b6535692560d7dcec495f3d1f59d934ad0506",
+      "identity": {
+        "repository": "example/android-app",
+        "pr_number": 7,
+        "recipe": "android-check",
+        "workflow": "assurance.yml",
+        "source_sha": "1111111111111111111111111111111111111111",
+        "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recipe_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "toolchain_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "dependency_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "configuration_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "required_contexts": [
+          "assurance/android-check"
+        ]
+      },
+      "dispatch_ref": "main",
+      "reason": "newer_observed_intent",
+      "replaces_checkpoint_id": "a4eb68daec283b2c442567de2ed66f94c771ab2d3736a70c5ce05eeca88e834a"
+    },
+    {
+      "kind": "select",
+      "checkpoint_id": "ff264426a5ea6202423218bc708b6535692560d7dcec495f3d1f59d934ad0506",
+      "identity": {
+        "repository": "example/android-app",
+        "pr_number": 7,
+        "recipe": "android-check",
+        "workflow": "assurance.yml",
+        "source_sha": "1111111111111111111111111111111111111111",
+        "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recipe_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "toolchain_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "dependency_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "configuration_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "required_contexts": [
+          "assurance/android-check"
+        ]
+      },
+      "dispatch_ref": "main",
+      "attempt": 1,
+      "idempotency_key": "551aa94ca5b180ecdbc0e3bee231627b3a5c47d0b665fbc0ce264b8ec490d09e",
+      "reason": "checkpoint_due"
+    }
+  ],
+  "state": {
+    "schema": "bheem.checkpoint.state.v1",
+    "updated_at": "2026-10-11T10:30:00Z",
+    "intents": [
+      {
+        "identity": {
+          "repository": "example/android-app",
+          "pr_number": 7,
+          "recipe": "android-check",
+          "workflow": "assurance.yml",
+          "source_sha": "1111111111111111111111111111111111111111",
+          "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "recipe_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "toolchain_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "dependency_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "configuration_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "required_contexts": [
+            "assurance/android-check"
+          ]
+        },
+        "checkpoint_id": "ff264426a5ea6202423218bc708b6535692560d7dcec495f3d1f59d934ad0506",
+        "dispatch_ref": "main",
+        "revision": 2,
+        "observed_at": "2026-10-11T10:29:59Z",
+        "first_requested_at": "2026-10-11T10:00:01Z",
+        "due_at": "2026-10-11T10:30:00Z",
+        "eligible": true,
+        "immediate": false,
+        "observation_flags": {
+          "immediate": false,
+          "retry": false
+        },
+        "retry_revision": 0,
+        "consumed_retry_revision": 0,
+        "work_class": "assurance",
+        "resources": {
+          "cpu_millis": 3000,
+          "memory_bytes": 8589934592,
+          "gradle": true
+        }
+      }
+    ],
+    "attempts": [],
+    "history": [
+      {
+        "at": "2026-10-11T10:30:00Z",
+        "kind": "requested",
+        "identity": {
+          "repository": "example/android-app",
+          "pr_number": 7,
+          "recipe": "android-check",
+          "workflow": "assurance.yml",
+          "source_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "recipe_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "toolchain_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "dependency_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "configuration_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "required_contexts": [
+            "assurance/android-check"
+          ]
+        },
+        "checkpoint_id": "a4eb68daec283b2c442567de2ed66f94c771ab2d3736a70c5ce05eeca88e834a",
+        "revision": 1
+      },
+      {
+        "at": "2026-10-11T10:30:00Z",
+        "kind": "superseded",
+        "identity": {
+          "repository": "example/android-app",
+          "pr_number": 7,
+          "recipe": "android-check",
+          "workflow": "assurance.yml",
+          "source_sha": "1111111111111111111111111111111111111111",
+          "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "recipe_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "toolchain_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "dependency_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "configuration_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "required_contexts": [
+            "assurance/android-check"
+          ]
+        },
+        "checkpoint_id": "ff264426a5ea6202423218bc708b6535692560d7dcec495f3d1f59d934ad0506",
+        "replaces_checkpoint_id": "a4eb68daec283b2c442567de2ed66f94c771ab2d3736a70c5ce05eeca88e834a",
+        "revision": 2
+      }
+    ]
+  }
+}

@@ -1,0 +1,325 @@
+{
+  "schema": "agent-sessions.efficiency-report.v1",
+  "generated_at": "2026-10-11T10:30:00+00:00",
+  "synthetic": true,
+  "collection": {
+    "state": "attention_required",
+    "sessions": 644,
+    "messages": 39578,
+    "counts_complete": false,
+    "invalid_catalog_rows": 2,
+    "sessions_with_partial_parse": 3,
+    "empty_source_files": 1,
+    "sessions_with_unknown_message_count": 4,
+    "local_markdown_bytes": 58720256,
+    "missing_local_artifacts": 2,
+    "last_successful_export": "2026-10-11T10:20:00+00:00",
+    "indexes": {
+      "index.jsonl": "readable",
+      ".router-index.jsonl": "malformed"
+    },
+    "sources": [
+      {
+        "source_id": "source-001",
+        "kind": "codex",
+        "state": "available"
+      },
+      {
+        "source_id": "source-002",
+        "kind": "claude",
+        "state": "available"
+      },
+      {
+        "source_id": "source-003",
+        "kind": "grok",
+        "state": "roots_missing"
+      },
+      {
+        "source_id": "source-004",
+        "kind": "inventory",
+        "state": "inventory_only"
+      }
+    ]
+  },
+  "bindings": [
+    {
+      "session_id": "session-opaque-a",
+      "worktree_id": "worktree-opaque-a",
+      "checkpoint_id": "ff264426a5ea6202423218bc708b6535692560d7dcec495f3d1f59d934ad0506",
+      "identity": {
+        "repository": "example/android-app",
+        "pr_number": 7,
+        "recipe": "android-check",
+        "workflow": "assurance.yml",
+        "source_sha": "1111111111111111111111111111111111111111",
+        "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recipe_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "toolchain_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "dependency_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "configuration_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "required_contexts": [
+          "assurance/android-check"
+        ]
+      },
+      "package": {
+        "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "closure_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+        "cache_digest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "created_at": "2026-10-11T10:00:00Z",
+        "expires_at": "2026-10-11T11:00:00Z",
+        "identity": {
+          "repository": "example/android-app",
+          "pr_number": 7,
+          "recipe": "android-check",
+          "workflow": "assurance.yml",
+          "source_sha": "1111111111111111111111111111111111111111",
+          "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "recipe_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "toolchain_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "dependency_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "configuration_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "required_contexts": [
+            "assurance/android-check"
+          ]
+        },
+        "download_policy": "deny",
+        "evidence_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+      },
+      "state": "declaration_bound",
+      "reasons": [
+        "package_content_unverified",
+        "no_egress_execution_unverified"
+      ]
+    },
+    {
+      "session_id": "session-opaque-b",
+      "worktree_id": "worktree-opaque-b",
+      "checkpoint_id": "eff9f03b21abf131f4a196abc0b4ae1ecab7f2601da7c636889a8f9fdcc22b71",
+      "identity": {
+        "repository": "example/session-hub",
+        "pr_number": 21,
+        "recipe": "python-gates",
+        "workflow": "assurance.yml",
+        "source_sha": "2222222222222222222222222222222222222222",
+        "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recipe_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "toolchain_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "dependency_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "configuration_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "required_contexts": [
+          "assurance/android-check"
+        ]
+      },
+      "package": null,
+      "state": "blocked",
+      "reasons": [
+        "package_metadata_missing",
+        "package_content_unverified",
+        "no_egress_execution_unverified"
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "checkpoint_id": "ff264426a5ea6202423218bc708b6535692560d7dcec495f3d1f59d934ad0506",
+      "identity": {
+        "repository": "example/android-app",
+        "pr_number": 7,
+        "recipe": "android-check",
+        "workflow": "assurance.yml",
+        "source_sha": "1111111111111111111111111111111111111111",
+        "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recipe_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "toolchain_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "dependency_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "configuration_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "required_contexts": [
+          "assurance/android-check"
+        ]
+      },
+      "action": "supersede",
+      "reason": "newer_observed_intent",
+      "observed_at": "2026-10-11T10:30:00Z",
+      "not_before": null,
+      "stale": false
+    },
+    {
+      "checkpoint_id": "ff264426a5ea6202423218bc708b6535692560d7dcec495f3d1f59d934ad0506",
+      "identity": {
+        "repository": "example/android-app",
+        "pr_number": 7,
+        "recipe": "android-check",
+        "workflow": "assurance.yml",
+        "source_sha": "1111111111111111111111111111111111111111",
+        "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recipe_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "toolchain_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "dependency_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "configuration_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "required_contexts": [
+          "assurance/android-check"
+        ]
+      },
+      "action": "select",
+      "reason": "checkpoint_due",
+      "observed_at": "2026-10-11T10:30:00Z",
+      "not_before": null,
+      "stale": false
+    },
+    {
+      "checkpoint_id": "eff9f03b21abf131f4a196abc0b4ae1ecab7f2601da7c636889a8f9fdcc22b71",
+      "identity": {
+        "repository": "example/session-hub",
+        "pr_number": 21,
+        "recipe": "python-gates",
+        "workflow": "assurance.yml",
+        "source_sha": "2222222222222222222222222222222222222222",
+        "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recipe_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "toolchain_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "dependency_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "configuration_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "required_contexts": [
+          "assurance/android-check"
+        ]
+      },
+      "action": "defer",
+      "reason": "checkpoint_not_due",
+      "observed_at": "2026-10-11T10:30:00Z",
+      "not_before": "2026-10-11T11:00:00Z",
+      "stale": false
+    }
+  ],
+  "runs": [
+    {
+      "schema": "bheem.workload-run.v1",
+      "run_id": "sample-check-001",
+      "identity": {
+        "repository": "example/android-app",
+        "source_sha": "1111111111111111111111111111111111111111",
+        "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recipe_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "toolchain_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "dependency_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "configuration_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "pr_number": 7
+      },
+      "machine": {
+        "machine_id": "demo-workstation",
+        "surface_id": "demo-linux",
+        "host_class": "demo-two-core"
+      },
+      "cache": {
+        "state": "warm"
+      },
+      "limits": {
+        "cpu_limit_cores": 2,
+        "memory_limit_bytes": 4294967296,
+        "max_parallelism": 1,
+        "active_workloads": 1
+      },
+      "controls": {
+        "source": "cgroup-v2",
+        "cpu_quota_cores": 2,
+        "cpu_unlimited": false,
+        "memory_max_bytes": 4294967296,
+        "memory_unlimited": false,
+        "omissions": []
+      },
+      "collector": {
+        "source": "bheem-usage",
+        "version": "v1",
+        "scope": "owned-cgroup",
+        "coverage": "complete_boundary",
+        "omissions": []
+      },
+      "timing": {
+        "started_at": "2026-10-11T10:15:00Z",
+        "finished_at": "2026-10-11T10:16:00Z",
+        "wall": {
+          "value": 60,
+          "unit": "s",
+          "quality": "measured",
+          "scope": "owned-cgroup",
+          "reason": ""
+        },
+        "queue": {
+          "value": null,
+          "unit": "s",
+          "quality": "unavailable",
+          "scope": "owned-cgroup",
+          "reason": "queue observer unavailable"
+        },
+        "phases": []
+      },
+      "outcome": {
+        "status": "passed",
+        "exit_code": 0
+      },
+      "tests": {
+        "source": "test-report",
+        "executed": 240,
+        "failed": 0,
+        "skipped": 0,
+        "coverage_percent": 96.7
+      },
+      "metrics": {
+        "cpu": {
+          "value": 84.6,
+          "unit": "CPU-s",
+          "quality": "measured",
+          "scope": "owned-cgroup",
+          "reason": ""
+        },
+        "peak_memory": {
+          "value": 2254857830.4,
+          "unit": "bytes",
+          "quality": "measured",
+          "scope": "owned-cgroup",
+          "reason": ""
+        },
+        "disk_read": {
+          "value": null,
+          "unit": "bytes",
+          "quality": "unavailable",
+          "scope": "owned-cgroup",
+          "reason": "block I/O counter unavailable"
+        },
+        "disk_write": {
+          "value": null,
+          "unit": "bytes",
+          "quality": "unavailable",
+          "scope": "owned-cgroup",
+          "reason": "block I/O counter unavailable"
+        },
+        "network_received": {
+          "value": null,
+          "unit": "bytes",
+          "quality": "unavailable",
+          "scope": "owned-cgroup",
+          "reason": "traffic counter unavailable"
+        },
+        "network_sent": {
+          "value": null,
+          "unit": "bytes",
+          "quality": "unavailable",
+          "scope": "owned-cgroup",
+          "reason": "traffic counter unavailable"
+        }
+      },
+      "network_boundary": {
+        "kind": "isolation",
+        "source": "executor",
+        "version": "v1",
+        "scope": "owned-cgroup",
+        "evidence_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      "reasons": [],
+      "binding_checkpoint_id": "ff264426a5ea6202423218bc708b6535692560d7dcec495f3d1f59d934ad0506"
+    }
+  ],
+  "comparison": {
+    "state": "unavailable",
+    "reason": "no_matched_before_after_comparison_imported"
+  }
+}

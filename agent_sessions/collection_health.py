@@ -6,7 +6,7 @@ import datetime as dt
 from pathlib import Path
 from typing import Any
 
-from .catalog import CATALOG_NAMES, read_catalog
+from .catalog import CATALOG_NAMES, CatalogRead, read_catalog
 from .config import ArchiveConfig
 from .models import Source
 from .sources.registry import get_extractor
@@ -31,7 +31,9 @@ def _source_state(source: Source) -> str:
     return "available"
 
 
-def collection_health(config: ArchiveConfig, records: list[dict[str, Any]]) -> dict[str, Any]:
+def collection_health(
+    config: ArchiveConfig, records: list[dict[str, Any]], *, catalogs: dict[str, CatalogRead] | None = None,
+) -> dict[str, Any]:
     archive = config.archive_dir.resolve()
     total_messages = 0
     unknown_messages = 0
@@ -78,7 +80,8 @@ def collection_health(config: ArchiveConfig, records: list[dict[str, Any]]) -> d
                     export_times.append(timestamp.astimezone(dt.UTC))
             except ValueError:
                 pass
-    catalogs = {name: read_catalog(archive / name) for name in CATALOG_NAMES}
+    if catalogs is None:
+        catalogs = {name: read_catalog(archive / name) for name in CATALOG_NAMES}
     indexes = {name: catalog.state for name, catalog in catalogs.items()}
     problems = [f"{name}: unresolved path template" for name, state in sources.items() if state == "unresolved_template"]
     problems.extend(f"{name}: {state}" for name, state in indexes.items() if state in {"malformed", "unreadable"})

@@ -37,7 +37,7 @@ agent-archive = "agent_sessions.cli:main"
 packages = ["agent_sessions", "agent_sessions.sources"]
 
 [tool.setuptools.package-data]
-agent_sessions = ["default_sources.toml"]
+agent_sessions = ["default_sources.toml", "efficiency_demo.json"]
 
 [project.optional-dependencies]
 # Upper bounds are deliberate. These are gate tools, not libraries: a new major
