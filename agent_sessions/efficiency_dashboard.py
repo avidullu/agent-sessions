@@ -116,7 +116,7 @@ def render(document: dict[str, Any]) -> str:
         )
     actions = (
         "".join(action_rows)
-        or '<tr><td colspan="3">No Bheem plan supplied. Checkpoint activity is unavailable.</td></tr>'
+        or '<tr><td colspan="3">No checkpoint decisions supplied. Checkpoint activity is unavailable in this snapshot.</td></tr>'
     )
     run_rows = []
     for run in report["runs"]:

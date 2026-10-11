@@ -357,7 +357,7 @@ def plan_actions(document: dict[str, Any], now: dt.datetime) -> list[dict[str, A
     _object(document, ("schema", "now", "mode", "status", "actions", "state"))
     if (
         document["schema"] != "bheem.checkpoint.plan.v1"
-        or document["mode"] not in {"disabled", "shadow", "enforce"}
+        or document["mode"] not in {"shadow", "dispatch"}
         or document["status"] != "PLANNED"
     ):
         raise EvidenceRejected("unsupported checkpoint plan")

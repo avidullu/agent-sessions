@@ -137,7 +137,7 @@ traffic counter or a signed receipt.
 The plan adapter projects actions from `bheem.checkpoint.plan.v1`; it does not
 reimplement or validate the selector's entire persistent state machine. Use
 Bheem's selector/validator for that authority. Accepted plans are `PLANNED` in
-`disabled`, `shadow` or `enforce` mode. Future observations are refused and plan
+`shadow` or `dispatch` mode. Future observations are refused and plan
 observations older than 30 minutes are shown as stale. `select`, `defer`,
 `supersede` and `cancel-candidate` retain their actual meanings. Counts apply only
 to the supplied plan; a superseded intent does not prove an avoided build.

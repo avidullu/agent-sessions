@@ -46,6 +46,19 @@ def _set(document: dict[str, Any], path: tuple[str, ...], value: Any) -> None:
     node[path[-1]] = value
 
 
+@pytest.mark.parametrize("mode", ["shadow", "dispatch"])
+def test_actual_selector_modes_and_empty_plan(demo: dict[str, Any], mode: str) -> None:
+    plan = efficiency.load_json(Path(__file__).parent / "fixtures/bheem_checkpoint_plan.json")
+    plan["mode"] = mode
+    assert efficiency.plan_actions(plan, efficiency.timestamp(demo["generated_at"]))
+    plan["actions"] = []
+    assert efficiency.plan_actions(plan, efficiency.timestamp(demo["generated_at"])) == []
+    assert "No checkpoint decisions" in render({**demo, "actions": []})
+    plan["mode"] = "enforce"
+    with pytest.raises(efficiency.EvidenceRejected, match="unsupported checkpoint plan"):
+        efficiency.plan_actions(plan, efficiency.timestamp(demo["generated_at"]))
+
+
 def test_go_plan_and_hash_conformance(demo: dict[str, Any]) -> None:
     plan = efficiency.load_json(Path(__file__).parent / "fixtures/bheem_checkpoint_plan.json")
     now = efficiency.timestamp(demo["generated_at"])
@@ -352,7 +365,11 @@ def test_renderer_escaping_and_honest_unknowns(demo: dict[str, Any]) -> None:
     demo["actions"] = []
     demo["runs"] = []
     report = render(demo)
-    assert "No configured sources" in report and "No Bheem plan" in report and "No workload observations" in report
+    assert (
+        "No configured sources" in report
+        and "No checkpoint decisions" in report
+        and "No workload observations" in report
+    )
 
 
 def test_snapshot_privacy_and_create_only(tmp_path: Path, demo: dict[str, Any]) -> None:
