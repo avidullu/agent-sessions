@@ -1,7 +1,7 @@
 # Durable sessions and owned-model research
 
 > **Status:** IN PROGRESS — project authorized; documentation and first implementation slice in review preparation.
-> **Owner:** avidullu · **Created:** 2026-10-03 · **Updated:** 2026-10-03
+> **Owner:** avidullu · **Created:** 2026-10-03 · **Updated:** 2026-10-11
 > This document owns this project's scope, delivery order, and acceptance criteria.
 > Runtime deployment and research success are separate from merged source code.
 
@@ -185,6 +185,7 @@ silently replace or inherit spend from the earlier four-arm prototype.
 | DR6 | Review-yield study, session copilot | Available retained corpus | 50 reviewed candidates with measured effort and a decision to continue, simplify, or stop | Planned; may run alongside DR1–DR5 |
 | DR7 | Frozen pilot dataset and dry preparation, hub + SFT/ONS | DR6 | Existing admission thresholds, exact token plan, leakage checks, and matched work orders pass locally | Conditional on usable-data yield |
 | DR8 | Bounded training comparison and portability proof | DR7 | Exact data/model/provider and total spend approved; blinded results and independent inference recorded | Requires experiment approval |
+| DR9 | Local checkpoint/resource metadata dashboard, hub + Bheem seam | Current health and Bheem contracts | Nullable collection counts, opaque exact-checkpoint bindings, blocked package declarations, actual plan actions and per-run observations render offline with a synthetic demo | Complete |
 
 Each slice is a small reviewable change. DR1 is based on current main and can be
 prepared independently of the docs PR; it does not imply DR2–DR5 are implemented.
@@ -264,3 +265,7 @@ It is a bounded implementation path alongside the broader
 fleet or synthesis scope. Existing archive output identities remain unchanged.
 The [xdsync boundary](XDSYNC_BOUNDARY.md) remains: archived observations do not
 silently rewrite instructions or durable memory.
+
+## Changelog
+
+- 2026-10-11 — Added DR9, the [offline efficiency dashboard](BHEEM_EFFICIENCY_DASHBOARD.md). This source slice preserves explicit missing evidence and package declarations; executor admission, transport, scheduler cutover and measured savings remain follow-up work.

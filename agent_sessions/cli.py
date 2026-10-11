@@ -40,6 +40,42 @@ def _handle_routine_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_efficiency(args: argparse.Namespace) -> int:
+    from .efficiency import EvidenceRejected, assemble, collection_snapshot, load_json
+    from .efficiency_dashboard import make_server, render, write_snapshot
+
+    try:
+        if args.efficiency_cmd == "demo":
+            report = load_json(Path(__file__).with_name("efficiency_demo.json"))
+        elif args.efficiency_cmd == "render":
+            report = load_json(args.report)
+        else:
+            config = load_config(args.repo_root.expanduser().resolve(), args.config)
+            report = assemble(
+                collection_snapshot(config),
+                bindings=load_json(args.bindings) if args.bindings else None,
+                plan=load_json(args.plan) if args.plan else None,
+                runs=[load_json(path) for path in args.run],
+            )
+        output = write_snapshot(report, args.output)
+        print(f"Private local snapshot: {output / 'index.html'}", flush=True)
+        if args.serve:
+            server = make_server(render(report).encode("utf-8"), args.port)
+            print(f"Local dashboard: http://127.0.0.1:{server.server_port}/", flush=True)
+            print("Ctrl-C stops this foreground server. No scheduler was installed.", flush=True)
+            try:
+                server.serve_forever()
+            except KeyboardInterrupt:
+                pass
+            finally:
+                server.server_close()
+        return 0
+    except (EvidenceRejected, OSError, ValueError):
+        print("Efficiency input/output rejected. Check schemas, metadata bounds and a new output directory; "
+              "existing files are preserved. No input contents are printed.", file=sys.stderr)
+        return 2
+
+
 def _export_summary_lines(
     result: ExportResult,
     *,
@@ -512,6 +548,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_routine_status.add_argument("--json", action="store_true", help="Write the versioned machine contract.")
     p_routine_status.set_defaults(func=_handle_routine_status)
 
+    p_efficiency = sub.add_parser("efficiency", help="Local sanitized collection, Bheem checkpoint and resource dashboard.")
+    efficiency_sub = p_efficiency.add_subparsers(dest="efficiency_cmd", required=True)
+    for operation in ("report", "render", "demo"):
+        child = efficiency_sub.add_parser(operation)
+        child.add_argument("--output", required=True, type=Path, help="New private directory; existing output is refused.")
+        child.add_argument("--serve", action="store_true", help="Foreground loopback HTML-only server.")
+        child.add_argument("--port", type=int, default=0, choices=range(65536), metavar="PORT")
+        child.set_defaults(func=_handle_efficiency)
+        if operation == "report":
+            child.add_argument("--bindings", type=Path, help="Opaque Bheem checkpoint/package binding manifest.")
+            child.add_argument("--plan", type=Path, help="Actual bheem.checkpoint.plan.v1 JSON.")
+            child.add_argument("--run", type=Path, action="append", default=[], help="Bheem workload observation; repeatable.")
+        elif operation == "render":
+            child.add_argument("--report", required=True, type=Path, help="agent-sessions.efficiency-report.v1 JSON.")
+
     p_prune = sub.add_parser("prune", help="Drop index records whose archive Markdown is missing on disk.")
     p_prune.add_argument("--dry-run", action="store_true", help="Report what would be pruned without writing.")
     p_prune.set_defaults(func=_handle_prune)
@@ -814,6 +865,8 @@ def main(argv: list[str] | None = None) -> int:
         print("Next: review sources.toml, then run agent-archive discover and agent-archive status from this workspace.")
         print("No sessions exported or uploaded. Local files are ignored by Git; existing tracked files stay tracked.")
         return 0
+    if args.cmd == "efficiency":
+        return _handle_efficiency(args)
     if args.cmd == "copilot":
         return int(args.func(args))
     if args.cmd in {"provenance", "routine"}:

@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Collection health reports an unresolved path template as `unresolved_template` and requires attention even when other sources have sessions. A missing directory stays `roots_missing`.
 - Grok extraction counts encrypted rows and textless assistant or tool calls as unsupported, so those files export as `partial` instead of `complete`. Cached parses refresh at extractor revision 2.
 
+## Unreleased
+
+### Added
+
+- Local `efficiency report|render|demo` dashboard joining nullable collection health, opaque exact-checkpoint/package declarations and Bheem plan/workload observations, with no fetch fallback or inferred resource savings.
+
 ## [0.4.0rc1] — 2026-10-10
 
 Reliability prerelease candidate; stable release remains 0.3.0.

@@ -22,6 +22,8 @@ DeepSeek, Grok, and VS Code agents (via the companion
 > **Where is this going?** → [Product direction and code map](docs/PRODUCT_DIRECTION.md)\
 > **Want to contribute?** → [CONTRIBUTING.md](CONTRIBUTING.md)
 
+See the [local Bheem efficiency dashboard](docs/BHEEM_EFFICIENCY_DASHBOARD.md) for sanitized collection health, checkpoint/package declarations and per-run resource observations.
+
 ## Supported Agents
 
 > **Note:** This tool has been manually tested on **Windows, WSL, and Ubuntu**. macOS
