@@ -39,4 +39,4 @@ types-reportlab==4.5.1.20260712
 coverage==7.15.2
 iniconfig==2.3.0
 packaging==26.2
-pluggy==1.6.0
+pluggy==1.7.0
