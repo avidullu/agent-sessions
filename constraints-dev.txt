@@ -29,7 +29,7 @@
 # clean, mypy clean, coverage 96.61%.
 
 mypy==2.3.0
-pytest==9.1.1
+pytest==9.2.0
 pytest-cov==7.1.0
 reportlab==5.0.0
 ruff==0.15.22
